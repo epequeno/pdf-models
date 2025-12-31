@@ -1,0 +1,4 @@
+#!/bin/sh
+# Placeholder bootstrap - actual binary will be built by CodeBuild
+echo "This is a placeholder. Build the lambda with: make lambda-build"
+exit 1

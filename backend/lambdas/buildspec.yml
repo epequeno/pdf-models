@@ -1,0 +1,35 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      rust: 1.83
+    commands:
+      # Install cargo-lambda for building Lambda functions
+      - pip3 install cargo-lambda
+
+  build:
+    commands:
+      - echo "Building Rust Lambda functions..."
+      - cd backend/lambdas
+
+      # Build submit-job Lambda
+      - echo "Building submit-job Lambda..."
+      - cd submit-job
+      - cargo lambda build --release --arm64
+      - cd ..
+
+      # Build get-job Lambda
+      - echo "Building get-job Lambda..."
+      - cd get-job
+      - cargo lambda build --release --arm64
+      - cd ..
+
+      - echo "Lambda builds complete"
+
+artifacts:
+  files:
+    # Include the bootstrap binaries from cargo-lambda output
+    - backend/lambdas/submit-job/target/lambda/submit-job/bootstrap
+    - backend/lambdas/get-job/target/lambda/get-job/bootstrap
+  name: rust-lambda-builds

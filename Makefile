@@ -1,4 +1,4 @@
-.PHONY: help test test-watch cdk-synth cdk-diff cdk-deploy cdk-destroy aws-logs aws-s3-ls container-build setup
+.PHONY: help test test-watch cdk-synth cdk-diff cdk-deploy cdk-destroy aws-logs aws-s3-ls container-build lambda-build setup
 
 # AWS Profile to use for all commands
 AWS_PROFILE := arch
@@ -22,8 +22,9 @@ help:
 	@echo "  make aws-s3-ls                     - List S3 buckets"
 	@echo "  make aws-stepfunctions-list        - List Step Functions state machines"
 	@echo ""
-	@echo "Container Commands:"
+	@echo "Build Commands:"
 	@echo "  make container-build MODEL=<name>  - Build and push container (runs in CodeBuild)"
+	@echo "  make lambda-build                  - Build Rust Lambda functions (runs in CodeBuild)"
 	@echo ""
 	@echo "Stack Deployment Order:"
 	@echo "  1. make cdk-deploy STACK=FoundationStack"
@@ -99,6 +100,13 @@ container-build:
 	@echo "Note: This triggers the CodeBuild project, it does not build locally."
 	AWS_PROFILE=arch aws codebuild start-build \
 		--project-name pdf-models-$(MODEL)-container-build
+
+# Lambda Build Commands (triggers CodeBuild)
+lambda-build:
+	@echo "Triggering CodeBuild for Rust Lambda functions with AWS_PROFILE=arch..."
+	@echo "Note: This triggers the CodeBuild project, it does not build locally."
+	AWS_PROFILE=arch aws codebuild start-build \
+		--project-name pdf-models-rust-lambda-build
 
 # Development setup
 setup:

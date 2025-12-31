@@ -1,7 +1,7 @@
 """
-CI/CD Stack for container builds.
+CI/CD Stack for container and Lambda builds.
 
-This stack creates CodeBuild projects for building and pushing container images to ECR.
+This stack creates CodeBuild projects for building container images and Rust Lambda functions.
 Separated from other stacks as CI/CD has different lifecycle and change frequency.
 """
 
@@ -10,6 +10,7 @@ from aws_cdk import (
     aws_codecommit as codecommit,
     aws_codebuild as codebuild,
     aws_iam as iam,
+    aws_s3 as s3,
     aws_ssm as ssm,
 )
 from constructs import Construct
@@ -18,12 +19,13 @@ from backend.stack_config import CONFIG
 
 
 class CiCdStack(Stack):
-    """CI/CD infrastructure for container builds.
+    """CI/CD infrastructure for container and Lambda builds.
 
     Creates:
     - CodeCommit repository for source code
     - CodeBuild project for Marker container
-    - IAM role with ECR push permissions
+    - CodeBuild project for Rust Lambda functions
+    - IAM roles with appropriate permissions
     """
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
@@ -107,4 +109,46 @@ class CiCdStack(Stack):
                     f"arn:aws:ecr:{self.region}:{self.account}:repository/{CONFIG.ECR_MARKER_REPO_NAME}"
                 ],
             )
+        )
+
+        # Get S3 bucket name from SSM and import bucket
+        s3_bucket_name = ssm.StringParameter.value_for_string_parameter(
+            self, CONFIG.SSM_S3_BUCKET_NAME
+        )
+        artifacts_bucket = s3.Bucket.from_bucket_name(
+            self,
+            "S3BucketForArtifacts",
+            s3_bucket_name,
+        )
+
+        # Create CodeBuild project for Rust Lambda functions
+        lambda_build = codebuild.Project(
+            self,
+            "RustLambdaBuild",
+            project_name=f"{CONFIG.PROJECT_NAME}-rust-lambda-build",
+            description="Build Rust Lambda functions for API",
+            source=codebuild.Source.code_commit(
+                repository=repo,
+                branch_or_ref="main",
+            ),
+            environment=codebuild.BuildEnvironment(
+                build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
+                compute_type=codebuild.ComputeType.SMALL,
+            ),
+            build_spec=codebuild.BuildSpec.from_source_filename("backend/lambdas/buildspec.yml"),
+            artifacts=codebuild.Artifacts.s3(
+                bucket=artifacts_bucket,
+                include_build_id=True,
+                package_zip=True,
+                name="rust-lambda-builds.zip",
+            ),
+        )
+
+        # Export CodeBuild project name to SSM for easy reference
+        ssm.StringParameter(
+            self,
+            "RustLambdaBuildProject",
+            parameter_name="/pdf-models/cicd/rust-lambda-build-project",
+            string_value=lambda_build.project_name,
+            description="CodeBuild project name for Rust Lambda builds",
         )

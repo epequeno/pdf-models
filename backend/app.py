@@ -9,6 +9,8 @@ import aws_cdk as cdk
 from backend.foundation_stack import FoundationStack
 from backend.core_infrastructure_stack import CoreInfrastructureStack
 from backend.cicd_stack import CiCdStack
+from backend.marker_stack import MarkerStack
+from backend.api_stack import ApiStack
 
 
 app = cdk.App()
@@ -36,8 +38,25 @@ cicd_stack = CiCdStack(
     description="CI/CD: CodeCommit repository and CodeBuild for container builds",
 )
 
+# Stack 4: Marker Processing (ECS cluster, Fargate task, Step Functions)
+# Depends on: Foundation (ECR), Core (S3, DynamoDB)
+marker_stack = MarkerStack(
+    app,
+    "MarkerStack",
+    description="Marker processing: ECS cluster, Fargate task definition, Step Functions orchestration",
+)
+
+# Stack 5: API (API Gateway, Lambda functions, Cognito authorizer)
+# Depends on: Core (Cognito, DynamoDB), Marker (Step Functions)
+api_stack = ApiStack(
+    app,
+    "ApiStack",
+    description="API Gateway with Cognito authorization and Lambda functions for job management",
+)
+
 # Note: Foundation and Core are independent in Phase 1
 # CiCdStack reads ECR URI from Foundation via SSM
-# Later phases (MarkerStack, ApiStack) will depend on both Foundation and Core
+# MarkerStack reads from Foundation (ECR) and Core (S3, DynamoDB) via SSM
+# ApiStack reads from Core (Cognito, DynamoDB) and Marker (Step Functions) via SSM
 
 app.synth()
