@@ -17,6 +17,10 @@ phases:
       - echo "Building Rust Lambda functions..."
       - cd backend/lambdas
 
+      # Disable pyenv to avoid conflicts with cargo-lambda
+      - unset PYENV_VERSION
+      - export PYENV_VERSION=
+
       # Build submit-job Lambda
       - echo "Building submit-job Lambda..."
       - cd submit-job
