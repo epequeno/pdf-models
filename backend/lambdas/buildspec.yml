@@ -3,13 +3,13 @@ version: 0.2
 phases:
   install:
     commands:
-      # Install Rust toolchain
-      - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.83
+      # Install Rust toolchain (1.85 for cargo-lambda compatibility)
+      - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.85
       - . "$HOME/.cargo/env"
       - rustup target add aarch64-unknown-linux-gnu
 
-      # Install cargo-lambda via cargo (use 1.6.3 which supports Rust 1.80+)
-      - cargo install cargo-lambda --version 1.6.3
+      # Install cargo-lambda via cargo
+      - cargo install cargo-lambda
 
   build:
     commands:
