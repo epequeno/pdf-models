@@ -5,7 +5,7 @@ phases:
     commands:
       # Install Rust toolchain
       - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.83
-      - source "$HOME/.cargo/env"
+      - . "$HOME/.cargo/env"
       - rustup target add aarch64-unknown-linux-gnu
 
       # Install cargo-lambda for building Lambda functions
@@ -13,7 +13,7 @@ phases:
 
   build:
     commands:
-      - source "$HOME/.cargo/env"
+      - . "$HOME/.cargo/env"
       - echo "Building Rust Lambda functions..."
       - cd backend/lambdas
 
