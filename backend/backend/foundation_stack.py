@@ -1,0 +1,89 @@
+"""
+FoundationStack: Rarely-changing infrastructure.
+
+Resources:
+- ECR repositories for container images
+- (Future) Route53 hosted zone for custom domain
+- (Future) ACM certificate for HTTPS
+
+Change Frequency: Rare
+Replaceability: Hard (especially DNS/certs)
+"""
+
+from aws_cdk import (
+    Stack,
+    RemovalPolicy,
+    Tags,
+    aws_ecr as ecr,
+    aws_ssm as ssm,
+)
+from constructs import Construct
+
+from .stack_config import CONFIG
+
+
+class FoundationStack(Stack):
+    """Foundation infrastructure stack.
+
+    This stack contains long-lived resources that rarely change:
+    - ECR repositories for model container images
+    - (Future) DNS and SSL/TLS certificates
+
+    All resources export their identifiers to SSM Parameter Store
+    for loose coupling with dependent stacks.
+    """
+
+    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+        super().__init__(scope, construct_id, **kwargs)
+
+        # ECR Repository for Marker container
+        marker_repo = ecr.Repository(
+            self,
+            "MarkerEcrRepo",
+            repository_name=CONFIG.ECR_MARKER_REPO_NAME,
+            # MVP: Allow deletion of repository
+            removal_policy=RemovalPolicy.DESTROY,
+            # Automatically empty repository before deletion (prevents failure)
+            empty_on_delete=True,
+            # Security: Scan images on push for vulnerabilities
+            image_scan_on_push=True,
+            # Lifecycle: Keep only last 5 images to control costs
+            lifecycle_rules=[
+                ecr.LifecycleRule(
+                    description="Keep last 5 images only",
+                    max_image_count=5,
+                    rule_priority=1,
+                )
+            ],
+        )
+
+        # Export ECR URI to SSM Parameter Store
+        ssm.StringParameter(
+            self,
+            "MarkerEcrUriParam",
+            parameter_name=CONFIG.SSM_ECR_MARKER_URI,
+            string_value=marker_repo.repository_uri,
+            description="ECR repository URI for Marker container",
+        )
+
+        # Tags for cost tracking and organization
+        Tags.of(self).add("Project", CONFIG.PROJECT_NAME)
+        Tags.of(self).add("Stack", "Foundation")
+        Tags.of(self).add("Environment", "dev")
+
+        # FUTURE: Route53 and ACM will go here
+        # Deferred until custom domain is needed for production
+        # API Gateway provides default HTTPS endpoints for MVP
+        #
+        # Example (when ready):
+        # hosted_zone = route53.HostedZone(
+        #     self, "HostedZone",
+        #     zone_name="pdf-models.example.com",
+        # )
+        # certificate = acm.Certificate(
+        #     self, "Certificate",
+        #     domain_name="pdf-models.example.com",
+        #     validation=acm.CertificateValidation.from_dns(hosted_zone),
+        # )
+        # ssm.StringParameter(..., CONFIG.SSM_HOSTED_ZONE_ID, hosted_zone.zone_id)
+        # ssm.StringParameter(..., CONFIG.SSM_CERTIFICATE_ARN, certificate.arn)

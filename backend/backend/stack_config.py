@@ -1,0 +1,53 @@
+"""
+Centralized configuration for all CDK stacks.
+
+CRITICAL: This file contains NO hardcoded account IDs or regions.
+Account and region are determined by AWS_PROFILE at deployment time.
+"""
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class StackConfig:
+    """Centralized configuration for all CDK stacks.
+
+    This configuration is environment-agnostic. Account ID and region
+    are determined by AWS_PROFILE and accessed via CDK's Aws.ACCOUNT_ID
+    and Aws.REGION pseudo-parameters where needed.
+    """
+
+    # Project naming
+    PROJECT_NAME: str = "pdf-models"
+
+    # SSM Parameter Names - Foundation
+    SSM_ECR_MARKER_URI: str = "/pdf-models/foundation/ecr-repo-uri-marker"
+    SSM_HOSTED_ZONE_ID: str = "/pdf-models/foundation/hosted-zone-id"
+    SSM_CERTIFICATE_ARN: str = "/pdf-models/foundation/certificate-arn"
+
+    # SSM Parameter Names - Core
+    SSM_S3_BUCKET_NAME: str = "/pdf-models/core/s3-bucket-name"
+    SSM_DYNAMODB_TABLE_NAME: str = "/pdf-models/core/dynamodb-table-name"
+    SSM_COGNITO_USER_POOL_ID: str = "/pdf-models/core/cognito-user-pool-id"
+    SSM_COGNITO_IDENTITY_POOL_ID: str = "/pdf-models/core/cognito-identity-pool-id"
+    SSM_COGNITO_USER_POOL_CLIENT_ID: str = "/pdf-models/core/cognito-user-pool-client-id"
+
+    # Resource Names (base names, account-specific suffixes added in stacks)
+    ECR_MARKER_REPO_NAME: str = "pdf-models/marker"
+    S3_BUCKET_NAME_PREFIX: str = "pdf-models-docs"  # Actual name will be: {prefix}-{account-id}
+    DYNAMODB_TABLE_NAME: str = "pdf-models-jobs"
+    COGNITO_USER_POOL_NAME: str = "pdf-models-users"
+    COGNITO_IDENTITY_POOL_NAME: str = "pdf-models-identity-pool"
+
+    # S3 Configuration
+    S3_EXPIRATION_DAYS: int = 7
+
+    # DynamoDB Schema
+    DYNAMODB_PK: str = "job_id"
+    DYNAMODB_GSI_NAME: str = "user_id-created_at-index"
+    DYNAMODB_GSI_PK: str = "user_id"
+    DYNAMODB_GSI_SK: str = "created_at"
+
+
+# Single instance to import across stacks
+CONFIG = StackConfig()
