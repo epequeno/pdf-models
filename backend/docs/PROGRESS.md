@@ -533,21 +533,91 @@ make aws-stepfunctions-list                           # List state machines
   - **CRITICAL ISSUE**: Build takes ~28 minutes total (20min install Rust+cargo-lambda, 8min build)
   - **DECISION**: Implement custom Docker base image with Rust+cargo-lambda pre-installed
 
-- **NEXT STEPS** (Session 5):
-  1. Create custom Docker base image for Rust Lambda builds:
-     - Create backend/containers/rust-lambda-builder/Dockerfile
-     - Pre-install Rust 1.88, aarch64 target, cargo-lambda
-     - Create buildspec.yml for building the base image
-  2. Add BaseImageBuild CodeBuild project to CiCdStack:
-     - Build Dockerfile and push to ECR (one-time ~30min build)
-     - Export ECR image URI via SSM parameter
-  3. Update RustLambdaBuild CodeBuild project:
-     - Use custom image instead of aws/codebuild/standard:7.0
-     - Remove install phase (Rust already installed in image)
-     - Should reduce build time from 28min → ~2min
-  4. Fix get-job Lambda Rust compilation errors:
-     - Lines 132, 133, 134, 136: Replace .unwrap_or("") with .map_or("", |v| v)
-     - Rust 1.88 requires exact type matching for unwrap_or
-  5. Build Lambdas via CodeBuild (should be fast with custom image)
-  6. Deploy ApiStack to AWS
-  7. Validate all API resources
+### Session 5: Rust Lambda Builder Base Image (IN PROGRESS)
+**Date**: 2026-01-01
+**Agent**: Claude Sonnet 4.5
+**Summary**:
+- Implemented custom Docker base image to eliminate 28-minute Rust installation overhead
+- Fixed Rust 1.88 compilation errors in get-job Lambda
+- Deployed infrastructure changes (FoundationStack, CiCdStack)
+- Triggered base image build (Build #1) - currently in progress
+
+**Files Created**:
+1. **`backend/containers/rust-lambda-builder/Dockerfile`**
+   - Ubuntu 22.04 base image
+   - Pre-installs Rust 1.88 stable toolchain
+   - Pre-installs cargo-lambda 1.6.3
+   - Adds aarch64-unknown-linux-gnu target
+   - Verifies installations in build
+
+2. **`backend/containers/rust-lambda-builder/buildspec.yml`**
+   - Builds Dockerfile and pushes to ECR
+   - Tags with both commit SHA and "latest"
+   - ~30 minute build time (one-time cost)
+
+**Files Modified**:
+1. **`backend/backend/stack_config.py`**
+   - Added `SSM_ECR_RUST_LAMBDA_BUILDER_URI` constant
+   - Added `ECR_RUST_LAMBDA_BUILDER_REPO_NAME` constant
+
+2. **`backend/backend/foundation_stack.py`**
+   - Added ECR repository for rust-lambda-builder image
+   - Added SSM parameter export for builder image URI
+   - Lifecycle policy: keep last 3 images
+
+3. **`backend/backend/cicd_stack.py`**
+   - Added `BaseImageBuild` CodeBuild project (MEDIUM compute, 60min timeout)
+   - Updated `RustLambdaBuild` to use custom ECR image instead of standard:7.0
+   - Added SSM parameter export for base image build project name
+   - Granted ECR push permissions to BaseImageBuild role
+
+4. **`backend/lambdas/buildspec.yml`**
+   - **REMOVED** entire install phase (Rust pre-installed in base image)
+   - **REMOVED** pyenv PATH manipulation (clean Ubuntu environment)
+   - Build phase now just runs cargo-lambda commands
+   - Build time reduced from ~28min → ~2min (estimated)
+
+5. **`backend/lambdas/get-job/src/main.rs`**
+   - Fixed lines 132, 133, 134, 136: `.unwrap_or("")` → `.map_or("", |v| v)`
+   - Rust 1.88 requires exact type matching for unwrap_or with references
+
+6. **`backend/tests/unit/test_foundation_stack.py`**
+   - Updated to expect 2 ECR repositories (was 1)
+   - Added assertions for rust-lambda-builder SSM parameter
+
+7. **`Makefile`**
+   - Added `base-image-build` command to trigger base image build via CodeBuild
+   - Updated help text with new command
+
+**Test Results**:
+```
+34 passed in 2.40s
+```
+
+All tests passing including updated FoundationStack tests.
+
+**Deployment Results**:
+- **FoundationStack**: Updated successfully
+  - New ECR repository: `496830984285.dkr.ecr.us-east-1.amazonaws.com/pdf-models/rust-lambda-builder`
+  - New SSM parameter: `/pdf-models/foundation/ecr-repo-uri-rust-lambda-builder`
+
+- **CiCdStack**: Updated successfully
+  - New CodeBuild project: `pdf-models-rust-lambda-builder-build`
+  - New SSM parameter: `/pdf-models/cicd/base-image-build-project`
+  - Updated RustLambdaBuild to use custom base image
+
+**Code Pushed to CodeCommit**: ✅
+- Commit: `f134553` - "Add Rust Lambda builder base image for faster Lambda builds"
+
+**Base Image Build Status**: IN PROGRESS
+- Build ID: `pdf-models-rust-lambda-builder-build:562a123a-bf74-4c46-a7d5-7a4fed788efe`
+- Started: 2026-01-01 5:37 PM
+- Expected duration: ~30 minutes
+- Status: Building Rust 1.88 + cargo-lambda Docker image
+
+**NEXT STEPS** (Session 6 - after base image completes):
+1. Verify base image build succeeded
+2. Build Rust Lambdas via CodeBuild: `make lambda-build` (~2min with new base image)
+3. Deploy ApiStack to AWS: `make cdk-deploy STACK=ApiStack`
+4. Validate API endpoints (POST/GET jobs)
+5. End-to-end testing with Cognito authentication

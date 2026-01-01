@@ -1,4 +1,4 @@
-.PHONY: help test test-watch cdk-synth cdk-diff cdk-deploy cdk-destroy aws-logs aws-s3-ls container-build lambda-build setup
+.PHONY: help test test-watch cdk-synth cdk-diff cdk-deploy cdk-destroy aws-logs aws-s3-ls container-build base-image-build lambda-build setup
 
 # AWS Profile to use for all commands
 AWS_PROFILE := arch
@@ -23,6 +23,7 @@ help:
 	@echo "  make aws-stepfunctions-list        - List Step Functions state machines"
 	@echo ""
 	@echo "Build Commands:"
+	@echo "  make base-image-build              - Build Rust Lambda builder base image (runs in CodeBuild)"
 	@echo "  make container-build MODEL=<name>  - Build and push container (runs in CodeBuild)"
 	@echo "  make lambda-build                  - Build Rust Lambda functions (runs in CodeBuild)"
 	@echo ""
@@ -100,6 +101,13 @@ container-build:
 	@echo "Note: This triggers the CodeBuild project, it does not build locally."
 	AWS_PROFILE=arch aws codebuild start-build \
 		--project-name pdf-models-$(MODEL)-container-build
+
+# Base Image Build (triggers CodeBuild) - run once to build Rust Lambda builder image
+base-image-build:
+	@echo "Triggering CodeBuild for Rust Lambda builder base image with AWS_PROFILE=arch..."
+	@echo "Note: This is a one-time build that takes ~30 minutes. Subsequent Lambda builds will be fast."
+	AWS_PROFILE=arch aws codebuild start-build \
+		--project-name pdf-models-rust-lambda-builder-build
 
 # Lambda Build Commands (triggers CodeBuild)
 lambda-build:

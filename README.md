@@ -69,19 +69,29 @@ See [Architecture Documentation](backend/docs/architecture.md) for detailed setu
 ## Current Status
 
 - [x] Architecture designed and documented
-- [x] Phase 1: Core Infrastructure - **IMPLEMENTATION COMPLETE, READY FOR DEPLOYMENT**
-  - [x] FoundationStack implemented (ECR repository)
-  - [x] CoreInfrastructureStack implemented (S3, DynamoDB, Cognito)
-  - [x] Unit tests written and passing (14/14 tests)
-  - [x] Makefile updated with test commands
-  - [ ] FoundationStack deployed to AWS
-  - [ ] CoreInfrastructureStack deployed to AWS
-- [ ] Phase 2: Marker model integration
-- [ ] Phase 3: API Layer
-- [ ] Phase 4: CI/CD automation
+- [x] Phase 1: Core Infrastructure - **DEPLOYED** ✅
+  - [x] FoundationStack (ECR repositories)
+  - [x] CoreInfrastructureStack (S3, DynamoDB, Cognito)
+  - [x] All resources validated in AWS
+- [x] Phase 1.5: CI/CD Infrastructure - **DEPLOYED** ✅
+  - [x] CiCdStack (CodeCommit, CodeBuild)
+  - [x] Custom Rust Lambda builder base image (in progress)
+- [x] Phase 2: Marker Model - **DEPLOYED** ✅
+  - [x] MarkerStack (ECS, Fargate, Step Functions)
+  - [x] Marker container built and pushed to ECR
+  - [x] VPC with NAT gateways
+- [x] Phase 3: API Layer - **IN PROGRESS** 🚧
+  - [x] Rust Lambda functions written (submit-job, get-job)
+  - [x] ApiStack CDK code complete
+  - [x] All 34 unit tests passing
+  - [ ] Rust Lambda builder base image building (~30min)
+  - [ ] Rust Lambdas built via CodeBuild
+  - [ ] ApiStack deployed to AWS
 
-**Resume Point**: Phase 1 code is complete. Next step is deployment:
+**Resume Point**: Base image build in progress. Once complete:
 ```bash
-make cdk-deploy STACK=FoundationStack
-make cdk-deploy STACK=CoreInfrastructureStack
+make lambda-build                    # Build Rust Lambdas (~2min)
+make cdk-deploy STACK=ApiStack       # Deploy API
 ```
+
+See [backend/docs/PROGRESS.md](backend/docs/PROGRESS.md) for detailed session notes.
