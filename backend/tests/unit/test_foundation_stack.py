@@ -13,14 +13,22 @@ def test_foundation_stack_synthesizes():
     stack = FoundationStack(app, "TestFoundationStack")
     template = Template.from_stack(stack)
 
-    # Assert ECR repository exists
-    template.resource_count_is("AWS::ECR::Repository", 1)
+    # Assert both ECR repositories exist (Marker + Rust Lambda Builder)
+    template.resource_count_is("AWS::ECR::Repository", 2)
 
-    # Assert SSM parameter created for ECR URI
+    # Assert SSM parameters created for both ECR URIs
     template.has_resource_properties(
         "AWS::SSM::Parameter",
         {
             "Name": CONFIG.SSM_ECR_MARKER_URI,
+            "Type": "String",
+        },
+    )
+
+    template.has_resource_properties(
+        "AWS::SSM::Parameter",
+        {
+            "Name": CONFIG.SSM_ECR_RUST_LAMBDA_BUILDER_URI,
             "Type": "String",
         },
     )
@@ -74,8 +82,8 @@ def test_stack_has_correct_tags():
     stack = FoundationStack(app, "TestFoundationStack")
     template = Template.from_stack(stack)
 
-    # Stack should have resources (ECR repo)
-    template.resource_count_is("AWS::ECR::Repository", 1)
+    # Stack should have resources (both ECR repos)
+    template.resource_count_is("AWS::ECR::Repository", 2)
 
     # Tags are applied at stack level via Tags.of(self)
     # CDK applies these to all taggable resources

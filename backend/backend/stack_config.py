@@ -22,6 +22,7 @@ class StackConfig:
 
     # SSM Parameter Names - Foundation
     SSM_ECR_MARKER_URI: str = "/pdf-models/foundation/ecr-repo-uri-marker"
+    SSM_ECR_RUST_LAMBDA_BUILDER_URI: str = "/pdf-models/foundation/ecr-repo-uri-rust-lambda-builder"
     SSM_HOSTED_ZONE_ID: str = "/pdf-models/foundation/hosted-zone-id"
     SSM_CERTIFICATE_ARN: str = "/pdf-models/foundation/certificate-arn"
 
@@ -34,6 +35,7 @@ class StackConfig:
 
     # Resource Names (base names, account-specific suffixes added in stacks)
     ECR_MARKER_REPO_NAME: str = "pdf-models/marker"
+    ECR_RUST_LAMBDA_BUILDER_REPO_NAME: str = "pdf-models/rust-lambda-builder"
     S3_BUCKET_NAME_PREFIX: str = "pdf-models-docs"  # Actual name will be: {prefix}-{account-id}
     DYNAMODB_TABLE_NAME: str = "pdf-models-jobs"
     COGNITO_USER_POOL_NAME: str = "pdf-models-users"

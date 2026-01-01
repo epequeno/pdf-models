@@ -1,0 +1,23 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO_URI
+      - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:-latest}
+      - echo "Building image with tag $IMAGE_TAG"
+
+  build:
+    commands:
+      - echo Building Rust Lambda builder base image...
+      - cd backend/containers/rust-lambda-builder
+      - docker build -t $ECR_REPO_URI:$IMAGE_TAG .
+      - docker tag $ECR_REPO_URI:$IMAGE_TAG $ECR_REPO_URI:latest
+
+  post_build:
+    commands:
+      - echo Pushing image to ECR...
+      - docker push $ECR_REPO_URI:$IMAGE_TAG
+      - docker push $ECR_REPO_URI:latest
+      - echo Build completed on `date`

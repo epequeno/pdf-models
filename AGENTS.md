@@ -43,7 +43,7 @@ pip install boto3
 ```bash
 uv run python -m pytest
 uv run cdk synth
-uv pip install boto3
+uv add boto3
 ```
 
 **Why**: `uv` manages the virtual environment and dependencies. Bare commands won't have access to installed packages.

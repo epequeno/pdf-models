@@ -7,8 +7,10 @@ Separated from other stacks as CI/CD has different lifecycle and change frequenc
 
 from aws_cdk import (
     Stack,
+    Duration,
     aws_codecommit as codecommit,
     aws_codebuild as codebuild,
+    aws_ecr as ecr,
     aws_iam as iam,
     aws_s3 as s3,
     aws_ssm as ssm,
@@ -56,9 +58,72 @@ class CiCdStack(Stack):
             description="CodeCommit repository SSH clone URL",
         )
 
-        # Get ECR repository URI from SSM (created by FoundationStack)
-        ecr_repo_uri = ssm.StringParameter.value_for_string_parameter(
+        # Get ECR repository URIs from SSM (created by FoundationStack)
+        ecr_marker_uri = ssm.StringParameter.value_for_string_parameter(
             self, CONFIG.SSM_ECR_MARKER_URI
+        )
+        ecr_rust_builder_uri = ssm.StringParameter.value_for_string_parameter(
+            self, CONFIG.SSM_ECR_RUST_LAMBDA_BUILDER_URI
+        )
+
+        # Create CodeBuild project for Rust Lambda builder base image
+        base_image_build = codebuild.Project(
+            self,
+            "BaseImageBuild",
+            project_name=f"{CONFIG.PROJECT_NAME}-rust-lambda-builder-build",
+            description="Build Rust Lambda builder base image with pre-installed Rust and cargo-lambda",
+            source=codebuild.Source.code_commit(
+                repository=repo,
+                branch_or_ref="main",
+            ),
+            environment=codebuild.BuildEnvironment(
+                build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
+                privileged=True,  # Required for Docker builds
+                compute_type=codebuild.ComputeType.MEDIUM,  # Medium for longer build
+                environment_variables={
+                    "ECR_REPO_URI": codebuild.BuildEnvironmentVariable(value=ecr_rust_builder_uri),
+                }
+            ),
+            build_spec=codebuild.BuildSpec.from_source_filename(
+                "backend/containers/rust-lambda-builder/buildspec.yml"
+            ),
+            timeout=Duration.minutes(60),  # Allow up to 60 minutes for base image build
+        )
+
+        # Grant ECR permissions to base image build
+        base_image_build.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["ecr:GetAuthorizationToken"],
+                resources=["*"],
+            )
+        )
+
+        base_image_build.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "ecr:BatchCheckLayerAvailability",
+                    "ecr:GetDownloadUrlForLayer",
+                    "ecr:BatchGetImage",
+                    "ecr:PutImage",
+                    "ecr:InitiateLayerUpload",
+                    "ecr:UploadLayerPart",
+                    "ecr:CompleteLayerUpload",
+                ],
+                resources=[
+                    f"arn:aws:ecr:{self.region}:{self.account}:repository/{CONFIG.ECR_RUST_LAMBDA_BUILDER_REPO_NAME}"
+                ],
+            )
+        )
+
+        # Export base image build project name to SSM
+        ssm.StringParameter(
+            self,
+            "BaseImageBuildProject",
+            parameter_name="/pdf-models/cicd/base-image-build-project",
+            string_value=base_image_build.project_name,
+            description="CodeBuild project name for Rust Lambda builder base image",
         )
 
         # Create CodeBuild project for Marker container
@@ -76,7 +141,7 @@ class CiCdStack(Stack):
                 privileged=True,  # Required for Docker builds
                 compute_type=codebuild.ComputeType.SMALL,
                 environment_variables={
-                    "ECR_REPOSITORY_URI": codebuild.BuildEnvironmentVariable(value=ecr_repo_uri),
+                    "ECR_REPOSITORY_URI": codebuild.BuildEnvironmentVariable(value=ecr_marker_uri),
                 }
             ),
             build_spec=codebuild.BuildSpec.from_source_filename("backend/containers/marker/buildspec.yml"),
@@ -132,7 +197,13 @@ class CiCdStack(Stack):
                 branch_or_ref="main",
             ),
             environment=codebuild.BuildEnvironment(
-                build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
+                build_image=codebuild.LinuxBuildImage.from_ecr_repository(
+                    repository=ecr.Repository.from_repository_name(
+                        self,
+                        "RustBuilderRepo",
+                        CONFIG.ECR_RUST_LAMBDA_BUILDER_REPO_NAME,
+                    )
+                ),
                 compute_type=codebuild.ComputeType.SMALL,
             ),
             build_spec=codebuild.BuildSpec.from_source_filename("backend/lambdas/buildspec.yml"),

@@ -66,6 +66,32 @@ class FoundationStack(Stack):
             description="ECR repository URI for Marker container",
         )
 
+        # ECR Repository for Rust Lambda builder base image
+        rust_builder_repo = ecr.Repository(
+            self,
+            "RustLambdaBuilderEcrRepo",
+            repository_name=CONFIG.ECR_RUST_LAMBDA_BUILDER_REPO_NAME,
+            removal_policy=RemovalPolicy.DESTROY,
+            empty_on_delete=True,
+            image_scan_on_push=True,
+            lifecycle_rules=[
+                ecr.LifecycleRule(
+                    description="Keep last 3 images only",
+                    max_image_count=3,
+                    rule_priority=1,
+                )
+            ],
+        )
+
+        # Export ECR URI to SSM Parameter Store
+        ssm.StringParameter(
+            self,
+            "RustLambdaBuilderEcrUriParam",
+            parameter_name=CONFIG.SSM_ECR_RUST_LAMBDA_BUILDER_URI,
+            string_value=rust_builder_repo.repository_uri,
+            description="ECR repository URI for Rust Lambda builder base image",
+        )
+
         # Tags for cost tracking and organization
         Tags.of(self).add("Project", CONFIG.PROJECT_NAME)
         Tags.of(self).add("Stack", "Foundation")

@@ -129,11 +129,11 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
                 let job = JobResponse {
                     job_id: job_id.clone(),
                     user_id: job_user_id.to_string(),
-                    model: item.get("model").and_then(|v| v.as_s().ok()).unwrap_or("").to_string(),
-                    status: item.get("status").and_then(|v| v.as_s().ok()).unwrap_or("unknown").to_string(),
-                    s3_input_key: item.get("s3_input_key").and_then(|v| v.as_s().ok()).unwrap_or("").to_string(),
+                    model: item.get("model").and_then(|v| v.as_s().ok()).map_or("", |v| v).to_string(),
+                    status: item.get("status").and_then(|v| v.as_s().ok()).map_or("unknown", |v| v).to_string(),
+                    s3_input_key: item.get("s3_input_key").and_then(|v| v.as_s().ok()).map_or("", |v| v).to_string(),
                     s3_result_key: item.get("s3_result_key").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
-                    created_at: item.get("created_at").and_then(|v| v.as_s().ok()).unwrap_or("").to_string(),
+                    created_at: item.get("created_at").and_then(|v| v.as_s().ok()).map_or("", |v| v).to_string(),
                     completed_at: item.get("completed_at").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
                     error: item.get("error").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
                 };

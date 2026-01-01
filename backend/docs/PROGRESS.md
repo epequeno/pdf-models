@@ -518,10 +518,36 @@ make aws-stepfunctions-list                           # List state machines
   - Created placeholder bootstrap files to enable CDK synthesis before actual builds
   - Wrote 11 comprehensive unit tests in backend/tests/unit/test_api_stack.py
   - All 34 tests passing (11 ApiStack + 23 existing)
-- **NEXT STEPS**:
-  1. ~~Add CodeBuild project to CiCdStack for building Rust Lambdas~~ ✅
-  2. ~~Complete ApiStack CDK implementation with correct Lambda asset paths~~ ✅
-  3. ~~Write unit tests for ApiStack~~ ✅
-  4. Deploy CiCdStack updates to AWS (RustLambdaBuild project)
-  5. Build Lambdas via CodeBuild (replace placeholder bootstrap files)
+- **CiCdStack Deployment** ✅:
+  - Deployed updated CiCdStack with RustLambdaBuild project successfully
+- **Lambda Build Challenges**:
+  - Initial buildspec.yml had multiple issues requiring 10 iterations:
+    1. CodeBuild standard:7.0 doesn't support rust in runtime-versions → manual rustup install
+    2. source command not available in /bin/sh → use . instead
+    3. pyenv conflicts from backend/.python-version → remove pyenv from PATH
+    4. pip3 install cargo-lambda didn't work without pyenv → use cargo install
+    5. cargo-lambda 1.6.3 requires edition2024 feature → upgrade to Rust 1.85
+    6. AWS SDK dependencies require Rust 1.88 → upgrade to Rust 1.88
+  - Successfully got through INSTALL phase (~20 min) and BUILD phase
+  - Build failed due to Rust 1.88 compiler being stricter about .unwrap_or() with string references
+  - **CRITICAL ISSUE**: Build takes ~28 minutes total (20min install Rust+cargo-lambda, 8min build)
+  - **DECISION**: Implement custom Docker base image with Rust+cargo-lambda pre-installed
+
+- **NEXT STEPS** (Session 5):
+  1. Create custom Docker base image for Rust Lambda builds:
+     - Create backend/containers/rust-lambda-builder/Dockerfile
+     - Pre-install Rust 1.88, aarch64 target, cargo-lambda
+     - Create buildspec.yml for building the base image
+  2. Add BaseImageBuild CodeBuild project to CiCdStack:
+     - Build Dockerfile and push to ECR (one-time ~30min build)
+     - Export ECR image URI via SSM parameter
+  3. Update RustLambdaBuild CodeBuild project:
+     - Use custom image instead of aws/codebuild/standard:7.0
+     - Remove install phase (Rust already installed in image)
+     - Should reduce build time from 28min → ~2min
+  4. Fix get-job Lambda Rust compilation errors:
+     - Lines 132, 133, 134, 136: Replace .unwrap_or("") with .map_or("", |v| v)
+     - Rust 1.88 requires exact type matching for unwrap_or
+  5. Build Lambdas via CodeBuild (should be fast with custom image)
   6. Deploy ApiStack to AWS
+  7. Validate all API resources

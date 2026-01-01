@@ -1,26 +1,10 @@
 version: 0.2
 
 phases:
-  install:
-    commands:
-      # Install Rust toolchain (1.88 for cargo-lambda compatibility)
-      - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88
-      - . "$HOME/.cargo/env"
-      - rustup target add aarch64-unknown-linux-gnu
-
-      # Install cargo-lambda via cargo
-      - cargo install cargo-lambda
-
   build:
     commands:
-      - . "$HOME/.cargo/env"
       - echo "Building Rust Lambda functions..."
       - cd backend/lambdas
-
-      # Disable pyenv completely to avoid conflicts with cargo-lambda
-      - export PATH=$(echo $PATH | tr ':' '\n' | grep -v pyenv | tr '\n' ':' | sed 's/:$//')
-      - unset PYENV_VERSION
-      - unset PYENV_ROOT
 
       # Build submit-job Lambda
       - echo "Building submit-job Lambda..."
