@@ -23,8 +23,8 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --de
 # Add aarch64 target for ARM Lambda builds
 RUN rustup target add aarch64-unknown-linux-gnu
 
-# Install cargo-lambda
-RUN cargo install cargo-lambda --version 1.6.3
+# Install cargo-lambda (latest version compatible with Rust 1.88)
+RUN cargo install cargo-lambda
 
 # Verify installations
 RUN rustc --version && \
