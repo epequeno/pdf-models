@@ -5,6 +5,7 @@ use chrono::Utc;
 use lambda_runtime::{service_fn, Error, LambdaEvent};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::env;
 use tracing::info;
 use uuid::Uuid;
@@ -25,12 +26,17 @@ struct PathParameters {
 
 #[derive(Deserialize)]
 struct RequestContext {
-    authorizer: Authorizer,
+    #[serde(rename = "requestId")]
+    request_id: String,
+    authorizer: Option<Authorizer>,
 }
 
 #[derive(Deserialize)]
 struct Authorizer {
-    claims: Claims,
+    claims: Option<Claims>,
+    // Handle different possible structures
+    #[serde(flatten)]
+    extra: std::collections::HashMap<String, serde_json::Value>,
 }
 
 #[derive(Deserialize)]
@@ -93,7 +99,26 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
     }
 
     // Extract user ID from Cognito claims
-    let user_id = &request.request_context.authorizer.claims.sub;
+    let user_id = match &request.request_context.authorizer {
+        Some(authorizer) => match &authorizer.claims {
+            Some(claims) => &claims.sub,
+            None => {
+                // Try to extract from other possible locations
+                if let Some(sub) = authorizer.extra.get("sub") {
+                    if let Some(sub_str) = sub.as_str() {
+                        sub_str
+                    } else {
+                        return Ok(Response::error(401, "Invalid user ID in authorizer context"));
+                    }
+                } else {
+                    return Ok(Response::error(401, "No user ID found in authorizer context"));
+                }
+            }
+        },
+        None => {
+            return Ok(Response::error(401, "No authorizer context found"));
+        }
+    };
 
     // Parse request body
     let body: SubmitJobBody = match request.body {
