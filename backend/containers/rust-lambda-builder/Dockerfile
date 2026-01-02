@@ -10,7 +10,16 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     ca-certificates \
     git \
+    wget \
+    xz-utils \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Zig 0.13.0 (required by cargo-lambda for ARM64 cross-compilation)
+ENV ZIG_VERSION=0.13.0
+RUN wget -q https://ziglang.org/download/${ZIG_VERSION}/zig-linux-x86_64-${ZIG_VERSION}.tar.xz \
+    && tar -xf zig-linux-x86_64-${ZIG_VERSION}.tar.xz -C /usr/local \
+    && rm zig-linux-x86_64-${ZIG_VERSION}.tar.xz \
+    && ln -s /usr/local/zig-linux-x86_64-${ZIG_VERSION}/zig /usr/local/bin/zig
 
 # Install Rust 1.88 (stable channel)
 ENV RUSTUP_HOME=/usr/local/rustup \
@@ -29,7 +38,8 @@ RUN cargo install cargo-lambda
 # Verify installations
 RUN rustc --version && \
     cargo --version && \
-    cargo lambda --version
+    cargo lambda --version && \
+    zig version
 
 # Set working directory
 WORKDIR /workspace
