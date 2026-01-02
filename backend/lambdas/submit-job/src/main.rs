@@ -7,7 +7,6 @@ use chrono::Utc;
 use lambda_runtime::{service_fn, Error, LambdaEvent};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashMap;
 use std::env;
 use std::time::Duration;
 use tracing::info;
@@ -142,7 +141,7 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
     };
 
     // Determine S3 input key and job ID
-    let (job_id, s3_input_key) = match body.s3_input_key {
+    let (job_id, s3_input_key) = match &body.s3_input_key {
         Some(provided_key) => {
             // Validate that the provided S3 key matches the user's identity prefix
             if !provided_key.starts_with(&format!("{}/", user_id)) {
@@ -156,7 +155,7 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
             }
             
             let job_id = key_parts[1].trim_end_matches(".pdf").to_string();
-            (job_id, provided_key)
+            (job_id, provided_key.clone())
         }
         None => {
             // Generate new job ID and S3 key (for pre-signed URL workflow)
