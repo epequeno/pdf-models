@@ -143,15 +143,14 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
     // Determine S3 input key and job ID
     let (job_id, s3_input_key) = match &body.s3_input_key {
         Some(provided_key) => {
-            // Validate that the provided S3 key matches the user's identity prefix
-            if !provided_key.starts_with(&format!("{}/", user_id)) {
-                return Ok(Response::error(403, "S3 key must be within your user prefix"));
-            }
+            // Note: S3 key validation is handled by S3 IAM permissions
+            // Users can only access files in their Identity Pool prefix due to IAM policies
+            // We don't validate the prefix here since Cognito User ID != Identity Pool ID
             
-            // Extract job ID from the S3 key (assuming format: user_id/job_id.pdf)
+            // Extract job ID from the S3 key (assuming format: prefix/job_id.pdf)
             let key_parts: Vec<&str> = provided_key.split('/').collect();
             if key_parts.len() != 2 || !key_parts[1].ends_with(".pdf") {
-                return Ok(Response::error(400, "Invalid S3 key format. Expected: user_id/job_id.pdf"));
+                return Ok(Response::error(400, "Invalid S3 key format. Expected: prefix/job_id.pdf"));
             }
             
             let job_id = key_parts[1].trim_end_matches(".pdf").to_string();

@@ -189,7 +189,6 @@ class TestMarkerEndToEnd:
         assert "404" in str(exc_info.value), "Expected 404 for non-existent job"
         print(f"    ✓ Got expected 404 error")
 
-    @pytest.mark.skip(reason="S3 key validation not yet implemented in Lambda")
     def test_invalid_s3_key_rejected(
         self,
         config,
