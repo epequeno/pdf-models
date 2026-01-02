@@ -29,7 +29,7 @@ RUN cargo install cargo-lambda
 # Verify installations
 RUN rustc --version && \
     cargo --version && \
-    cargo-lambda --version
+    cargo lambda --version
 
 # Set working directory
 WORKDIR /workspace
