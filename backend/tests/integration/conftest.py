@@ -11,18 +11,64 @@ from pathlib import Path
 from typing import Dict, Optional
 
 
-# Test configuration - can be overridden with environment variables
-TEST_CONFIG = {
-    "region": os.getenv("AWS_REGION", "us-east-1"),
-    "user_pool_id": os.getenv("COGNITO_USER_POOL_ID", "us-east-1_wslqPOxQd"),
-    "client_id": os.getenv("COGNITO_CLIENT_ID", "4tmf8s58738hrbrp4ff2utqg5"),
-    "identity_pool_id": os.getenv("COGNITO_IDENTITY_POOL_ID", "us-east-1:ea186bba-83ba-467a-be54-550f7fed870a"),
-    "api_base_url": os.getenv("API_BASE_URL", "https://gh0j9u3bx5.execute-api.us-east-1.amazonaws.com/v1"),
-    "s3_bucket": os.getenv("S3_BUCKET", "pdf-models-docs-496830984285"),
-    "dynamodb_table": os.getenv("DYNAMODB_TABLE", "pdf-models-jobs"),
-    "test_email": os.getenv("TEST_USER_EMAIL"),
-    "test_password": os.getenv("TEST_USER_PASSWORD"),
-}
+def _get_ssm_parameter(parameter_name: str, region: str = "us-east-1") -> Optional[str]:
+    """
+    Fetch a parameter from SSM Parameter Store.
+
+    Returns None if the parameter doesn't exist or if there's an error.
+    """
+    try:
+        # Use AWS_PROFILE environment variable if set (for integration tests)
+        profile_name = os.getenv("AWS_PROFILE")
+        if profile_name:
+            import boto3.session
+            session = boto3.session.Session(profile_name=profile_name)
+            ssm = session.client("ssm", region_name=region)
+        else:
+            ssm = boto3.client("ssm", region_name=region)
+
+        response = ssm.get_parameter(Name=parameter_name)
+        return response["Parameter"]["Value"]
+    except Exception as e:
+        print(f"Warning: Could not fetch SSM parameter {parameter_name}: {e}")
+        return None
+
+
+def _load_config() -> Dict[str, Optional[str]]:
+    """
+    Load test configuration from environment variables or SSM Parameter Store.
+
+    Priority:
+    1. Environment variables (if explicitly set)
+    2. SSM Parameter Store (deployed infrastructure values)
+    3. None (will cause test to fail with clear error message)
+    """
+    region = os.getenv("AWS_REGION", "us-east-1")
+
+    # Fetch from SSM if not provided via environment
+    api_base_url = os.getenv("API_BASE_URL") or _get_ssm_parameter("/pdf-models/api-v2/endpoint", region)
+
+    # API v2 endpoint needs /v1 appended (routes are defined with /v1 prefix)
+    if api_base_url and not api_base_url.endswith("/v1"):
+        api_base_url = f"{api_base_url.rstrip('/')}/v1"
+
+    config = {
+        "region": region,
+        "user_pool_id": os.getenv("COGNITO_USER_POOL_ID") or _get_ssm_parameter("/pdf-models/core/cognito-user-pool-id", region),
+        "client_id": os.getenv("COGNITO_CLIENT_ID") or _get_ssm_parameter("/pdf-models/core/cognito-user-pool-client-id", region),
+        "identity_pool_id": os.getenv("COGNITO_IDENTITY_POOL_ID") or _get_ssm_parameter("/pdf-models/core/cognito-identity-pool-id", region),
+        "api_base_url": api_base_url,
+        "s3_bucket": os.getenv("S3_BUCKET") or _get_ssm_parameter("/pdf-models/core/s3-bucket-name", region),
+        "dynamodb_table": os.getenv("DYNAMODB_TABLE") or _get_ssm_parameter("/pdf-models/core/dynamodb-table-name", region),
+        "test_email": os.getenv("TEST_USER_EMAIL"),
+        "test_password": os.getenv("TEST_USER_PASSWORD"),
+    }
+
+    return config
+
+
+# Test configuration - loaded once when module is imported
+TEST_CONFIG = _load_config()
 
 
 @pytest.fixture(scope="session")

@@ -61,7 +61,7 @@ test-integration:
 		echo "Run 'make test-integration-setup' first to create a test user."; \
 		exit 1; \
 	fi
-	cd backend && uv run pytest tests/integration/ -v -s
+	cd backend && AWS_PROFILE=arch uv run pytest tests/integration/ -v -s
 
 test-integration-setup:
 	@echo "Creating Cognito test user for integration tests..."
@@ -73,7 +73,7 @@ test-integration-auto:
 	@echo "Using default test credentials..."
 	cd backend && AWS_PROFILE=arch uv run python tests/integration/setup_test_user.py "integration-test@pdf-models.local" "TestPass123!"
 	@echo "Running integration tests..."
-	cd backend && TEST_USER_EMAIL="integration-test@pdf-models.local" TEST_USER_PASSWORD="TestPass123!" uv run pytest tests/integration/ -v -s
+	cd backend && AWS_PROFILE=arch TEST_USER_EMAIL="integration-test@pdf-models.local" TEST_USER_PASSWORD="TestPass123!" uv run pytest tests/integration/ -v -s
 
 test-integration-debug:
 	@echo "Debugging Cognito authentication and API access..."

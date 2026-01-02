@@ -32,14 +32,16 @@ struct RequestContext {
 }
 
 #[derive(Deserialize)]
-struct Authorizer {
-    // REST API format
-    claims: Option<Claims>,
-    // HTTP API v2 format - JWT claims are at top level
-    jwt: Option<JwtAuthorizer>,
-    // Handle different possible structures
-    #[serde(flatten)]
-    extra: std::collections::HashMap<String, serde_json::Value>,
+#[serde(untagged)]
+enum Authorizer {
+    // REST API v1 format: claims at top level
+    RestApi {
+        claims: Claims,
+    },
+    // HTTP API v2 format: JWT with nested claims
+    HttpApiV2 {
+        jwt: JwtAuthorizer,
+    },
 }
 
 #[derive(Deserialize)]
@@ -106,26 +108,8 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
 
     // Extract user ID from Cognito claims (supports both REST API and HTTP API v2 formats)
     let user_id = match &request.request_context.authorizer {
-        Some(authorizer) => {
-            // Try REST API format first
-            if let Some(claims) = &authorizer.claims {
-                &claims.sub
-            }
-            // Try HTTP API v2 format
-            else if let Some(jwt) = &authorizer.jwt {
-                &jwt.claims.sub
-            }
-            // Try to extract from extra fields
-            else if let Some(sub) = authorizer.extra.get("sub") {
-                if let Some(sub_str) = sub.as_str() {
-                    sub_str
-                } else {
-                    return Ok(Response::error(401, "Invalid user ID in authorizer context"));
-                }
-            } else {
-                return Ok(Response::error(401, "No user ID found in authorizer context"));
-            }
-        },
+        Some(Authorizer::RestApi { claims }) => &claims.sub,
+        Some(Authorizer::HttpApiV2 { jwt }) => &jwt.claims.sub,
         None => {
             return Ok(Response::error(401, "No authorizer context found"));
         }
