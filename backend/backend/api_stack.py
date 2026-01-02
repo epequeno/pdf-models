@@ -163,8 +163,9 @@ class ApiStack(Stack):
             description="PDF Models API for job submission and status queries",
             deploy_options=apigw.StageOptions(
                 stage_name="v1",
-                logging_level=apigw.MethodLoggingLevel.INFO,
-                data_trace_enabled=True,
+                # Logging disabled - requires CloudWatch Logs role ARN in account settings
+                # logging_level=apigw.MethodLoggingLevel.INFO,
+                # data_trace_enabled=True,
                 metrics_enabled=True,
             ),
             default_cors_preflight_options=apigw.CorsOptions(

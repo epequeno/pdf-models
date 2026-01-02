@@ -533,27 +533,30 @@ make aws-stepfunctions-list                           # List state machines
   - **CRITICAL ISSUE**: Build takes ~28 minutes total (20min install Rust+cargo-lambda, 8min build)
   - **DECISION**: Implement custom Docker base image with Rust+cargo-lambda pre-installed
 
-### Session 5: Rust Lambda Builder Base Image (IN PROGRESS)
+### Session 5: Rust Lambda Builder Base Image & ApiStack Deployment - COMPLETE ✅
 **Date**: 2026-01-01
 **Agent**: Claude Sonnet 4.5
 **Summary**:
 - Implemented custom Docker base image to eliminate 28-minute Rust installation overhead
 - Fixed Rust 1.88 compilation errors in get-job Lambda
 - Deployed infrastructure changes (FoundationStack, CiCdStack)
-- Triggered base image build (Build #1) - currently in progress
+- Troubleshot and fixed multiple base image build failures
+- Successfully built Rust Lambda functions
+- Deployed ApiStack to AWS with REST API Gateway and Cognito authorization
 
 **Files Created**:
 1. **`backend/containers/rust-lambda-builder/Dockerfile`**
    - Ubuntu 22.04 base image
    - Pre-installs Rust 1.88 stable toolchain
-   - Pre-installs cargo-lambda 1.6.3
+   - Pre-installs cargo-lambda (latest version, compatible with Rust 1.88)
+   - Pre-installs Zig 0.13.0 (required for ARM64 cross-compilation)
    - Adds aarch64-unknown-linux-gnu target
    - Verifies installations in build
 
 2. **`backend/containers/rust-lambda-builder/buildspec.yml`**
    - Builds Dockerfile and pushes to ECR
    - Tags with both commit SHA and "latest"
-   - ~30 minute build time (one-time cost)
+   - ~11 minute build time (one-time cost)
 
 **Files Modified**:
 1. **`backend/backend/stack_config.py`**
@@ -575,17 +578,22 @@ make aws-stepfunctions-list                           # List state machines
    - **REMOVED** entire install phase (Rust pre-installed in base image)
    - **REMOVED** pyenv PATH manipulation (clean Ubuntu environment)
    - Build phase now just runs cargo-lambda commands
-   - Build time reduced from ~28min → ~2min (estimated)
+   - Build time reduced from ~28min → ~10min (compiling AWS SDK dependencies)
 
-5. **`backend/lambdas/get-job/src/main.rs`**
+5. **`backend/backend/api_stack.py`**
+   - Disabled API Gateway logging (requires CloudWatch Logs role ARN in account settings)
+   - Commented out `logging_level` and `data_trace_enabled` options
+   - Kept `metrics_enabled=True`
+
+6. **`backend/lambdas/get-job/src/main.rs`**
    - Fixed lines 132, 133, 134, 136: `.unwrap_or("")` → `.map_or("", |v| v)`
    - Rust 1.88 requires exact type matching for unwrap_or with references
 
-6. **`backend/tests/unit/test_foundation_stack.py`**
+7. **`backend/tests/unit/test_foundation_stack.py`**
    - Updated to expect 2 ECR repositories (was 1)
    - Added assertions for rust-lambda-builder SSM parameter
 
-7. **`Makefile`**
+8. **`Makefile`**
    - Added `base-image-build` command to trigger base image build via CodeBuild
    - Updated help text with new command
 
@@ -606,18 +614,68 @@ All tests passing including updated FoundationStack tests.
   - New SSM parameter: `/pdf-models/cicd/base-image-build-project`
   - Updated RustLambdaBuild to use custom base image
 
-**Code Pushed to CodeCommit**: ✅
-- Commit: `f134553` - "Add Rust Lambda builder base image for faster Lambda builds"
+**Build Troubleshooting Journey**:
+1. **Build #1 (562a123a)** - FAILED
+   - Issue: cargo-lambda 1.6.3 incompatible with Rust 1.88
+   - Fix: Removed version pin, install latest cargo-lambda
 
-**Base Image Build Status**: IN PROGRESS
-- Build ID: `pdf-models-rust-lambda-builder-build:562a123a-bf74-4c46-a7d5-7a4fed788efe`
-- Started: 2026-01-01 5:37 PM
-- Expected duration: ~30 minutes
-- Status: Building Rust 1.88 + cargo-lambda Docker image
+2. **Build #2 (bd7248cb)** - FAILED
+   - Issue: Verification command `cargo-lambda --version` incorrect
+   - Fix: Changed to `cargo lambda --version` (subcommand syntax)
 
-**NEXT STEPS** (Session 6 - after base image completes):
-1. Verify base image build succeeded
-2. Build Rust Lambdas via CodeBuild: `make lambda-build` (~2min with new base image)
-3. Deploy ApiStack to AWS: `make cdk-deploy STACK=ApiStack`
-4. Validate API endpoints (POST/GET jobs)
-5. End-to-end testing with Cognito authentication
+3. **Build #3 (d8faf24a)** - SUCCEEDED ✅
+   - Successfully built base image with Rust 1.88 + cargo-lambda 1.8.6
+   - Duration: ~11 minutes
+
+4. **Lambda Build #11 (41dcf1fe)** - FAILED
+   - Issue: Zig not installed (required for ARM64 cross-compilation)
+   - Fix: Added Zig 0.13.0 installation to Dockerfile
+
+5. **Build #4 (33bf678b)** - SUCCEEDED ✅
+   - Successfully built base image with Rust 1.88 + cargo-lambda 1.8.6 + Zig 0.13.0
+   - Duration: ~11 minutes
+
+6. **Lambda Build #12 (f90aeef2)** - SUCCEEDED ✅
+   - Successfully built both Rust Lambda functions (submit-job, get-job)
+   - ARM64 binaries (~7MB total)
+   - Duration: ~10 minutes
+
+**Deployment Results**:
+- **FoundationStack**: Updated successfully
+  - New ECR repository: `496830984285.dkr.ecr.us-east-1.amazonaws.com/pdf-models/rust-lambda-builder`
+  - New SSM parameter: `/pdf-models/foundation/ecr-repo-uri-rust-lambda-builder`
+
+- **CiCdStack**: Updated successfully
+  - New CodeBuild project: `pdf-models-rust-lambda-builder-build`
+  - New SSM parameter: `/pdf-models/cicd/base-image-build-project`
+  - Updated RustLambdaBuild to use custom base image
+
+- **ApiStack**: Deployed successfully ✅
+  - API Endpoint: `https://ivd1t6g04g.execute-api.us-east-1.amazonaws.com/v1/`
+  - Lambda Functions: `pdf-models-submit-job`, `pdf-models-get-job` (ARM64, 256MB, 30s timeout)
+  - API Routes: POST/GET /v1/models/{model}/jobs, GET /v1/models/{model}/jobs/{job_id}
+  - Cognito User Pool Authorizer configured
+  - SSM Parameters: `/pdf-models/api/endpoint`, `/pdf-models/api/id`
+
+**Code Commits**:
+- `f134553` - Add Rust Lambda builder base image for faster Lambda builds
+- `24e0d13` - Fix Dockerfile: use latest cargo-lambda for Rust 1.88 compatibility
+- `b9d3369` - Fix Dockerfile: correct cargo-lambda verification command
+- `956049c` - Add Zig to rust-lambda-builder base image
+
+**What's Ready**:
+- [x] Base image built and pushed to ECR
+- [x] Rust Lambdas built and deployed
+- [x] ApiStack deployed with REST API Gateway
+- [x] All 3 API routes configured with Cognito authorization
+- [x] All tests passing (34 tests)
+
+**Known Issues / Notes**:
+- API Gateway logging disabled (requires CloudWatch Logs role ARN configuration in AWS account settings)
+- Lambda build time ~10 minutes (compiling AWS SDK dependencies from scratch)
+- Future optimization: Use cargo caching in CodeBuild to speed up subsequent builds
+
+**Next Steps**:
+- Create Cognito test user for API testing
+- End-to-end testing of job submission and retrieval
+- Verify Step Functions integration with MarkerStack
