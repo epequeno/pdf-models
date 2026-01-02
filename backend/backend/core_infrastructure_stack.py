@@ -86,8 +86,9 @@ class CoreInfrastructureStack(Stack):
                     expiration=Duration.days(CONFIG.S3_EXPIRATION_DAYS),
                 )
             ],
-            # Versioning: Not needed for MVP (users should save results)
-            versioned=False,
+            # Versioning: Enabled for Lambda code deployment tracking
+            # CloudFormation uses object versions to detect Lambda code changes
+            versioned=True,
             # Public access: Block all (users access via scoped IAM credentials)
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
         )

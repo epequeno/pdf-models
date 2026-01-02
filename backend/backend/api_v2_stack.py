@@ -56,6 +56,15 @@ class ApiV2Stack(Stack):
             self, "/pdf-models/core/s3-bucket-arn"
         )
 
+        # Get Lambda S3 object versions from SSM
+        # These are updated by CodeBuild after each Lambda build
+        submit_job_version = ssm.StringParameter.value_for_string_parameter(
+            self, "/pdf-models/lambda/submit-job-version"
+        )
+        get_job_version = ssm.StringParameter.value_for_string_parameter(
+            self, "/pdf-models/lambda/get-job-version"
+        )
+
         # Create CloudWatch log groups for Lambdas
         submit_job_log_group = logs.LogGroup(
             self,
@@ -157,6 +166,7 @@ class ApiV2Stack(Stack):
             code=lambda_.Code.from_bucket(
                 bucket=s3.Bucket.from_bucket_name(self, "LambdaArtifactsBucket", s3_bucket_name),
                 key="lambda-artifacts/submit-job.zip",
+                object_version=submit_job_version,
             ),
             architecture=lambda_.Architecture.ARM_64,
             role=submit_job_role,
@@ -167,7 +177,6 @@ class ApiV2Stack(Stack):
                 "DYNAMODB_TABLE_NAME": dynamodb_table_name,
                 "STATE_MACHINE_ARN": state_machine_arn,
                 "S3_BUCKET_NAME": s3_bucket_name,
-                "BUILD_TIMESTAMP": "2026-01-02T05:00:00Z",
             },
         )
 
@@ -181,6 +190,7 @@ class ApiV2Stack(Stack):
             code=lambda_.Code.from_bucket(
                 bucket=s3.Bucket.from_bucket_name(self, "LambdaArtifactsBucket2", s3_bucket_name),
                 key="lambda-artifacts/get-job.zip",
+                object_version=get_job_version,
             ),
             architecture=lambda_.Architecture.ARM_64,
             role=get_job_role,
@@ -190,7 +200,6 @@ class ApiV2Stack(Stack):
             environment={
                 "DYNAMODB_TABLE_NAME": dynamodb_table_name,
                 "S3_BUCKET_NAME": s3_bucket_name,
-                "BUILD_TIMESTAMP": "2026-01-02T05:00:00Z",
             },
         )
 

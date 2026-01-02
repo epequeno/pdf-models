@@ -59,6 +59,8 @@ struct JwtAuthorizer {
 
 #[derive(Deserialize)]
 struct SubmitJobBody {
+    /// S3 key of the input file (required when using Identity Pool credentials)
+    s3_input_key: Option<String>,
     /// Optional: if provided, start processing immediately
     /// If not provided, return upload_url for client to upload first
     #[serde(default)]
@@ -79,7 +81,8 @@ struct SubmitJobResponse {
     model: String,
     status: String,
     s3_input_key: String,
-    upload_url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    upload_url: Option<String>,
     created_at: String,
 }
 
@@ -124,7 +127,7 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
         }
     };
 
-    // Parse request body (optional)
+    // Parse request body
     let body: SubmitJobBody = match request.body {
         Some(body_str) if !body_str.is_empty() => match serde_json::from_str(&body_str) {
             Ok(body) => body,
@@ -133,13 +136,36 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
             }
         },
         _ => SubmitJobBody {
+            s3_input_key: None,
             start_processing: false,
         },
     };
 
-    // Generate job ID and S3 key
-    let job_id = Uuid::new_v4().to_string();
-    let s3_input_key = format!("{}/{}.pdf", user_id, job_id);
+    // Determine S3 input key and job ID
+    let (job_id, s3_input_key) = match body.s3_input_key {
+        Some(provided_key) => {
+            // Validate that the provided S3 key matches the user's identity prefix
+            if !provided_key.starts_with(&format!("{}/", user_id)) {
+                return Ok(Response::error(403, "S3 key must be within your user prefix"));
+            }
+            
+            // Extract job ID from the S3 key (assuming format: user_id/job_id.pdf)
+            let key_parts: Vec<&str> = provided_key.split('/').collect();
+            if key_parts.len() != 2 || !key_parts[1].ends_with(".pdf") {
+                return Ok(Response::error(400, "Invalid S3 key format. Expected: user_id/job_id.pdf"));
+            }
+            
+            let job_id = key_parts[1].trim_end_matches(".pdf").to_string();
+            (job_id, provided_key)
+        }
+        None => {
+            // Generate new job ID and S3 key (for pre-signed URL workflow)
+            let job_id = Uuid::new_v4().to_string();
+            let s3_input_key = format!("{}/{}.pdf", user_id, job_id);
+            (job_id, s3_input_key)
+        }
+    };
+
     let created_at = Utc::now().to_rfc3339();
 
     // Get environment variables
@@ -153,19 +179,27 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
     let sfn_client = SfnClient::new(&config);
     let s3_client = S3Client::new(&config);
 
-    // Generate pre-signed URL for upload (15 minutes validity)
-    let presigning_config = PresigningConfig::expires_in(Duration::from_secs(900))?;
-    let presigned_request = s3_client
-        .put_object()
-        .bucket(&bucket_name)
-        .key(&s3_input_key)
-        .content_type("application/pdf")
-        .presigned(presigning_config)
-        .await?;
+    // Generate pre-signed URL for upload only if no S3 key was provided
+    let upload_url = if body.s3_input_key.is_none() {
+        let presigning_config = PresigningConfig::expires_in(Duration::from_secs(900))?;
+        let presigned_request = s3_client
+            .put_object()
+            .bucket(&bucket_name)
+            .key(&s3_input_key)
+            .content_type("application/pdf")
+            .presigned(presigning_config)
+            .await?;
 
-    let upload_url = presigned_request.uri().to_string();
+        Some(presigned_request.uri().to_string())
+    } else {
+        None
+    };
 
-    info!("Generated pre-signed upload URL for job: {}", job_id);
+    if upload_url.is_some() {
+        info!("Generated pre-signed upload URL for job: {}", job_id);
+    } else {
+        info!("Using provided S3 key for job: {}", job_id);
+    }
 
     // Create job record in DynamoDB
     let initial_status = if body.start_processing {

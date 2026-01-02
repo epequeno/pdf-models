@@ -30,7 +30,7 @@ class APIClient:
 
     def submit_job(self, model: str, s3_input_key: str) -> Dict:
         """
-        Submit a new processing job.
+        Submit a new processing job with existing S3 key.
 
         Args:
             model: Model name (e.g., "marker")
@@ -44,6 +44,27 @@ class APIClient:
         """
         url = f"{self.base_url}/models/{model}/jobs"
         payload = {"s3_input_key": s3_input_key}
+
+        response = self.session.post(url, json=payload)
+        response.raise_for_status()
+
+        return response.json()
+
+    def submit_job_for_upload(self, model: str) -> Dict:
+        """
+        Submit a new processing job and get upload URL.
+
+        Args:
+            model: Model name (e.g., "marker")
+
+        Returns:
+            Job details including job_id, s3_input_key, and upload_url
+
+        Raises:
+            requests.HTTPError: If the request fails
+        """
+        url = f"{self.base_url}/models/{model}/jobs"
+        payload = {}  # Empty payload - let API generate S3 key
 
         response = self.session.post(url, json=payload)
         response.raise_for_status()
@@ -142,7 +163,7 @@ def wait_for_job_completion(
         elif status == "failed":
             error_msg = job.get("error", "Unknown error")
             raise RuntimeError(f"Job {job_id} failed: {error_msg}")
-        elif status in ["pending", "processing"]:
+        elif status in ["created", "processing"]:
             time.sleep(poll_interval)
         else:
             raise RuntimeError(f"Unknown job status: {status}")

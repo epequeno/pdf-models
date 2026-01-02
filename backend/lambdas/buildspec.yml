@@ -27,16 +27,22 @@ phases:
       # Create submit-job.zip
       - cd submit-job/target/lambda/submit-job
       - zip submit-job.zip bootstrap
-      - aws s3 cp submit-job.zip s3://${S3_BUCKET_NAME}/lambda-artifacts/submit-job.zip
+      - SUBMIT_JOB_UPLOAD=$(aws s3api put-object --bucket ${S3_BUCKET_NAME} --key lambda-artifacts/submit-job.zip --body submit-job.zip --output json)
+      - SUBMIT_JOB_VERSION=$(echo $SUBMIT_JOB_UPLOAD | jq -r '.VersionId')
+      - echo "submit-job.zip uploaded with version ${SUBMIT_JOB_VERSION}"
+      - aws ssm put-parameter --name /pdf-models/lambda/submit-job-version --value ${SUBMIT_JOB_VERSION} --type String --overwrite
       - cd ../../../..
 
       # Create get-job.zip
       - cd get-job/target/lambda/get-job
       - zip get-job.zip bootstrap
-      - aws s3 cp get-job.zip s3://${S3_BUCKET_NAME}/lambda-artifacts/get-job.zip
+      - GET_JOB_UPLOAD=$(aws s3api put-object --bucket ${S3_BUCKET_NAME} --key lambda-artifacts/get-job.zip --body get-job.zip --output json)
+      - GET_JOB_VERSION=$(echo $GET_JOB_UPLOAD | jq -r '.VersionId')
+      - echo "get-job.zip uploaded with version ${GET_JOB_VERSION}"
+      - aws ssm put-parameter --name /pdf-models/lambda/get-job-version --value ${GET_JOB_VERSION} --type String --overwrite
       - cd ../../../..
 
-      - echo "Lambda artifacts uploaded to S3"
+      - echo "Lambda artifacts uploaded to S3 with versions stored in SSM"
 
 artifacts:
   files:
