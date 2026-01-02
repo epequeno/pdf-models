@@ -5,7 +5,6 @@ use aws_sdk_s3::Client as S3Client;
 use lambda_runtime::{service_fn, Error, LambdaEvent};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashMap;
 use std::env;
 use std::time::Duration;
 use tracing::info;
@@ -226,7 +225,7 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
             .key_condition_expression("user_id = :user_id")
             .expression_attribute_values(
                 ":user_id",
-                aws_sdk_dynamodb::types::AttributeValue::S(user_id.clone()),
+                aws_sdk_dynamodb::types::AttributeValue::S(user_id.to_string()),
             )
             .scan_index_forward(false)  // Sort by created_at descending (newest first)
             .limit(100)  // Limit to 100 most recent jobs
