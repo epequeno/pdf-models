@@ -1,4 +1,4 @@
-.PHONY: help test test-watch cdk-synth cdk-diff cdk-deploy cdk-destroy aws-logs aws-s3-ls container-build base-image-build lambda-build setup
+.PHONY: help test test-watch cdk-synth cdk-diff cdk-deploy cdk-destroy aws-logs aws-s3-ls container-build base-image-build lambda-build lambda-clean setup
 
 # AWS Profile to use for all commands
 AWS_PROFILE := arch
@@ -26,6 +26,7 @@ help:
 	@echo "  make base-image-build              - Build Rust Lambda builder base image (runs in CodeBuild)"
 	@echo "  make container-build MODEL=<name>  - Build and push container (runs in CodeBuild)"
 	@echo "  make lambda-build                  - Build Rust Lambda functions (runs in CodeBuild)"
+	@echo "  make lambda-clean                  - Clean local Lambda build artifacts"
 	@echo ""
 	@echo "Stack Deployment Order:"
 	@echo "  1. make cdk-deploy STACK=FoundationStack"
@@ -115,6 +116,12 @@ lambda-build:
 	@echo "Note: This triggers the CodeBuild project, it does not build locally."
 	AWS_PROFILE=arch aws codebuild start-build \
 		--project-name pdf-models-rust-lambda-build
+
+lambda-clean:
+	@echo "Cleaning Lambda build artifacts..."
+	rm -rf backend/lambdas/*/target/
+	rm -rf backend/lambdas/backend/
+	@echo "Lambda build artifacts cleaned."
 
 # Development setup
 setup:
