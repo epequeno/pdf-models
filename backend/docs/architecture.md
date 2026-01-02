@@ -48,6 +48,43 @@ PDF Models is a serverless models-as-a-service platform for hosting open-source 
 ### High-Level Flow
 
 ```
+User Authentication & File Upload:
+1. User authenticates with Cognito User Pool → JWT tokens
+2. User exchanges JWT for Identity Pool credentials → AWS credentials
+3. User uploads PDF to S3 using Identity Pool credentials → s3://bucket/identity-id/file.pdf
+
+Job Processing:
+4. User submits job via API with S3 key → Lambda validates & creates DynamoDB record
+5. Lambda starts Step Functions execution → ECS Fargate task processes PDF
+6. ECS task downloads from S3, runs Marker model, uploads result to S3
+7. Step Functions updates DynamoDB with completion status
+8. User polls API for status and downloads result from S3
+```
+
+### Authentication Architecture
+
+**Two-Layer Authentication System:**
+
+1. **API Authentication**: Cognito User Pool JWT tokens
+   - Used for API Gateway authorization
+   - User ID format: `74f87488-6071-7034-6f34-e23c3bca23fa` (UUID)
+
+2. **S3 Access Control**: Cognito Identity Pool credentials  
+   - Used for direct S3 access (upload/download)
+   - Identity ID format: `us-east-1:73ad6f30-5d77-c234-4c31-379685de07c5`
+
+**Key Insight**: These are different identifiers! S3 access is controlled by Identity Pool ID, not Cognito User ID. Lambda functions do NOT validate S3 key prefixes - this is handled by S3 IAM permissions.
+
+**IAM Policy Example**:
+```json
+{
+  "Effect": "Allow",
+  "Action": ["s3:GetObject", "s3:PutObject"],
+  "Resource": "arn:aws:s3:::bucket/${cognito-identity.amazonaws.com:sub}/*"
+}
+```
+
+This ensures users can only access files with their Identity Pool ID as the prefix.
 User Authentication
     ↓
 [Cognito User Pool] → [Cognito Identity Pool] → Temporary AWS Credentials

@@ -111,6 +111,32 @@ If you modify Lambda code locally (in `backend/lambdas/`), the changes will NOT 
 
 **Common mistake**: Editing Lambda Rust code, running `make lambda-build` or CodeBuild manually, expecting Lambda to update - it won't update because CodeBuild is building from the old CodeCommit code, not your local edits.
 
+### Identity Pool vs Cognito User ID
+
+**CRITICAL DISTINCTION**: The system uses two different user identifiers:
+
+- **Cognito User ID** (`sub` claim in JWT): Used for API authentication
+- **Identity Pool ID**: Used for S3 access permissions (format: `us-east-1:uuid`)
+
+**Key Insight**: S3 access is controlled by Identity Pool ID, not Cognito User ID. Users can only access S3 objects with their Identity Pool ID as the prefix due to IAM policies.
+
+**Architecture Decision**: Lambda functions do NOT validate S3 key prefixes - this is handled by S3 IAM permissions. This prevents the mismatch between Cognito User ID and Identity Pool ID from causing issues.
+
+### Integration Testing Workflow
+
+The system uses an **Identity Pool workflow** where:
+1. Users authenticate with Cognito to get JWT tokens
+2. Users exchange JWT for Identity Pool credentials
+3. Users upload files directly to S3 using Identity Pool credentials
+4. Users submit jobs via API referencing the S3 keys
+5. Lambda starts Step Functions execution for processing
+
+**Test user credentials**:
+- Email: `integration-test@pdf-models.local`
+- Password: `TestPass123!`
+
+Run tests with: `make test-integration-auto`
+
 ### Step Functions Use JSONata
 - Set `"QueryLanguage": "JSONata"` in all state machines
 - Prefer JSONata over JSONPath for better readability
@@ -143,6 +169,26 @@ If you modify Lambda code locally (in `backend/lambdas/`), the changes will NOT 
 **Root Cause**: CodeBuild pulls from CodeCommit repository, not local files
 **Solution**: Always `git commit && git push` before triggering CodeBuild
 **This is the #1 most common mistake** - it has come up repeatedly during debugging
+
+### ❌ Using timestamps instead of S3 version IDs for Lambda deployment
+**Symptom**: CDK deployment fails with "Invalid version id specified"
+**Root Cause**: SSM parameters contain timestamps instead of actual S3 version IDs
+**Solution**: Get real S3 version IDs and update SSM parameters before deployment
+
+### ❌ Confusing Cognito User ID with Identity Pool ID
+**Symptom**: 403 errors when submitting jobs, S3 access denied
+**Root Cause**: Using Cognito User ID for S3 keys instead of Identity Pool ID
+**Solution**: Use Identity Pool ID for S3 key prefixes, let IAM policies handle access control
+
+### ❌ Missing start_processing parameter in job submission
+**Symptom**: Jobs stay in "created" status and never start processing
+**Root Cause**: Lambda defaults to `start_processing: false`
+**Solution**: Include `"start_processing": true` in job submission payload
+
+### ❌ Using jq in CodeBuild buildspec
+**Symptom**: CodeBuild fails with "jq: command not found"
+**Root Cause**: jq is not available in the CodeBuild environment
+**Solution**: Use Python's built-in JSON parsing instead
 
 ## Quick Reference
 

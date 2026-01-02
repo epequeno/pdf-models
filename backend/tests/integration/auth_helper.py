@@ -28,13 +28,14 @@ class APIClient:
             "Content-Type": "application/json",
         })
 
-    def submit_job(self, model: str, s3_input_key: str) -> Dict:
+    def submit_job(self, model: str, s3_input_key: str, start_processing: bool = True) -> Dict:
         """
         Submit a new processing job with existing S3 key.
 
         Args:
             model: Model name (e.g., "marker")
             s3_input_key: S3 key of the input file
+            start_processing: Whether to start processing immediately (default: True)
 
         Returns:
             Job details including job_id
@@ -43,7 +44,10 @@ class APIClient:
             requests.HTTPError: If the request fails
         """
         url = f"{self.base_url}/models/{model}/jobs"
-        payload = {"s3_input_key": s3_input_key}
+        payload = {
+            "s3_input_key": s3_input_key,
+            "start_processing": start_processing
+        }
 
         response = self.session.post(url, json=payload)
         response.raise_for_status()
