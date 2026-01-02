@@ -30,7 +30,7 @@ phases:
       - aws s3 cp submit-job.zip s3://${S3_BUCKET_NAME}/lambda-artifacts/submit-job.zip
       - SUBMIT_JOB_VERSION=$(date +%s)
       - echo "submit-job.zip uploaded with timestamp version ${SUBMIT_JOB_VERSION}"
-      - aws ssm put-parameter --name /pdf-models/lambda/submit-job-version --value ${SUBMIT_JOB_VERSION} --type String --overwrite || echo "Warning: Could not update SSM parameter"
+      - aws ssm put-parameter --name /pdf-models/lambda/submit-job-version --value ${SUBMIT_JOB_VERSION} --type String --overwrite || echo "Warning Could not update SSM parameter"
       - cd ../../../..
 
       # Create get-job.zip
@@ -39,10 +39,10 @@ phases:
       - aws s3 cp get-job.zip s3://${S3_BUCKET_NAME}/lambda-artifacts/get-job.zip
       - GET_JOB_VERSION=$(date +%s)
       - echo "get-job.zip uploaded with timestamp version ${GET_JOB_VERSION}"
-      - aws ssm put-parameter --name /pdf-models/lambda/get-job-version --value ${GET_JOB_VERSION} --type String --overwrite || echo "Warning: Could not update SSM parameter"
+      - aws ssm put-parameter --name /pdf-models/lambda/get-job-version --value ${GET_JOB_VERSION} --type String --overwrite || echo "Warning Could not update SSM parameter"
       - cd ../../../..
 
-      - echo "Lambda artifacts uploaded to S3 with versions stored in SSM"
+      - echo "Lambda artifacts uploaded to S3"
 
 artifacts:
   files:
