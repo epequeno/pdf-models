@@ -20,6 +20,25 @@ phases:
 
       - echo "Lambda builds complete"
 
+  post_build:
+    commands:
+      - echo "Creating individual Lambda deployment packages..."
+      - cd backend/lambdas
+
+      # Create submit-job.zip
+      - cd submit-job/target/lambda/submit-job
+      - zip submit-job.zip bootstrap
+      - aws s3 cp submit-job.zip s3://${S3_BUCKET_NAME}/lambda-artifacts/submit-job.zip
+      - cd ../../../..
+
+      # Create get-job.zip
+      - cd get-job/target/lambda/get-job
+      - zip get-job.zip bootstrap
+      - aws s3 cp get-job.zip s3://${S3_BUCKET_NAME}/lambda-artifacts/get-job.zip
+      - cd ../../../..
+
+      - echo "Lambda artifacts uploaded to S3"
+
 artifacts:
   files:
     # Include the bootstrap binaries from cargo-lambda output

@@ -211,6 +211,8 @@ class CoreInfrastructureStack(Stack):
             access_token_validity=Duration.hours(1),
             id_token_validity=Duration.hours(1),
             refresh_token_validity=Duration.days(30),
+            # Disable OAuth flows for API Gateway JWT authorization
+            o_auth=None,
         )
 
         # Export User Pool ID to SSM
@@ -232,93 +234,18 @@ class CoreInfrastructureStack(Stack):
         )
 
         # ========================================
-        # Cognito Identity Pool (Authorization)
+        # S3 Bucket ARN Export for Lambda Pre-signed URLs
         # ========================================
+        # Note: Cognito Identity Pool removed - using pre-signed URLs for S3 access
+        # Lambda functions will generate time-limited pre-signed URLs for uploads/downloads
+        # This simplifies authentication and eliminates JWT/AWS credential confusion
 
-        # Identity Pool: Exchange User Pool JWT for temporary AWS credentials
-        identity_pool = cognito.CfnIdentityPool(
-            self,
-            "IdentityPool",
-            identity_pool_name=CONFIG.COGNITO_IDENTITY_POOL_NAME,
-            # No unauthenticated access
-            allow_unauthenticated_identities=False,
-            # Link to User Pool
-            cognito_identity_providers=[
-                cognito.CfnIdentityPool.CognitoIdentityProviderProperty(
-                    client_id=user_pool_client.user_pool_client_id,
-                    provider_name=user_pool.user_pool_provider_name,
-                )
-            ],
-        )
-
-        # IAM Role for authenticated users
-        # This role grants scoped S3 access based on Cognito identity ID
-        authenticated_role = iam.Role(
-            self,
-            "AuthenticatedRole",
-            assumed_by=iam.FederatedPrincipal(
-                "cognito-identity.amazonaws.com",
-                conditions={
-                    "StringEquals": {
-                        "cognito-identity.amazonaws.com:aud": identity_pool.ref,
-                    },
-                    "ForAnyValue:StringLike": {
-                        "cognito-identity.amazonaws.com:amr": "authenticated",
-                    },
-                },
-                assume_role_action="sts:AssumeRoleWithWebIdentity",
-            ),
-            description="IAM role for authenticated Cognito users with scoped S3 access",
-        )
-
-        # CRITICAL SECURITY: Scoped S3 permissions
-        # Users can ONLY access objects under their Cognito identity ID prefix
-        # ${cognito-identity.amazonaws.com:sub} is replaced with user's unique identity ID
-        authenticated_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "s3:PutObject",
-                    "s3:GetObject",
-                    "s3:DeleteObject",
-                ],
-                resources=[
-                    f"{docs_bucket.bucket_arn}/${{cognito-identity.amazonaws.com:sub}}/*",
-                ],
-            )
-        )
-
-        # Allow listing objects in their own prefix (for frontend UI)
-        authenticated_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=["s3:ListBucket"],
-                resources=[docs_bucket.bucket_arn],
-                conditions={
-                    "StringLike": {
-                        "s3:prefix": ["${cognito-identity.amazonaws.com:sub}/*"],
-                    },
-                },
-            )
-        )
-
-        # Attach role to Identity Pool
-        cognito.CfnIdentityPoolRoleAttachment(
-            self,
-            "IdentityPoolRoleAttachment",
-            identity_pool_id=identity_pool.ref,
-            roles={
-                "authenticated": authenticated_role.role_arn,
-            },
-        )
-
-        # Export Identity Pool ID to SSM
         ssm.StringParameter(
             self,
-            "CognitoIdentityPoolIdParam",
-            parameter_name=CONFIG.SSM_COGNITO_IDENTITY_POOL_ID,
-            string_value=identity_pool.ref,
-            description="Cognito Identity Pool ID",
+            "S3BucketArnParam",
+            parameter_name="/pdf-models/core/s3-bucket-arn",
+            string_value=docs_bucket.bucket_arn,
+            description="S3 bucket ARN for Lambda IAM permissions",
         )
 
         # ========================================

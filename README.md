@@ -68,20 +68,50 @@ See [Architecture Documentation](backend/docs/architecture.md) for detailed setu
 
 ## Current Status
 
-**All Infrastructure Deployed** ✅
+**Infrastructure Deployed - Auth Working with HTTP API v2** ✅
 
-- [x] Phase 1: Core Infrastructure - **DEPLOYED**
+- [x] Phase 1: Core Infrastructure - **DEPLOYED & SIMPLIFIED**
   - FoundationStack (ECR repositories)
-  - CoreInfrastructureStack (S3, DynamoDB, Cognito)
+  - CoreInfrastructureStack (S3, DynamoDB, Cognito User Pool)
+  - ✅ Cognito Identity Pool removed (simplified auth)
 - [x] Phase 1.5: CI/CD Infrastructure - **DEPLOYED**
   - CiCdStack (CodeCommit, CodeBuild)
   - Custom Rust Lambda builder base image
 - [x] Phase 2: Marker Model - **DEPLOYED**
   - MarkerStack (ECS, Fargate, Step Functions)
   - Marker container image
-- [x] Phase 3: API Layer - **DEPLOYED**
-  - ApiStack (API Gateway, Cognito authorizer)
-  - Rust Lambda functions (ARM64)
-  - API Endpoint: `https://ivd1t6g04g.execute-api.us-east-1.amazonaws.com/v1/`
+- [x] Phase 3: API Layer - **HTTP API v2 WORKING** ✅
+  - ApiV2Stack (HTTP API Gateway, Cognito JWT authorizer)
+  - Rust Lambda functions with S3 pre-signed URLs
+  - API Endpoint: `https://eykwwhrt16.execute-api.us-east-1.amazonaws.com/`
+  - ⚠️ ApiStack (legacy REST API) - has auth issues, use v2 instead
 
-**Next Steps**: Create Cognito test user for API testing
+## Quick Start - Testing API v2
+
+```bash
+# Get JWT token
+TOKEN=$(AWS_PROFILE=arch aws cognito-idp initiate-auth \
+  --client-id 4tmf8s58738hrbrp4ff2utqg5 \
+  --auth-flow USER_PASSWORD_AUTH \
+  --auth-parameters USERNAME=integration-test@pdf-models.local,PASSWORD=TestPass123! \
+  --query 'AuthenticationResult.AccessToken' --output text)
+
+# Submit a job (get upload URL)
+curl -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  https://eykwwhrt16.execute-api.us-east-1.amazonaws.com/v1/models/marker/jobs
+
+# Response includes upload_url for S3 upload and job_id for tracking
+```
+
+## Next Steps to Complete
+
+⚠️ **Lambda code needs to be updated** - See [HANDOVER.md](backend/docs/HANDOVER.md)
+
+1. Commit all local changes to CodeCommit
+2. Rebuild Lambda functions via CodeBuild
+3. Redeploy ApiV2Stack
+4. Test end-to-end workflow
+
+See [backend/docs/HANDOVER.md](backend/docs/HANDOVER.md) for complete instructions.

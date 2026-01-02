@@ -1,5 +1,7 @@
 use aws_config::BehaviorVersion;
 use aws_sdk_dynamodb::Client as DynamoDbClient;
+use aws_sdk_s3::presigning::PresigningConfig;
+use aws_sdk_s3::Client as S3Client;
 use aws_sdk_sfn::Client as SfnClient;
 use chrono::Utc;
 use lambda_runtime::{service_fn, Error, LambdaEvent};
@@ -7,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::env;
+use std::time::Duration;
 use tracing::info;
 use uuid::Uuid;
 
@@ -33,7 +36,10 @@ struct RequestContext {
 
 #[derive(Deserialize)]
 struct Authorizer {
+    // REST API format
     claims: Option<Claims>,
+    // HTTP API v2 format - JWT claims are at top level
+    jwt: Option<JwtAuthorizer>,
     // Handle different possible structures
     #[serde(flatten)]
     extra: std::collections::HashMap<String, serde_json::Value>,
@@ -45,8 +51,16 @@ struct Claims {
 }
 
 #[derive(Deserialize)]
+struct JwtAuthorizer {
+    claims: Claims,
+}
+
+#[derive(Deserialize)]
 struct SubmitJobBody {
-    s3_input_key: String,
+    /// Optional: if provided, start processing immediately
+    /// If not provided, return upload_url for client to upload first
+    #[serde(default)]
+    start_processing: bool,
 }
 
 #[derive(Serialize)]
@@ -63,6 +77,7 @@ struct SubmitJobResponse {
     model: String,
     status: String,
     s3_input_key: String,
+    upload_url: String,
     created_at: String,
 }
 
@@ -98,21 +113,26 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
         return Ok(Response::error(400, "Invalid model. Only 'marker' is supported"));
     }
 
-    // Extract user ID from Cognito claims
+    // Extract user ID from Cognito claims (supports both REST API and HTTP API v2 formats)
     let user_id = match &request.request_context.authorizer {
-        Some(authorizer) => match &authorizer.claims {
-            Some(claims) => &claims.sub,
-            None => {
-                // Try to extract from other possible locations
-                if let Some(sub) = authorizer.extra.get("sub") {
-                    if let Some(sub_str) = sub.as_str() {
-                        sub_str
-                    } else {
-                        return Ok(Response::error(401, "Invalid user ID in authorizer context"));
-                    }
+        Some(authorizer) => {
+            // Try REST API format first
+            if let Some(claims) = &authorizer.claims {
+                &claims.sub
+            }
+            // Try HTTP API v2 format
+            else if let Some(jwt) = &authorizer.jwt {
+                &jwt.claims.sub
+            }
+            // Try to extract from extra fields
+            else if let Some(sub) = authorizer.extra.get("sub") {
+                if let Some(sub_str) = sub.as_str() {
+                    sub_str
                 } else {
-                    return Ok(Response::error(401, "No user ID found in authorizer context"));
+                    return Ok(Response::error(401, "Invalid user ID in authorizer context"));
                 }
+            } else {
+                return Ok(Response::error(401, "No user ID found in authorizer context"));
             }
         },
         None => {
@@ -120,77 +140,95 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
         }
     };
 
-    // Parse request body
+    // Parse request body (optional)
     let body: SubmitJobBody = match request.body {
-        Some(body_str) => match serde_json::from_str(&body_str) {
+        Some(body_str) if !body_str.is_empty() => match serde_json::from_str(&body_str) {
             Ok(body) => body,
             Err(e) => {
                 return Ok(Response::error(400, &format!("Invalid request body: {}", e)));
             }
         },
-        None => {
-            return Ok(Response::error(400, "Missing request body"));
-        }
+        _ => SubmitJobBody {
+            start_processing: false,
+        },
     };
 
-    // Validate s3_input_key starts with user_id
-    if !body.s3_input_key.starts_with(&format!("{}/", user_id)) {
-        return Ok(Response::error(
-            403,
-            "S3 input key must start with your user ID prefix",
-        ));
-    }
-
-    // Generate job ID
+    // Generate job ID and S3 key
     let job_id = Uuid::new_v4().to_string();
+    let s3_input_key = format!("{}/{}.pdf", user_id, job_id);
     let created_at = Utc::now().to_rfc3339();
 
     // Get environment variables
     let table_name = env::var("DYNAMODB_TABLE_NAME")?;
     let state_machine_arn = env::var("STATE_MACHINE_ARN")?;
+    let bucket_name = env::var("S3_BUCKET_NAME")?;
 
     // Initialize AWS clients
     let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
     let dynamodb_client = DynamoDbClient::new(&config);
     let sfn_client = SfnClient::new(&config);
+    let s3_client = S3Client::new(&config);
+
+    // Generate pre-signed URL for upload (15 minutes validity)
+    let presigning_config = PresigningConfig::expires_in(Duration::from_secs(900))?;
+    let presigned_request = s3_client
+        .put_object()
+        .bucket(&bucket_name)
+        .key(&s3_input_key)
+        .content_type("application/pdf")
+        .presigned(presigning_config)
+        .await?;
+
+    let upload_url = presigned_request.uri().to_string();
+
+    info!("Generated pre-signed upload URL for job: {}", job_id);
 
     // Create job record in DynamoDB
+    let initial_status = if body.start_processing {
+        "processing".to_string()
+    } else {
+        "created".to_string()
+    };
+
     dynamodb_client
         .put_item()
         .table_name(&table_name)
         .item("job_id", aws_sdk_dynamodb::types::AttributeValue::S(job_id.clone()))
-        .item("user_id", aws_sdk_dynamodb::types::AttributeValue::S(user_id.clone()))
+        .item("user_id", aws_sdk_dynamodb::types::AttributeValue::S(user_id.to_string()))
         .item("model", aws_sdk_dynamodb::types::AttributeValue::S(model.clone()))
-        .item("status", aws_sdk_dynamodb::types::AttributeValue::S("pending".to_string()))
-        .item("s3_input_key", aws_sdk_dynamodb::types::AttributeValue::S(body.s3_input_key.clone()))
+        .item("status", aws_sdk_dynamodb::types::AttributeValue::S(initial_status.clone()))
+        .item("s3_input_key", aws_sdk_dynamodb::types::AttributeValue::S(s3_input_key.clone()))
         .item("created_at", aws_sdk_dynamodb::types::AttributeValue::S(created_at.clone()))
         .send()
         .await?;
 
     info!("Created job record in DynamoDB: {}", job_id);
 
-    // Start Step Functions execution
-    let execution_input = json!({
-        "job_id": job_id,
-        "s3_input_key": body.s3_input_key,
-    });
+    // Start Step Functions execution if requested
+    if body.start_processing {
+        let execution_input = json!({
+            "job_id": job_id,
+            "s3_input_key": s3_input_key,
+        });
 
-    sfn_client
-        .start_execution()
-        .state_machine_arn(&state_machine_arn)
-        .name(&job_id)  // Use job_id as execution name for idempotency
-        .input(execution_input.to_string())
-        .send()
-        .await?;
+        sfn_client
+            .start_execution()
+            .state_machine_arn(&state_machine_arn)
+            .name(&job_id)  // Use job_id as execution name for idempotency
+            .input(execution_input.to_string())
+            .send()
+            .await?;
 
-    info!("Started Step Functions execution for job: {}", job_id);
+        info!("Started Step Functions execution for job: {}", job_id);
+    }
 
     // Return response
     let response_body = SubmitJobResponse {
         job_id,
         model: model.clone(),
-        status: "pending".to_string(),
-        s3_input_key: body.s3_input_key,
+        status: initial_status,
+        s3_input_key,
+        upload_url,
         created_at,
     };
 

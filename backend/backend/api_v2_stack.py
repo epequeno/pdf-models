@@ -1,14 +1,16 @@
 """
-API Stack: REST API Gateway with Cognito authorization and Rust Lambda functions.
+API v2 Stack: HTTP API Gateway with Cognito JWT authorizer and Lambda functions.
 
-This stack creates the API layer for job submission and status queries.
+This stack uses API Gateway v2 (HTTP API) instead of REST API for better Cognito integration.
 """
 
 from aws_cdk import (
     Stack,
     Duration,
     RemovalPolicy,
-    aws_apigateway as apigw,
+    aws_apigatewayv2 as apigwv2,
+    aws_apigatewayv2_integrations as apigwv2_integrations,
+    aws_apigatewayv2_authorizers as apigwv2_authorizers,
     aws_cognito as cognito,
     aws_lambda as lambda_,
     aws_iam as iam,
@@ -21,14 +23,14 @@ from constructs import Construct
 from backend.stack_config import CONFIG
 
 
-class ApiStack(Stack):
-    """API Gateway and Lambda functions for job management.
+class ApiV2Stack(Stack):
+    """HTTP API Gateway and Lambda functions for job management.
 
     Creates:
-    - REST API Gateway with Cognito User Pool Authorizer
+    - HTTP API Gateway (v2) with Cognito JWT Authorizer
     - Lambda functions for job submission and status queries
-    - API routes with proper CORS configuration
-    - CloudWatch log groups for API and Lambda logs
+    - CORS configuration
+    - CloudWatch log groups
     """
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
@@ -44,6 +46,9 @@ class ApiStack(Stack):
         user_pool_id = ssm.StringParameter.value_for_string_parameter(
             self, CONFIG.SSM_COGNITO_USER_POOL_ID
         )
+        user_pool_client_id = ssm.StringParameter.value_for_string_parameter(
+            self, CONFIG.SSM_COGNITO_USER_POOL_CLIENT_ID
+        )
         s3_bucket_name = ssm.StringParameter.value_for_string_parameter(
             self, CONFIG.SSM_S3_BUCKET_NAME
         )
@@ -55,7 +60,7 @@ class ApiStack(Stack):
         submit_job_log_group = logs.LogGroup(
             self,
             "SubmitJobLogGroup",
-            log_group_name=f"/aws/lambda/{CONFIG.PROJECT_NAME}-submit-job",
+            log_group_name=f"/aws/lambda/{CONFIG.PROJECT_NAME}-submit-job-v2",
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY,
         )
@@ -63,7 +68,7 @@ class ApiStack(Stack):
         get_job_log_group = logs.LogGroup(
             self,
             "GetJobLogGroup",
-            log_group_name=f"/aws/lambda/{CONFIG.PROJECT_NAME}-get-job",
+            log_group_name=f"/aws/lambda/{CONFIG.PROJECT_NAME}-get-job-v2",
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY,
         )
@@ -142,15 +147,11 @@ class ApiStack(Stack):
             )
         )
 
-        # Note: s3_bucket_name already loaded from SSM above
-
         # Create submit-job Lambda function
-        # NOTE: Lambda code is built in CodeBuild and stored in S3
-        # Using the latest build artifacts from CodeBuild
         submit_job_function = lambda_.Function(
             self,
             "SubmitJobFunction",
-            function_name=f"{CONFIG.PROJECT_NAME}-submit-job",
+            function_name=f"{CONFIG.PROJECT_NAME}-submit-job-v2",
             runtime=lambda_.Runtime.PROVIDED_AL2023,
             handler="bootstrap",
             code=lambda_.Code.from_bucket(
@@ -166,17 +167,15 @@ class ApiStack(Stack):
                 "DYNAMODB_TABLE_NAME": dynamodb_table_name,
                 "STATE_MACHINE_ARN": state_machine_arn,
                 "S3_BUCKET_NAME": s3_bucket_name,
-                "BUILD_TIMESTAMP": "2026-01-02T04:30:00Z",  # Force update
+                "BUILD_TIMESTAMP": "2026-01-02T05:00:00Z",
             },
         )
 
         # Create get-job Lambda function
-        # NOTE: Lambda code is built in CodeBuild and stored in S3
-        # Using the latest build artifacts from CodeBuild
         get_job_function = lambda_.Function(
             self,
             "GetJobFunction",
-            function_name=f"{CONFIG.PROJECT_NAME}-get-job",
+            function_name=f"{CONFIG.PROJECT_NAME}-get-job-v2",
             runtime=lambda_.Runtime.PROVIDED_AL2023,
             handler="bootstrap",
             code=lambda_.Code.from_bucket(
@@ -191,98 +190,91 @@ class ApiStack(Stack):
             environment={
                 "DYNAMODB_TABLE_NAME": dynamodb_table_name,
                 "S3_BUCKET_NAME": s3_bucket_name,
-                "BUILD_TIMESTAMP": "2026-01-02T04:30:00Z",  # Force update
+                "BUILD_TIMESTAMP": "2026-01-02T05:00:00Z",
             },
         )
 
-        # Create API Gateway
-        api = apigw.RestApi(
+        # Create HTTP API Gateway (v2)
+        http_api = apigwv2.HttpApi(
             self,
-            "JobsApi",
-            rest_api_name=f"{CONFIG.PROJECT_NAME}-api",
-            description="PDF Models API for job submission and status queries",
-            deploy_options=apigw.StageOptions(
-                stage_name="v1",
-                # Logging disabled - requires CloudWatch Logs role ARN in account settings
-                # logging_level=apigw.MethodLoggingLevel.INFO,
-                # data_trace_enabled=True,
-                metrics_enabled=True,
-            ),
-            default_cors_preflight_options=apigw.CorsOptions(
-                allow_origins=apigw.Cors.ALL_ORIGINS,
-                allow_methods=apigw.Cors.ALL_METHODS,
+            "HttpApi",
+            api_name=f"{CONFIG.PROJECT_NAME}-http-api",
+            description="PDF Models HTTP API for job submission and status queries",
+            cors_preflight=apigwv2.CorsPreflightOptions(
+                allow_origins=["*"],
+                allow_methods=[apigwv2.CorsHttpMethod.GET, apigwv2.CorsHttpMethod.POST, apigwv2.CorsHttpMethod.OPTIONS],
                 allow_headers=["Content-Type", "Authorization"],
                 max_age=Duration.hours(1),
             ),
         )
 
-        # Create Cognito User Pool Authorizer
+        # Create Cognito JWT Authorizer for HTTP API
         user_pool = cognito.UserPool.from_user_pool_id(
             self,
             "UserPool",
             user_pool_id,
         )
 
-        authorizer = apigw.CognitoUserPoolsAuthorizer(
-            self,
+        authorizer = apigwv2_authorizers.HttpUserPoolAuthorizer(
             "CognitoAuthorizer",
-            cognito_user_pools=[user_pool],
+            user_pool,
+            user_pool_clients=[
+                cognito.UserPoolClient.from_user_pool_client_id(
+                    self, "UserPoolClient", user_pool_client_id
+                )
+            ],
         )
 
-        # Create API resources: /v1/models/{model}/jobs
-        v1 = api.root.add_resource("v1")
-        models = v1.add_resource("models")
-        model = models.add_resource("{model}")
-        jobs = model.add_resource("jobs")
-        job_id = jobs.add_resource("{job_id}")
-
-        # Integration for submit-job Lambda
-        submit_job_integration = apigw.LambdaIntegration(
+        # Create Lambda integrations
+        submit_job_integration = apigwv2_integrations.HttpLambdaIntegration(
+            "SubmitJobIntegration",
             submit_job_function,
-            proxy=True,
         )
 
-        # Integration for get-job Lambda
-        get_job_integration = apigw.LambdaIntegration(
+        get_job_integration = apigwv2_integrations.HttpLambdaIntegration(
+            "GetJobIntegration",
             get_job_function,
-            proxy=True,
         )
 
-        # Add POST /v1/models/{model}/jobs - submit job
-        jobs.add_method(
-            "POST",
-            submit_job_integration,
+        # Add routes with Cognito authorizer
+        # POST /v1/models/{model}/jobs - submit job
+        http_api.add_routes(
+            path="/v1/models/{model}/jobs",
+            methods=[apigwv2.HttpMethod.POST],
+            integration=submit_job_integration,
             authorizer=authorizer,
         )
 
-        # Add GET /v1/models/{model}/jobs - list jobs
-        jobs.add_method(
-            "GET",
-            get_job_integration,
+        # GET /v1/models/{model}/jobs - list jobs
+        http_api.add_routes(
+            path="/v1/models/{model}/jobs",
+            methods=[apigwv2.HttpMethod.GET],
+            integration=get_job_integration,
             authorizer=authorizer,
         )
 
-        # Add GET /v1/models/{model}/jobs/{job_id} - get single job
-        job_id.add_method(
-            "GET",
-            get_job_integration,
+        # GET /v1/models/{model}/jobs/{job_id} - get single job
+        http_api.add_routes(
+            path="/v1/models/{model}/jobs/{job_id}",
+            methods=[apigwv2.HttpMethod.GET],
+            integration=get_job_integration,
             authorizer=authorizer,
         )
 
         # Export API endpoint to SSM
         ssm.StringParameter(
             self,
-            "ApiEndpoint",
-            parameter_name="/pdf-models/api/endpoint",
-            string_value=api.url,
-            description="API Gateway endpoint URL",
+            "HttpApiEndpoint",
+            parameter_name="/pdf-models/api-v2/endpoint",
+            string_value=http_api.url or "",
+            description="HTTP API Gateway endpoint URL",
         )
 
         # Export API ID to SSM
         ssm.StringParameter(
             self,
-            "ApiId",
-            parameter_name="/pdf-models/api/id",
-            string_value=api.rest_api_id,
-            description="API Gateway REST API ID",
+            "HttpApiId",
+            parameter_name="/pdf-models/api-v2/id",
+            string_value=http_api.http_api_id,
+            description="HTTP API Gateway ID",
         )

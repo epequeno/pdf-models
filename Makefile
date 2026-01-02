@@ -1,4 +1,4 @@
-.PHONY: help test test-watch cdk-synth cdk-diff cdk-deploy cdk-destroy aws-logs aws-s3-ls container-build base-image-build lambda-build lambda-clean setup
+.PHONY: help test test-watch test-integration test-integration-setup cdk-synth cdk-diff cdk-deploy cdk-destroy aws-logs aws-s3-ls container-build base-image-build lambda-build lambda-clean setup
 
 # AWS Profile to use for all commands
 AWS_PROFILE := arch
@@ -10,6 +10,9 @@ help:
 	@echo "Testing Commands:"
 	@echo "  make test                          - Run all unit tests"
 	@echo "  make test-watch                    - Run tests in watch mode"
+	@echo "  make test-integration              - Run integration tests (requires setup)"
+	@echo "  make test-integration-setup        - Create Cognito test user for integration tests (interactive)"
+	@echo "  make test-integration-auto         - Create test user and run integration tests (automated)"
 	@echo ""
 	@echo "CDK Commands:"
 	@echo "  make cdk-synth                     - Synthesize all CDK stacks"
@@ -26,6 +29,7 @@ help:
 	@echo "  make base-image-build              - Build Rust Lambda builder base image (runs in CodeBuild)"
 	@echo "  make container-build MODEL=<name>  - Build and push container (runs in CodeBuild)"
 	@echo "  make lambda-build                  - Build Rust Lambda functions (runs in CodeBuild)"
+	@echo "  make lambda-build-status           - Check status of latest Lambda build"
 	@echo "  make lambda-clean                  - Clean local Lambda build artifacts"
 	@echo ""
 	@echo "Stack Deployment Order:"
@@ -34,6 +38,7 @@ help:
 	@echo "  3. make cdk-deploy STACK=MarkerStack"
 	@echo "  4. make cdk-deploy STACK=ApiStack"
 	@echo "  5. make cdk-deploy STACK=CiCdStack"
+	@echo "  6. make cdk-deploy STACK=MonitoringStack"
 	@echo ""
 	@echo "Note: All commands automatically use AWS_PROFILE=arch and uv"
 
@@ -45,6 +50,58 @@ test:
 test-watch:
 	@echo "Running tests in watch mode..."
 	cd backend && uv run pytest-watch tests/ -v
+
+test-integration:
+	@echo "Running integration tests..."
+	@if [ -z "$$TEST_USER_EMAIL" ] || [ -z "$$TEST_USER_PASSWORD" ]; then \
+		echo "Error: Integration tests require environment variables:"; \
+		echo "  TEST_USER_EMAIL - Email of test user"; \
+		echo "  TEST_USER_PASSWORD - Password of test user"; \
+		echo ""; \
+		echo "Run 'make test-integration-setup' first to create a test user."; \
+		exit 1; \
+	fi
+	cd backend && uv run pytest tests/integration/ -v -s
+
+test-integration-setup:
+	@echo "Creating Cognito test user for integration tests..."
+	@echo "This will prompt you for test user credentials."
+	cd backend && AWS_PROFILE=arch uv run python tests/integration/setup_test_user.py
+
+test-integration-auto:
+	@echo "Setting up test user and running integration tests automatically..."
+	@echo "Using default test credentials..."
+	cd backend && AWS_PROFILE=arch uv run python tests/integration/setup_test_user.py "integration-test@pdf-models.local" "TestPass123!"
+	@echo "Running integration tests..."
+	cd backend && TEST_USER_EMAIL="integration-test@pdf-models.local" TEST_USER_PASSWORD="TestPass123!" uv run pytest tests/integration/ -v -s
+
+test-integration-debug:
+	@echo "Debugging Cognito authentication and API access..."
+	cd backend && TEST_USER_EMAIL="integration-test@pdf-models.local" TEST_USER_PASSWORD="TestPass123!" uv run python -c "\
+import os, boto3, requests, json, base64; \
+cognito = boto3.client('cognito-idp', region_name='us-east-1'); \
+response = cognito.initiate_auth( \
+    ClientId='4tmf8s58738hrbrp4ff2utqg5', \
+    AuthFlow='USER_PASSWORD_AUTH', \
+    AuthParameters={'USERNAME': 'integration-test@pdf-models.local', 'PASSWORD': 'TestPass123!'} \
+); \
+tokens = response['AuthenticationResult']; \
+access_token = tokens['AccessToken']; \
+print('=== TOKEN DEBUG ==='); \
+parts = access_token.split('.'); \
+header = json.loads(base64.b64decode(parts[0] + '==').decode()); \
+payload = json.loads(base64.b64decode(parts[1] + '==').decode()); \
+print('Header:', json.dumps(header, indent=2)); \
+print('Payload:', json.dumps(payload, indent=2)); \
+print('=== API TEST ==='); \
+api_response = requests.post( \
+    'https://gh0j9u3bx5.execute-api.us-east-1.amazonaws.com/v1/models/marker/jobs', \
+    headers={'Authorization': f'Bearer {access_token}', 'Content-Type': 'application/json'}, \
+    json={'s3_input_key': 'test-key'} \
+); \
+print(f'Status: {api_response.status_code}'); \
+print(f'Response: {api_response.text}'); \
+"
 
 # CDK Commands
 cdk-synth:
@@ -116,6 +173,15 @@ lambda-build:
 	@echo "Note: This triggers the CodeBuild project, it does not build locally."
 	AWS_PROFILE=arch aws codebuild start-build \
 		--project-name pdf-models-rust-lambda-build
+
+lambda-build-status:
+	@echo "Checking status of latest Lambda build..."
+	AWS_PROFILE=arch aws codebuild list-builds-for-project \
+		--project-name pdf-models-rust-lambda-build \
+		--query 'ids[0]' --output text | \
+	xargs -I {} aws codebuild batch-get-builds --ids {} \
+		--query 'builds[0].{status:buildStatus,phase:currentPhase,startTime:startTime}' \
+		--profile arch
 
 lambda-clean:
 	@echo "Cleaning Lambda build artifacts..."

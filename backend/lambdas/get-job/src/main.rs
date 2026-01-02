@@ -1,10 +1,13 @@
 use aws_config::BehaviorVersion;
 use aws_sdk_dynamodb::Client as DynamoDbClient;
+use aws_sdk_s3::presigning::PresigningConfig;
+use aws_sdk_s3::Client as S3Client;
 use lambda_runtime::{service_fn, Error, LambdaEvent};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::env;
+use std::time::Duration;
 use tracing::info;
 
 #[derive(Deserialize)]
@@ -31,7 +34,10 @@ struct RequestContext {
 
 #[derive(Deserialize)]
 struct Authorizer {
+    // REST API format
     claims: Option<Claims>,
+    // HTTP API v2 format - JWT claims are at top level
+    jwt: Option<JwtAuthorizer>,
     // Handle different possible structures
     #[serde(flatten)]
     extra: std::collections::HashMap<String, serde_json::Value>,
@@ -40,6 +46,11 @@ struct Authorizer {
 #[derive(Deserialize)]
 struct Claims {
     sub: String,  // Cognito user ID
+}
+
+#[derive(Deserialize)]
+struct JwtAuthorizer {
+    claims: Claims,
 }
 
 #[derive(Serialize)]
@@ -59,6 +70,8 @@ struct JobResponse {
     s3_input_key: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     s3_result_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    download_url: Option<String>,
     created_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     completed_at: Option<String>,
@@ -92,21 +105,26 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
 
     info!("Processing get job request");
 
-    // Extract user ID from Cognito claims
+    // Extract user ID from Cognito claims (supports both REST API and HTTP API v2 formats)
     let user_id = match &request.request_context.authorizer {
-        Some(authorizer) => match &authorizer.claims {
-            Some(claims) => &claims.sub,
-            None => {
-                // Try to extract from other possible locations
-                if let Some(sub) = authorizer.extra.get("sub") {
-                    if let Some(sub_str) = sub.as_str() {
-                        sub_str
-                    } else {
-                        return Ok(Response::error(401, "Invalid user ID in authorizer context"));
-                    }
+        Some(authorizer) => {
+            // Try REST API format first
+            if let Some(claims) = &authorizer.claims {
+                &claims.sub
+            }
+            // Try HTTP API v2 format
+            else if let Some(jwt) = &authorizer.jwt {
+                &jwt.claims.sub
+            }
+            // Try to extract from extra fields
+            else if let Some(sub) = authorizer.extra.get("sub") {
+                if let Some(sub_str) = sub.as_str() {
+                    sub_str
                 } else {
-                    return Ok(Response::error(401, "No user ID found in authorizer context"));
+                    return Ok(Response::error(401, "Invalid user ID in authorizer context"));
                 }
+            } else {
+                return Ok(Response::error(401, "No user ID found in authorizer context"));
             }
         },
         None => {
@@ -124,10 +142,12 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
 
     // Get environment variables
     let table_name = env::var("DYNAMODB_TABLE_NAME")?;
+    let bucket_name = env::var("S3_BUCKET_NAME")?;
 
-    // Initialize AWS client
+    // Initialize AWS clients
     let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
     let dynamodb_client = DynamoDbClient::new(&config);
+    let s3_client = S3Client::new(&config);
 
     // If job_id is present, return single job; otherwise list user's jobs
     if let Some(job_id) = &path_params.job_id {
@@ -150,6 +170,35 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
                     return Ok(Response::error(404, "Job not found"));
                 }
 
+                // Generate download URL if result is available
+                let s3_result_key = item.get("s3_result_key").and_then(|v| v.as_s().ok()).map(|s| s.to_string());
+                let download_url = if let Some(ref result_key) = s3_result_key {
+                    // Generate pre-signed URL for download (1 hour validity)
+                    match PresigningConfig::expires_in(Duration::from_secs(3600)) {
+                        Ok(presigning_config) => {
+                            match s3_client
+                                .get_object()
+                                .bucket(&bucket_name)
+                                .key(result_key)
+                                .presigned(presigning_config)
+                                .await
+                            {
+                                Ok(presigned_request) => Some(presigned_request.uri().to_string()),
+                                Err(e) => {
+                                    info!("Failed to generate pre-signed URL: {}", e);
+                                    None
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            info!("Failed to create presigning config: {}", e);
+                            None
+                        }
+                    }
+                } else {
+                    None
+                };
+
                 // Build job response
                 let job = JobResponse {
                     job_id: job_id.clone(),
@@ -157,7 +206,8 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
                     model: item.get("model").and_then(|v| v.as_s().ok()).map_or("", |v| v).to_string(),
                     status: item.get("status").and_then(|v| v.as_s().ok()).map_or("unknown", |v| v).to_string(),
                     s3_input_key: item.get("s3_input_key").and_then(|v| v.as_s().ok()).map_or("", |v| v).to_string(),
-                    s3_result_key: item.get("s3_result_key").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
+                    s3_result_key,
+                    download_url,
                     created_at: item.get("created_at").and_then(|v| v.as_s().ok()).map_or("", |v| v).to_string(),
                     completed_at: item.get("completed_at").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
                     error: item.get("error").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
@@ -187,6 +237,8 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
             .items()
             .iter()
             .filter_map(|item| {
+                // Note: For list view, we don't generate download URLs to save time
+                // Users can get the download URL from the single job endpoint
                 Some(JobResponse {
                     job_id: item.get("job_id")?.as_s().ok()?.to_string(),
                     user_id: item.get("user_id")?.as_s().ok()?.to_string(),
@@ -194,6 +246,7 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
                     status: item.get("status")?.as_s().ok()?.to_string(),
                     s3_input_key: item.get("s3_input_key")?.as_s().ok()?.to_string(),
                     s3_result_key: item.get("s3_result_key").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
+                    download_url: None,  // Not generated for list view
                     created_at: item.get("created_at")?.as_s().ok()?.to_string(),
                     completed_at: item.get("completed_at").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
                     error: item.get("error").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),

@@ -1,0 +1,11 @@
+{
+  "requestContext": {
+    "requestId": "test-123",
+    "authorizer": {
+      "claims": {
+        "sub": "test-user-id"
+      }
+    }
+  },
+  "body": "{\"s3_input_key\":\"test-key\"}"
+}

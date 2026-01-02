@@ -205,6 +205,9 @@ class CiCdStack(Stack):
                     )
                 ),
                 compute_type=codebuild.ComputeType.SMALL,
+                environment_variables={
+                    "S3_BUCKET_NAME": codebuild.BuildEnvironmentVariable(value=s3_bucket_name),
+                },
             ),
             build_spec=codebuild.BuildSpec.from_source_filename("backend/lambdas/buildspec.yml"),
             artifacts=codebuild.Artifacts.s3(
@@ -213,6 +216,15 @@ class CiCdStack(Stack):
                 package_zip=True,
                 name="rust-lambda-builds.zip",
             ),
+        )
+
+        # Grant S3 permissions to Lambda build for uploading individual Lambda packages
+        lambda_build.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["s3:PutObject"],
+                resources=[f"arn:aws:s3:::{s3_bucket_name}/lambda-artifacts/*"],
+            )
         )
 
         # Export CodeBuild project name to SSM for easy reference

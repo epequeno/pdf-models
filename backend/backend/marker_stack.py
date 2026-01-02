@@ -7,12 +7,14 @@ This stack creates the compute infrastructure for processing PDFs with the Marke
 from aws_cdk import (
     Stack,
     Duration,
+    RemovalPolicy,
     aws_ecs as ecs,
     aws_ec2 as ec2,
     aws_iam as iam,
     aws_logs as logs,
     aws_stepfunctions as sfn,
     aws_stepfunctions_tasks as tasks,
+    aws_dynamodb as dynamodb,
     aws_ssm as ssm,
 )
 from constructs import Construct
@@ -97,6 +99,7 @@ class MarkerStack(Stack):
             "MarkerTaskLogGroup",
             log_group_name=f"/ecs/{CONFIG.PROJECT_NAME}-marker",
             retention=logs.RetentionDays.ONE_WEEK,
+            removal_policy=RemovalPolicy.DESTROY,
         )
 
         # Create Fargate task definition
@@ -180,6 +183,17 @@ class MarkerStack(Stack):
             )
         )
 
+        # Grant DynamoDB permissions to Step Functions (for error handling)
+        sfn_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["dynamodb:UpdateItem"],
+                resources=[
+                    f"arn:aws:dynamodb:{self.region}:{self.account}:table/{dynamodb_table_name}"
+                ],
+            )
+        )
+
         # Grant EventBridge permissions for task state changes
         sfn_role.add_to_policy(
             iam.PolicyStatement(
@@ -191,8 +205,37 @@ class MarkerStack(Stack):
             )
         )
 
-        # Create ECS RunTask integration
-        # Note: Using low-level EcsRunTask to get full control over network configuration
+        # Import the DynamoDB table for error handling
+        jobs_table = dynamodb.Table.from_table_name(
+            self,
+            "JobsTable",
+            dynamodb_table_name,
+        )
+
+        # Create DynamoDB update task for job status
+        update_job_status = tasks.DynamoUpdateItem(
+            self,
+            "UpdateJobStatus",
+            table=jobs_table,
+            key={
+                "job_id": tasks.DynamoAttributeValue.from_string(
+                    sfn.JsonPath.string_at("$.job_id")
+                )
+            },
+            update_expression="SET #status = :status, completed_at = :completed_at",
+            expression_attribute_names={
+                "#status": "status"
+            },
+            expression_attribute_values={
+                ":status": tasks.DynamoAttributeValue.from_string("failed"),
+                ":completed_at": tasks.DynamoAttributeValue.from_string(
+                    sfn.JsonPath.string_at("$$.State.EnteredTime")
+                )
+            },
+            result_path=sfn.JsonPath.DISCARD,
+        )
+
+        # Create ECS RunTask integration with error handling
         run_task = tasks.EcsRunTask(
             self,
             "RunMarkerTask",
@@ -218,10 +261,24 @@ class MarkerStack(Stack):
                 )
             ],
             result_path=sfn.JsonPath.DISCARD,
+        ).add_retry(
+            # Retry on service exceptions (temporary failures)
+            errors=["States.TaskFailed"],
+            interval=Duration.seconds(30),
+            max_attempts=3,
+            backoff_rate=2.0,
+        ).add_catch(
+            # Catch all errors and update job status to failed
+            update_job_status,
+            errors=["States.ALL"],
+            result_path="$.error",
         )
 
-        # Create state machine definition
-        definition = run_task
+        # Create success state
+        success = sfn.Succeed(self, "ProcessingComplete")
+
+        # Create state machine definition with error handling
+        definition = run_task.next(success)
 
         # Create state machine
         state_machine = sfn.StateMachine(
