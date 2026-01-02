@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     git \
     wget \
     xz-utils \
+    zip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Zig 0.13.0 (required by cargo-lambda for ARM64 cross-compilation)
