@@ -25,6 +25,13 @@ PDF Models is a serverless models-as-a-service platform for hosting open-source 
 - Ensures hermetic, reproducible builds from day one
 - Anti-patterns: local scripts modifying AWS resources, local container builds, local server processes
 
+**🚨 CRITICAL: CodeCommit is Source of Truth**
+- CodeBuild pulls code from CodeCommit repository, NOT from local files
+- Lambda code changes MUST be committed and pushed to CodeCommit before rebuilding
+- Local file edits are invisible to CodeBuild - you can rebuild 100 times and Lambda won't update
+- Workflow: `git commit && git push` → trigger CodeBuild → redeploy stack
+- This is the #1 most common mistake during development
+
 ### 4. Transparency Philosophy
 - Behave as a thin infrastructure layer over models
 - Return model outputs with minimal transformation

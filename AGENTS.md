@@ -97,6 +97,20 @@ bucket_name = ssm.StringParameter.value_from_lookup(
 - All deployments eventually happen in CodePipeline
 - Local development is for code editing and CDK synthesis only
 
+### 🚨 CodeCommit is Source of Truth for Lambda Builds
+
+**CRITICAL**: CodeBuild pulls Lambda code from CodeCommit, NOT from local files.
+
+If you modify Lambda code locally (in `backend/lambdas/`), the changes will NOT be deployed until you:
+1. Commit the changes: `git add . && git commit -m "message"`
+2. Push to CodeCommit: `git push`
+3. Trigger rebuild: `AWS_PROFILE=arch aws codebuild start-build --project-name pdf-models-rust-lambda-build`
+4. Redeploy the stack: `make cdk-deploy STACK=ApiV2Stack`
+
+**Why this matters**: Local file changes are invisible to CodeBuild. You can rebuild 100 times locally, but Lambda will continue using old code until you push to CodeCommit.
+
+**Common mistake**: Editing Lambda Rust code, running `make lambda-build` or CodeBuild manually, expecting Lambda to update - it won't update because CodeBuild is building from the old CodeCommit code, not your local edits.
+
 ### Step Functions Use JSONata
 - Set `"QueryLanguage": "JSONata"` in all state machines
 - Prefer JSONata over JSONPath for better readability
@@ -123,6 +137,12 @@ bucket_name = ssm.StringParameter.value_from_lookup(
 ### ❌ Creating nested/monolithic stacks
 **Symptom**: Hard to update individual components
 **Solution**: Keep stacks separate, deploy independently
+
+### ❌ Modifying Lambda code without pushing to CodeCommit
+**Symptom**: Lambda continues using old code even after rebuilding in CodeBuild
+**Root Cause**: CodeBuild pulls from CodeCommit repository, not local files
+**Solution**: Always `git commit && git push` before triggering CodeBuild
+**This is the #1 most common mistake** - it has come up repeatedly during debugging
 
 ## Quick Reference
 

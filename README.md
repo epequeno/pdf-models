@@ -25,6 +25,7 @@ A serverless platform for hosting open-source document processing models as API 
 - Nothing runs locally except code editing
 - All builds, deployments, and AWS operations happen in CodeBuild/CodePipeline
 - Ensures hermetic, reproducible environments from day one
+- 🚨 **CRITICAL**: CodeBuild pulls from CodeCommit - Lambda code changes must be committed & pushed before rebuilding
 
 **Clean Separation**
 - Infrastructure split into independent stacks by lifecycle (stable vs frequently changing)
