@@ -6,13 +6,25 @@ Separated from other stacks as CI/CD has different lifecycle and change frequenc
 """
 
 from aws_cdk import (
-    Stack,
     Duration,
-    aws_codecommit as codecommit,
+    Stack,
+)
+from aws_cdk import (
     aws_codebuild as codebuild,
+)
+from aws_cdk import (
+    aws_codecommit as codecommit,
+)
+from aws_cdk import (
     aws_ecr as ecr,
+)
+from aws_cdk import (
     aws_iam as iam,
+)
+from aws_cdk import (
     aws_s3 as s3,
+)
+from aws_cdk import (
     aws_ssm as ssm,
 )
 from constructs import Construct
@@ -81,8 +93,10 @@ class CiCdStack(Stack):
                 privileged=True,  # Required for Docker builds
                 compute_type=codebuild.ComputeType.MEDIUM,  # Medium for longer build
                 environment_variables={
-                    "ECR_REPO_URI": codebuild.BuildEnvironmentVariable(value=ecr_rust_builder_uri),
-                }
+                    "ECR_REPO_URI": codebuild.BuildEnvironmentVariable(
+                        value=ecr_rust_builder_uri
+                    ),
+                },
             ),
             build_spec=codebuild.BuildSpec.from_source_filename(
                 "backend/containers/rust-lambda-builder/buildspec.yml"
@@ -141,10 +155,14 @@ class CiCdStack(Stack):
                 privileged=True,  # Required for Docker builds
                 compute_type=codebuild.ComputeType.SMALL,
                 environment_variables={
-                    "ECR_REPOSITORY_URI": codebuild.BuildEnvironmentVariable(value=ecr_marker_uri),
-                }
+                    "ECR_REPOSITORY_URI": codebuild.BuildEnvironmentVariable(
+                        value=ecr_marker_uri
+                    ),
+                },
             ),
-            build_spec=codebuild.BuildSpec.from_source_filename("backend/containers/marker/buildspec.yml"),
+            build_spec=codebuild.BuildSpec.from_source_filename(
+                "backend/containers/marker/buildspec.yml"
+            ),
         )
 
         # Grant ECR permissions to CodeBuild
@@ -172,6 +190,17 @@ class CiCdStack(Stack):
                 ],
                 resources=[
                     f"arn:aws:ecr:{self.region}:{self.account}:repository/{CONFIG.ECR_MARKER_REPO_NAME}"
+                ],
+            )
+        )
+
+        # Grant SSM permissions to write image tag
+        marker_build.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["ssm:PutParameter"],
+                resources=[
+                    f"arn:aws:ssm:{self.region}:{self.account}:parameter{CONFIG.SSM_MARKER_IMAGE_TAG}"
                 ],
             )
         )
@@ -206,10 +235,14 @@ class CiCdStack(Stack):
                 ),
                 compute_type=codebuild.ComputeType.SMALL,
                 environment_variables={
-                    "S3_BUCKET_NAME": codebuild.BuildEnvironmentVariable(value=s3_bucket_name),
+                    "S3_BUCKET_NAME": codebuild.BuildEnvironmentVariable(
+                        value=s3_bucket_name
+                    ),
                 },
             ),
-            build_spec=codebuild.BuildSpec.from_source_filename("backend/lambdas/buildspec.yml"),
+            build_spec=codebuild.BuildSpec.from_source_filename(
+                "backend/lambdas/buildspec.yml"
+            ),
             artifacts=codebuild.Artifacts.s3(
                 bucket=artifacts_bucket,
                 include_build_id=True,

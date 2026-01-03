@@ -5,17 +5,30 @@ This stack creates the compute infrastructure for processing PDFs with the Marke
 """
 
 from aws_cdk import (
-    Stack,
     Duration,
     RemovalPolicy,
-    aws_ecs as ecs,
-    aws_ec2 as ec2,
-    aws_iam as iam,
-    aws_logs as logs,
-    aws_stepfunctions as sfn,
-    aws_stepfunctions_tasks as tasks,
+    Stack,
+)
+from aws_cdk import (
     aws_dynamodb as dynamodb,
+)
+from aws_cdk import (
+    aws_ecs as ecs,
+)
+from aws_cdk import (
+    aws_iam as iam,
+)
+from aws_cdk import (
+    aws_logs as logs,
+)
+from aws_cdk import (
     aws_ssm as ssm,
+)
+from aws_cdk import (
+    aws_stepfunctions as sfn,
+)
+from aws_cdk import (
+    aws_stepfunctions_tasks as tasks,
 )
 from constructs import Construct
 
@@ -44,6 +57,10 @@ class MarkerStack(Stack):
         )
         dynamodb_table_name = ssm.StringParameter.value_for_string_parameter(
             self, CONFIG.SSM_DYNAMODB_TABLE_NAME
+        )
+        # Get the image tag from SSM (updated by CodeBuild after each build)
+        image_tag = ssm.StringParameter.value_for_string_parameter(
+            self, CONFIG.SSM_MARKER_IMAGE_TAG
         )
 
         # Create ECS cluster
@@ -117,7 +134,7 @@ class MarkerStack(Stack):
         container = task_definition.add_container(
             "marker",
             container_name="marker",
-            image=ecs.ContainerImage.from_registry(f"{ecr_repo_uri}:latest"),
+            image=ecs.ContainerImage.from_registry(f"{ecr_repo_uri}:{image_tag}"),
             logging=ecs.LogDriver.aws_logs(
                 stream_prefix="marker",
                 log_group=log_group,
@@ -223,55 +240,57 @@ class MarkerStack(Stack):
                 )
             },
             update_expression="SET #status = :status, completed_at = :completed_at",
-            expression_attribute_names={
-                "#status": "status"
-            },
+            expression_attribute_names={"#status": "status"},
             expression_attribute_values={
                 ":status": tasks.DynamoAttributeValue.from_string("failed"),
                 ":completed_at": tasks.DynamoAttributeValue.from_string(
                     sfn.JsonPath.string_at("$$.State.EnteredTime")
-                )
+                ),
             },
             result_path=sfn.JsonPath.DISCARD,
         )
 
         # Create ECS RunTask integration with error handling
-        run_task = tasks.EcsRunTask(
-            self,
-            "RunMarkerTask",
-            integration_pattern=sfn.IntegrationPattern.RUN_JOB,
-            cluster=cluster,
-            task_definition=task_definition,
-            launch_target=tasks.EcsFargateLaunchTarget(
-                platform_version=ecs.FargatePlatformVersion.LATEST,
-            ),
-            container_overrides=[
-                tasks.ContainerOverride(
-                    container_definition=container,
-                    environment=[
-                        tasks.TaskEnvironmentVariable(
-                            name="JOB_ID",
-                            value=sfn.JsonPath.string_at("$.job_id"),
-                        ),
-                        tasks.TaskEnvironmentVariable(
-                            name="S3_INPUT_KEY",
-                            value=sfn.JsonPath.string_at("$.s3_input_key"),
-                        ),
-                    ],
-                )
-            ],
-            result_path=sfn.JsonPath.DISCARD,
-        ).add_retry(
-            # Retry on service exceptions (temporary failures)
-            errors=["States.TaskFailed"],
-            interval=Duration.seconds(30),
-            max_attempts=3,
-            backoff_rate=2.0,
-        ).add_catch(
-            # Catch all errors and update job status to failed
-            update_job_status,
-            errors=["States.ALL"],
-            result_path="$.error",
+        run_task = (
+            tasks.EcsRunTask(
+                self,
+                "RunMarkerTask",
+                integration_pattern=sfn.IntegrationPattern.RUN_JOB,
+                cluster=cluster,
+                task_definition=task_definition,
+                launch_target=tasks.EcsFargateLaunchTarget(
+                    platform_version=ecs.FargatePlatformVersion.LATEST,
+                ),
+                container_overrides=[
+                    tasks.ContainerOverride(
+                        container_definition=container,
+                        environment=[
+                            tasks.TaskEnvironmentVariable(
+                                name="JOB_ID",
+                                value=sfn.JsonPath.string_at("$.job_id"),
+                            ),
+                            tasks.TaskEnvironmentVariable(
+                                name="S3_INPUT_KEY",
+                                value=sfn.JsonPath.string_at("$.s3_input_key"),
+                            ),
+                        ],
+                    )
+                ],
+                result_path=sfn.JsonPath.DISCARD,
+            )
+            .add_retry(
+                # Retry on service exceptions (temporary failures)
+                errors=["States.TaskFailed"],
+                interval=Duration.seconds(30),
+                max_attempts=3,
+                backoff_rate=2.0,
+            )
+            .add_catch(
+                # Catch all errors and update job status to failed
+                update_job_status,
+                errors=["States.ALL"],
+                result_path="$.error",
+            )
         )
 
         # Create success state

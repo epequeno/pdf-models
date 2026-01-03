@@ -30,3 +30,6 @@ phases:
       - docker push $ECR_REPOSITORY_URI:$IMAGE_TAG
       - echo "Successfully pushed $ECR_REPOSITORY_URI:latest"
       - echo "Successfully pushed $ECR_REPOSITORY_URI:$IMAGE_TAG"
+      - echo "Updating SSM parameter with image tag..."
+      - aws ssm put-parameter --name "/pdf-models/cicd/marker-image-tag" --value "$IMAGE_TAG" --type String --overwrite
+      - echo "SSM parameter /pdf-models/cicd/marker-image-tag updated to $IMAGE_TAG"

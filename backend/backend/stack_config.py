@@ -22,21 +22,30 @@ class StackConfig:
 
     # SSM Parameter Names - Foundation
     SSM_ECR_MARKER_URI: str = "/pdf-models/foundation/ecr-repo-uri-marker"
-    SSM_ECR_RUST_LAMBDA_BUILDER_URI: str = "/pdf-models/foundation/ecr-repo-uri-rust-lambda-builder"
+    SSM_ECR_RUST_LAMBDA_BUILDER_URI: str = (
+        "/pdf-models/foundation/ecr-repo-uri-rust-lambda-builder"
+    )
     SSM_HOSTED_ZONE_ID: str = "/pdf-models/foundation/hosted-zone-id"
     SSM_CERTIFICATE_ARN: str = "/pdf-models/foundation/certificate-arn"
+
+    # SSM Parameter Names - CI/CD
+    SSM_MARKER_IMAGE_TAG: str = "/pdf-models/cicd/marker-image-tag"
 
     # SSM Parameter Names - Core
     SSM_S3_BUCKET_NAME: str = "/pdf-models/core/s3-bucket-name"
     SSM_DYNAMODB_TABLE_NAME: str = "/pdf-models/core/dynamodb-table-name"
     SSM_COGNITO_USER_POOL_ID: str = "/pdf-models/core/cognito-user-pool-id"
     SSM_COGNITO_IDENTITY_POOL_ID: str = "/pdf-models/core/cognito-identity-pool-id"
-    SSM_COGNITO_USER_POOL_CLIENT_ID: str = "/pdf-models/core/cognito-user-pool-client-id"
+    SSM_COGNITO_USER_POOL_CLIENT_ID: str = (
+        "/pdf-models/core/cognito-user-pool-client-id"
+    )
 
     # Resource Names (base names, account-specific suffixes added in stacks)
     ECR_MARKER_REPO_NAME: str = "pdf-models/marker"
     ECR_RUST_LAMBDA_BUILDER_REPO_NAME: str = "pdf-models/rust-lambda-builder"
-    S3_BUCKET_NAME_PREFIX: str = "pdf-models-docs"  # Actual name will be: {prefix}-{account-id}
+    S3_BUCKET_NAME_PREFIX: str = (
+        "pdf-models-docs"  # Actual name will be: {prefix}-{account-id}
+    )
     DYNAMODB_TABLE_NAME: str = "pdf-models-jobs"
     COGNITO_USER_POOL_NAME: str = "pdf-models-users"
     COGNITO_IDENTITY_POOL_NAME: str = "pdf-models-identity-pool"
