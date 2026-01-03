@@ -11,7 +11,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
+# Note: pypdfium2 must be installed to avoid warnings
 RUN pip install --no-cache-dir \
+    pypdfium2 \
     marker-pdf \
     boto3
 

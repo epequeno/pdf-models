@@ -19,6 +19,7 @@ import logging
 from pathlib import Path
 from datetime import datetime, timezone
 
+import pypdfium2  # Must be imported first to avoid warnings
 import boto3
 from marker.convert import convert_single_pdf
 from marker.models import load_all_models

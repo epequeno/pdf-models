@@ -18,6 +18,7 @@ help:
 	@echo "  make cdk-synth                     - Synthesize all CDK stacks"
 	@echo "  make cdk-diff STACK=<name>         - Show changes for a specific stack"
 	@echo "  make cdk-deploy STACK=<name>       - Deploy a specific stack"
+	@echo "  make cdk-deploy-all                - Deploy all stacks in correct order"
 	@echo "  make cdk-destroy STACK=<name>      - Destroy a specific stack"
 	@echo ""
 	@echo "AWS Commands:"
@@ -131,6 +132,24 @@ cdk-destroy:
 	fi
 	@echo "Destroying $(STACK) with AWS_PROFILE=arch..."
 	cd backend && AWS_PROFILE=arch uv run cdk destroy $(STACK)
+
+cdk-deploy-all:
+	@echo "Deploying all stacks in correct order with AWS_PROFILE=arch..."
+	@echo "Step 1/7: Deploying FoundationStack..."
+	cd backend && AWS_PROFILE=arch uv run cdk deploy FoundationStack --require-approval never
+	@echo "Step 2/7: Deploying CoreInfrastructureStack..."
+	cd backend && AWS_PROFILE=arch uv run cdk deploy CoreInfrastructureStack --require-approval never
+	@echo "Step 3/7: Deploying CiCdStack..."
+	cd backend && AWS_PROFILE=arch uv run cdk deploy CiCdStack --require-approval never
+	@echo "Step 4/7: Deploying MarkerStack..."
+	cd backend && AWS_PROFILE=arch uv run cdk deploy MarkerStack --require-approval never
+	@echo "Step 5/7: Deploying ApiV2Stack..."
+	cd backend && AWS_PROFILE=arch uv run cdk deploy ApiV2Stack --require-approval never
+	@echo "Step 6/7: Deploying MonitoringStack..."
+	cd backend && AWS_PROFILE=arch uv run cdk deploy MonitoringStack --require-approval never
+	@echo "Step 7/7: Deploying FrontendStack..."
+	cd backend && AWS_PROFILE=arch uv run cdk deploy FrontendStack --require-approval never
+	@echo "All stacks deployed successfully!"
 
 # AWS Commands
 aws-logs:

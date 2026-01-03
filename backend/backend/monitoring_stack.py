@@ -5,9 +5,13 @@ This stack creates monitoring infrastructure for the PDF Models platform.
 """
 
 from aws_cdk import (
-    Stack,
     Duration,
+    Stack,
+)
+from aws_cdk import (
     aws_cloudwatch as cloudwatch,
+)
+from aws_cdk import (
     aws_ssm as ssm,
 )
 from constructs import Construct
@@ -29,9 +33,9 @@ class MonitoringStack(Stack):
 
         # Get resource names from SSM
         api_id = ssm.StringParameter.value_for_string_parameter(
-            self, "/pdf-models/api/id"
+            self, "/pdf-models/api-v2/id"
         )
-        
+
         # Create dashboard
         dashboard = cloudwatch.Dashboard(
             self,
@@ -76,7 +80,9 @@ class MonitoringStack(Stack):
                 cloudwatch.Metric(
                     namespace="AWS/Lambda",
                     metric_name="Duration",
-                    dimensions_map={"FunctionName": f"{CONFIG.PROJECT_NAME}-submit-job"},
+                    dimensions_map={
+                        "FunctionName": f"{CONFIG.PROJECT_NAME}-submit-job"
+                    },
                     statistic="Average",
                     period=Duration.minutes(5),
                 ),
@@ -92,7 +98,9 @@ class MonitoringStack(Stack):
                 cloudwatch.Metric(
                     namespace="AWS/Lambda",
                     metric_name="Errors",
-                    dimensions_map={"FunctionName": f"{CONFIG.PROJECT_NAME}-submit-job"},
+                    dimensions_map={
+                        "FunctionName": f"{CONFIG.PROJECT_NAME}-submit-job"
+                    },
                     statistic="Sum",
                     period=Duration.minutes(5),
                 ),
@@ -143,7 +151,9 @@ class MonitoringStack(Stack):
                 cloudwatch.Metric(
                     namespace="AWS/ECS",
                     metric_name="RunningTaskCount",
-                    dimensions_map={"ClusterName": f"{CONFIG.PROJECT_NAME}-marker-cluster"},
+                    dimensions_map={
+                        "ClusterName": f"{CONFIG.PROJECT_NAME}-marker-cluster"
+                    },
                     statistic="Average",
                     period=Duration.minutes(5),
                 )
@@ -152,14 +162,18 @@ class MonitoringStack(Stack):
                 cloudwatch.Metric(
                     namespace="AWS/ECS",
                     metric_name="CPUUtilization",
-                    dimensions_map={"ClusterName": f"{CONFIG.PROJECT_NAME}-marker-cluster"},
+                    dimensions_map={
+                        "ClusterName": f"{CONFIG.PROJECT_NAME}-marker-cluster"
+                    },
                     statistic="Average",
                     period=Duration.minutes(5),
                 ),
                 cloudwatch.Metric(
                     namespace="AWS/ECS",
                     metric_name="MemoryUtilization",
-                    dimensions_map={"ClusterName": f"{CONFIG.PROJECT_NAME}-marker-cluster"},
+                    dimensions_map={
+                        "ClusterName": f"{CONFIG.PROJECT_NAME}-marker-cluster"
+                    },
                     statistic="Average",
                     period=Duration.minutes(5),
                 ),
@@ -175,9 +189,9 @@ class MonitoringStack(Stack):
         )
 
         # Create critical alarms
-        
+
         # API Gateway 5XX errors
-        api_5xx_alarm = cloudwatch.Alarm(
+        self.api_5xx_alarm = cloudwatch.Alarm(
             self,
             "Api5xxAlarm",
             alarm_name=f"{CONFIG.PROJECT_NAME}-api-5xx-errors",
@@ -194,7 +208,7 @@ class MonitoringStack(Stack):
         )
 
         # Step Functions failures
-        sfn_failure_alarm = cloudwatch.Alarm(
+        self.sfn_failure_alarm = cloudwatch.Alarm(
             self,
             "StepFunctionsFailureAlarm",
             alarm_name=f"{CONFIG.PROJECT_NAME}-step-functions-failures",
