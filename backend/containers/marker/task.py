@@ -109,12 +109,12 @@ def main():
 
             # Load Marker models
             logger.info("Loading Marker models...")
-            model_dict = create_model_dict()
+            artifact_dict = create_model_dict()
             logger.info("Models loaded successfully")
 
             # Convert PDF to Markdown
             logger.info("Converting PDF to Markdown...")
-            converter = PdfConverter(model_dict=model_dict)
+            converter = PdfConverter(artifact_dict=artifact_dict)
             rendered = converter(str(input_pdf))
             full_text, images, out_meta = rendered.markdown, rendered.images, rendered.metadata
             logger.info(f"Conversion complete. Output length: {len(full_text)} characters")
