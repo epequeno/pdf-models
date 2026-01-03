@@ -190,6 +190,13 @@ Run tests with: `make test-integration-auto`
 **Root Cause**: jq is not available in the CodeBuild environment
 **Solution**: Use Python's built-in JSON parsing instead
 
+### ❌ Runtime model downloads in containers
+**Symptom**: Container jobs take 10+ minutes, timeout frequently
+**Root Cause**: Large ML models (1+ GB) downloading at runtime on every execution
+**Solution**: Pre-download models during container build using RUN commands
+**Example**: `RUN python -c "from marker.models import create_model_dict; create_model_dict()"`
+**This pattern should be applied to all ML model containers**
+
 ## Quick Reference
 
 | Task | Command |
