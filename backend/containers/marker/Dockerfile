@@ -10,6 +10,9 @@ RUN apt-get update && apt-get install -y \
     libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
+# Create non-root user first
+RUN useradd -m -u 1000 appuser
+
 # Install Python dependencies
 # Note: pypdfium2 must be installed to avoid warnings
 RUN pip install --no-cache-dir \
@@ -17,12 +20,15 @@ RUN pip install --no-cache-dir \
     marker-pdf \
     boto3
 
+# Fix permissions for marker-pdf's static directory
+RUN chmod -R 777 /usr/local/lib/python3.11/site-packages/static || true
+
 # Copy task script
 COPY task.py /app/task.py
 WORKDIR /app
+RUN chown -R appuser:appuser /app
 
 # Run as non-root user
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
 ENTRYPOINT ["python", "task.py"]
