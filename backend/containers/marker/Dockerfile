@@ -13,6 +13,10 @@ RUN apt-get update && apt-get install -y \
 # Create non-root user first
 RUN useradd -m -u 1000 appuser
 
+# Create writable directories for marker data
+RUN mkdir -p /app/marker_data/static /app/marker_data/cache && \
+    chown -R appuser:appuser /app
+
 # Install Python dependencies
 # Note: pypdfium2 must be installed to avoid warnings
 RUN pip install --no-cache-dir \
@@ -20,15 +24,15 @@ RUN pip install --no-cache-dir \
     marker-pdf \
     boto3
 
-# Fix permissions for marker-pdf's static directory
-RUN chmod -R 777 /usr/local/lib/python3.11/site-packages/static || true
-
 # Copy task script
 COPY task.py /app/task.py
 WORKDIR /app
-RUN chown -R appuser:appuser /app
 
 # Run as non-root user
 USER appuser
+
+# Set environment variables to redirect marker data to writable locations
+ENV MARKER_DATA_DIR=/app/marker_data
+ENV FONT_DIR=/app/marker_data/static
 
 ENTRYPOINT ["python", "task.py"]

@@ -19,6 +19,10 @@ import logging
 from pathlib import Path
 from datetime import datetime, timezone
 
+# Configure marker to use writable directories before importing
+os.environ['MARKER_DATA_DIR'] = '/app/marker_data'
+os.environ['FONT_DIR'] = '/app/marker_data/static'
+
 import pypdfium2  # Must be imported first to avoid warnings
 import boto3
 from marker.converters.pdf import PdfConverter
