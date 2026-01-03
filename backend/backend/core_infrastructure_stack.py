@@ -13,15 +13,25 @@ Replaceability: Moderate (contains stateful data)
 """
 
 from aws_cdk import (
-    Stack,
-    RemovalPolicy,
-    Duration,
     Aws,
+    Duration,
+    RemovalPolicy,
+    Stack,
     Tags,
-    aws_s3 as s3,
-    aws_dynamodb as dynamodb,
+)
+from aws_cdk import (
     aws_cognito as cognito,
+)
+from aws_cdk import (
+    aws_dynamodb as dynamodb,
+)
+from aws_cdk import (
     aws_iam as iam,
+)
+from aws_cdk import (
+    aws_s3 as s3,
+)
+from aws_cdk import (
     aws_ssm as ssm,
 )
 from constructs import Construct
@@ -159,8 +169,8 @@ class CoreInfrastructureStack(Stack):
             self,
             "UserPool",
             user_pool_name=CONFIG.COGNITO_USER_POOL_NAME,
-            # Self-registration: Disabled for MVP (admin creates users)
-            self_sign_up_enabled=False,
+            # Self-registration: Enabled for public sign-up
+            self_sign_up_enabled=True,
             # Sign-in: Email as username (more user-friendly)
             sign_in_aliases=cognito.SignInAliases(
                 email=True,

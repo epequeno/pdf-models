@@ -69,7 +69,7 @@ See [Architecture Documentation](backend/docs/architecture.md) for detailed setu
 
 ## Current Status
 
-**Integration Tests Working - End-to-End Workflow Functional** ✅
+**Integration Tests Partially Working - Container Deployment Issue** ⚠️
 
 - [x] Phase 1: Core Infrastructure - **DEPLOYED & WORKING**
   - FoundationStack (ECR repositories)
@@ -79,14 +79,22 @@ See [Architecture Documentation](backend/docs/architecture.md) for detailed setu
   - CiCdStack (CodeCommit, CodeBuild)
   - Custom Rust Lambda builder base image
   - ✅ Fixed buildspec to handle S3 versioning correctly
-- [x] Phase 2: Marker Model - **DEPLOYED & WORKING**
+- [x] Phase 2: Marker Model - **DEPLOYED BUT CONTAINER ISSUE**
   - MarkerStack (ECS, Fargate, Step Functions)
-  - Marker container image
+  - ⚠️ Container rebuilt with fixes but ECS not using new image
 - [x] Phase 3: API Layer - **HTTP API v2 FULLY WORKING** ✅
   - ApiV2Stack (HTTP API Gateway, Cognito JWT authorizer)
   - Rust Lambda functions with Identity Pool workflow
   - API Endpoint: `https://eykwwhrt16.execute-api.us-east-1.amazonaws.com/`
-  - ✅ Integration tests passing (3/4 tests, 1 processing job)
+  - ✅ S3 access permissions resolved
+
+**Current Issue**: Container permission problem identified and fixed, but ECS tasks still using old container image despite successful rebuild and deployment attempts.
+
+**Root Cause Identified**: Marker library tries to write to `/usr/local/lib/python3.11/site-packages/static` (permission denied)
+
+**Fix Implemented**: Redirected Marker data directories to writable locations using environment variables
+
+**Deployment Challenge**: ECS tasks not picking up new container image (revision 11) despite multiple deployment attempts
 
 ## Integration Testing
 

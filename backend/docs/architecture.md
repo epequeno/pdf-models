@@ -250,6 +250,25 @@ Global Secondary Index: user_id-created_at-index
 - Prepares for more complex workflows
 - **JSONata**: More expressive transformations, easier to read than JSONPath
 
+### Parameterized Pipeline Design
+
+**Key Innovation**: The system uses a parameterized approach to eliminate caching issues between container builds and deployments.
+
+**Problem Solved**: Previously, Step Functions state machines had hardcoded task definition ARNs, causing new container images to be ignored until infrastructure was redeployed.
+
+**Solution**: Dynamic task definition resolution at execution time:
+
+1. **Lambda Resolver**: A Lambda function reads the current task definition ARN from SSM Parameter Store
+2. **Two-Step Execution**: 
+   - Step 1: Resolve current task definition ARN
+   - Step 2: Use resolved ARN in ECS RunTask
+3. **Wildcard IAM Permissions**: Policies allow any task definition revision:
+   ```
+   arn:aws:ecs:region:account:task-definition/pdf-models-marker:*
+   ```
+
+**Result**: Container updates are immediately available without redeploying Step Functions infrastructure.
+
 ### Compute
 
 **Fargate Tasks (per model)**

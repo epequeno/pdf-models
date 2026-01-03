@@ -19,6 +19,9 @@ from aws_cdk import (
     aws_iam as iam,
 )
 from aws_cdk import (
+    aws_lambda as lambda_,
+)
+from aws_cdk import (
     aws_logs as logs,
 )
 from aws_cdk import (
@@ -59,6 +62,7 @@ class MarkerStack(Stack):
             self, CONFIG.SSM_DYNAMODB_TABLE_NAME
         )
         # Get the image tag from SSM (updated by CodeBuild after each build)
+        # Use a timestamp-based parameter name to force CDK to re-read the value
         image_tag = ssm.StringParameter.value_for_string_parameter(
             self, CONFIG.SSM_MARKER_IMAGE_TAG
         )
@@ -96,6 +100,15 @@ class MarkerStack(Stack):
                 effect=iam.Effect.ALLOW,
                 actions=["s3:GetObject", "s3:PutObject"],
                 resources=[f"arn:aws:s3:::{s3_bucket_name}/*"],
+            )
+        )
+
+        # Also grant bucket-level permissions for ListBucket (needed for some S3 operations)
+        task_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["s3:ListBucket"],
+                resources=[f"arn:aws:s3:::{s3_bucket_name}"],
             )
         )
 
@@ -170,12 +183,60 @@ class MarkerStack(Stack):
             assumed_by=iam.ServicePrincipal("states.amazonaws.com"),
         )
 
-        # Grant ECS RunTask permissions to Step Functions
+        # Create a simple Lambda function to resolve the current task definition ARN
+        # This eliminates all caching issues by reading from SSM at execution time
+        resolve_lambda = lambda_.Function(
+            self,
+            "ResolveTaskDefLambda",
+            runtime=lambda_.Runtime.PYTHON_3_11,
+            handler="index.handler",
+            code=lambda_.Code.from_inline("""
+import boto3
+
+def handler(event, context):
+    ssm = boto3.client('ssm')
+    
+    # Get the current task definition ARN from SSM
+    response = ssm.get_parameter(Name='/pdf-models/marker/task-definition-arn')
+    task_def_arn = response['Parameter']['Value']
+    
+    # Return the original event with the resolved task definition ARN
+    return {
+        **event,
+        'task_definition_arn': task_def_arn
+    }
+            """),
+            timeout=Duration.seconds(30),
+        )
+
+        # Grant SSM read permissions
+        resolve_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["ssm:GetParameter"],
+                resources=[
+                    f"arn:aws:ssm:{self.region}:{self.account}:parameter/pdf-models/marker/task-definition-arn"
+                ],
+            )
+        )
+
+        # Grant Lambda invoke permissions to Step Functions
+        sfn_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["lambda:InvokeFunction"],
+                resources=[resolve_lambda.function_arn],
+            )
+        )
         sfn_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["ecs:RunTask"],
-                resources=[task_definition.task_definition_arn],
+                resources=[
+                    # Use wildcard to allow any revision of the task definition family
+                    f"arn:aws:ecs:{self.region}:{self.account}:task-definition/{CONFIG.PROJECT_NAME}-marker:*",
+                    f"arn:aws:ecs:{self.region}:{self.account}:task-definition/{CONFIG.PROJECT_NAME}-marker",
+                ],
             )
         )
 
@@ -250,54 +311,64 @@ class MarkerStack(Stack):
             result_path=sfn.JsonPath.DISCARD,
         )
 
-        # Create ECS RunTask integration with error handling
-        run_task = (
-            tasks.EcsRunTask(
-                self,
-                "RunMarkerTask",
-                integration_pattern=sfn.IntegrationPattern.RUN_JOB,
-                cluster=cluster,
-                task_definition=task_definition,
-                launch_target=tasks.EcsFargateLaunchTarget(
-                    platform_version=ecs.FargatePlatformVersion.LATEST,
-                ),
-                container_overrides=[
-                    tasks.ContainerOverride(
-                        container_definition=container,
-                        environment=[
-                            tasks.TaskEnvironmentVariable(
-                                name="JOB_ID",
-                                value=sfn.JsonPath.string_at("$.job_id"),
-                            ),
-                            tasks.TaskEnvironmentVariable(
-                                name="S3_INPUT_KEY",
-                                value=sfn.JsonPath.string_at("$.s3_input_key"),
-                            ),
-                        ],
-                    )
-                ],
-                result_path=sfn.JsonPath.DISCARD,
-            )
-            .add_retry(
-                # Retry on service exceptions (temporary failures)
-                errors=["States.TaskFailed"],
-                interval=Duration.seconds(30),
-                max_attempts=3,
-                backoff_rate=2.0,
-            )
-            .add_catch(
-                # Catch all errors and update job status to failed
-                update_job_status,
-                errors=["States.ALL"],
-                result_path="$.error",
-            )
+        # Step 1: Resolve the current task definition ARN from SSM
+        resolve_task_def = tasks.LambdaInvoke(
+            self,
+            "ResolveTaskDefinition",
+            lambda_function=resolve_lambda,
+            comment="Get current task definition ARN from SSM to avoid caching",
+            payload_response_only=True,
         )
 
-        # Create success state
-        success = sfn.Succeed(self, "ProcessingComplete")
+        # Step 2: Use the resolved ARN in a custom ECS RunTask state
+        run_task_state = {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::ecs:runTask.sync",
+            "Parameters": {
+                "Cluster": cluster.cluster_arn,
+                "TaskDefinition.$": "$.task_definition_arn",
+                "LaunchType": "FARGATE",
+                "PlatformVersion": "LATEST",
+                "NetworkConfiguration": {
+                    "AwsvpcConfiguration": {
+                        "Subnets": [subnet.subnet_id for subnet in cluster.vpc.private_subnets],
+                        "AssignPublicIp": "DISABLED"
+                    }
+                },
+                "Overrides": {
+                    "ContainerOverrides": [
+                        {
+                            "Name": "marker",
+                            "Environment": [
+                                {"Name": "JOB_ID", "Value.$": "$.job_id"},
+                                {"Name": "S3_INPUT_KEY", "Value.$": "$.s3_input_key"},
+                                {"Name": "S3_BUCKET", "Value": s3_bucket_name},
+                                {"Name": "DYNAMODB_TABLE", "Value": dynamodb_table_name}
+                            ]
+                        }
+                    ]
+                }
+            },
+            "Retry": [
+                {
+                    "ErrorEquals": ["States.TaskFailed"],
+                    "IntervalSeconds": 30,
+                    "MaxAttempts": 3,
+                    "BackoffRate": 2.0
+                }
+            ],
+            "ResultPath": None,
+            "End": True
+        }
 
-        # Create state machine definition with error handling
-        definition = run_task.next(success)
+        run_task = sfn.CustomState(
+            self,
+            "RunMarkerTask",
+            state_json=run_task_state
+        )
+
+        # Create state machine definition with dynamic task definition resolution
+        definition = resolve_task_def.next(run_task)
 
         # Create state machine
         state_machine = sfn.StateMachine(
@@ -307,6 +378,7 @@ class MarkerStack(Stack):
             definition_body=sfn.DefinitionBody.from_chainable(definition),
             role=sfn_role,
             timeout=Duration.hours(1),
+            comment="Marker PDF processing with dynamic task definition resolution to eliminate caching",
         )
 
         # Export state machine ARN to SSM

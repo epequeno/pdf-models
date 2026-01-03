@@ -11,10 +11,14 @@ Replaceability: Hard (especially DNS/certs)
 """
 
 from aws_cdk import (
-    Stack,
     RemovalPolicy,
+    Stack,
     Tags,
+)
+from aws_cdk import (
     aws_ecr as ecr,
+)
+from aws_cdk import (
     aws_ssm as ssm,
 )
 from constructs import Construct

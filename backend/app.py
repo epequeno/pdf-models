@@ -12,6 +12,7 @@ from backend.cicd_stack import CiCdStack
 from backend.marker_stack import MarkerStack
 from backend.api_v2_stack import ApiV2Stack
 from backend.monitoring_stack import MonitoringStack
+from backend.frontend_stack import FrontendStack
 
 
 app = cdk.App()
@@ -64,9 +65,19 @@ monitoring_stack = MonitoringStack(
     description="CloudWatch dashboards and alarms for operational visibility",
 )
 
+# Stack 7: Frontend (S3 + CloudFront static site hosting)
+# Independent stack - serves the Elm frontend
+# Requires frontend/dst to be built before deployment
+frontend_stack = FrontendStack(
+    app,
+    "FrontendStack",
+    description="Frontend deployment: S3 bucket, CloudFront CDN, and Route53 DNS for epequeno.app",
+)
+
 # Note: Foundation and Core are independent in Phase 1
 # CiCdStack reads ECR URI from Foundation via SSM
 # MarkerStack reads from Foundation (ECR) and Core (S3, DynamoDB) via SSM
 # ApiV2Stack reads from Core (Cognito, DynamoDB) and Marker (Step Functions) via SSM
+# FrontendStack is independent and deploys from frontend/dst
 
 app.synth()

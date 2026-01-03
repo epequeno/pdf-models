@@ -212,13 +212,80 @@ This policy ensures users can only access files with their Identity Pool ID as p
 }
 ```
 
-### Jobs Fail with S3 Access Errors
+### Container Permission Issues
 
-**Symptom**: Step Functions execution fails when trying to read input file.
+**Symptom**: Jobs fail with `PermissionError: [Errno 13] Permission denied: '/usr/local/lib/python3.11/site-packages/static'`
 
-**Root Cause**: ECS task doesn't have permissions to read the S3 file.
+**Root Cause**: The marker-pdf library tries to download fonts to a system directory that's not writable by the non-root container user.
 
-**Solution**: Verify ECS task role has S3 read permissions for the bucket.
+**Solution**: Redirect Marker data directories to writable locations using environment variables:
+
+```dockerfile
+# Create writable directories for marker data
+RUN mkdir -p /app/marker_data/static /app/marker_data/cache && \
+    chown -R appuser:appuser /app
+
+# Set environment variables to redirect marker data to writable locations
+ENV MARKER_DATA_DIR=/app/marker_data
+ENV FONT_DIR=/app/marker_data/static
+```
+
+And in the Python code:
+```python
+# Configure marker to use writable directories before importing
+os.environ['MARKER_DATA_DIR'] = '/app/marker_data'
+os.environ['FONT_DIR'] = '/app/marker_data/static'
+
+import pypdfium2  # Must be imported first
+from marker.converters.pdf import PdfConverter
+```
+
+### ECS Task Definition Updates Not Propagating
+
+**Symptom**: New container images built successfully but ECS tasks still use old images.
+
+**Root Cause**: ECS caches container images and Step Functions references specific task definition revisions.
+
+**Solution**: 
+1. Create new task definition revision:
+   ```bash
+   make aws-ecs-force-new-deployment
+   ```
+
+2. Update SSM parameter with new revision:
+   ```bash
+   AWS_PROFILE=arch aws ssm put-parameter --name "/pdf-models/marker/task-definition-arn" \
+     --value "arn:aws:ecs:us-east-1:ACCOUNT:task-definition/pdf-models-marker:NEW_REVISION" \
+     --type String --overwrite
+   ```
+
+3. Force CDK to detect changes and redeploy:
+   ```bash
+   # Modify MarkerStack (add comment or change description)
+   make cdk-deploy STACK=MarkerStack
+   ```
+
+### Step Functions SUCCEEDED but Job Marked as Failed
+
+**Symptom**: Step Functions execution shows SUCCEEDED status but DynamoDB job record shows failed status.
+
+**Root Cause**: The ECS task completes (exits) but with a non-zero exit code due to application errors. Step Functions considers the task "completed" even if it failed.
+
+**Debugging Steps**:
+1. Check ECS task logs for the specific job:
+   ```bash
+   AWS_PROFILE=arch aws logs tail /ecs/pdf-models-marker --since 30m --format short
+   ```
+
+2. Check Step Functions execution details:
+   ```bash
+   AWS_PROFILE=arch aws stepfunctions describe-execution \
+     --execution-arn arn:aws:states:us-east-1:ACCOUNT:execution:pdf-models-marker:JOB_ID
+   ```
+
+3. Verify task exit codes in the execution history
+
+**Solution**: Review the Step Functions error handling logic to properly catch and handle ECS task failures.
 
 ## General AWS Issues
 

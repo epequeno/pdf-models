@@ -5,17 +5,35 @@ This stack uses API Gateway v2 (HTTP API) instead of REST API for better Cognito
 """
 
 from aws_cdk import (
-    Stack,
     Duration,
     RemovalPolicy,
+    Stack,
+)
+from aws_cdk import (
     aws_apigatewayv2 as apigwv2,
-    aws_apigatewayv2_integrations as apigwv2_integrations,
+)
+from aws_cdk import (
     aws_apigatewayv2_authorizers as apigwv2_authorizers,
+)
+from aws_cdk import (
+    aws_apigatewayv2_integrations as apigwv2_integrations,
+)
+from aws_cdk import (
     aws_cognito as cognito,
-    aws_lambda as lambda_,
+)
+from aws_cdk import (
     aws_iam as iam,
+)
+from aws_cdk import (
+    aws_lambda as lambda_,
+)
+from aws_cdk import (
     aws_logs as logs,
+)
+from aws_cdk import (
     aws_s3 as s3,
+)
+from aws_cdk import (
     aws_ssm as ssm,
 )
 from constructs import Construct
@@ -164,7 +182,9 @@ class ApiV2Stack(Stack):
             runtime=lambda_.Runtime.PROVIDED_AL2023,
             handler="bootstrap",
             code=lambda_.Code.from_bucket(
-                bucket=s3.Bucket.from_bucket_name(self, "LambdaArtifactsBucket", s3_bucket_name),
+                bucket=s3.Bucket.from_bucket_name(
+                    self, "LambdaArtifactsBucket", s3_bucket_name
+                ),
                 key="lambda-artifacts/submit-job.zip",
                 object_version=submit_job_version,
             ),
@@ -188,7 +208,9 @@ class ApiV2Stack(Stack):
             runtime=lambda_.Runtime.PROVIDED_AL2023,
             handler="bootstrap",
             code=lambda_.Code.from_bucket(
-                bucket=s3.Bucket.from_bucket_name(self, "LambdaArtifactsBucket2", s3_bucket_name),
+                bucket=s3.Bucket.from_bucket_name(
+                    self, "LambdaArtifactsBucket2", s3_bucket_name
+                ),
                 key="lambda-artifacts/get-job.zip",
                 object_version=get_job_version,
             ),
@@ -211,7 +233,11 @@ class ApiV2Stack(Stack):
             description="PDF Models HTTP API for job submission and status queries",
             cors_preflight=apigwv2.CorsPreflightOptions(
                 allow_origins=["*"],
-                allow_methods=[apigwv2.CorsHttpMethod.GET, apigwv2.CorsHttpMethod.POST, apigwv2.CorsHttpMethod.OPTIONS],
+                allow_methods=[
+                    apigwv2.CorsHttpMethod.GET,
+                    apigwv2.CorsHttpMethod.POST,
+                    apigwv2.CorsHttpMethod.OPTIONS,
+                ],
                 allow_headers=["Content-Type", "Authorization"],
                 max_age=Duration.hours(1),
             ),
