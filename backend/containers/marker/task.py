@@ -21,8 +21,8 @@ from datetime import datetime, timezone
 
 import pypdfium2  # Must be imported first to avoid warnings
 import boto3
-from marker.convert import convert_single_pdf
-from marker.models import load_all_models
+from marker.converters.pdf import PdfConverter
+from marker.models import create_model_dict
 
 # Configure logging
 logging.basicConfig(
@@ -109,15 +109,14 @@ def main():
 
             # Load Marker models
             logger.info("Loading Marker models...")
-            model_lst = load_all_models()
+            model_dict = create_model_dict()
             logger.info("Models loaded successfully")
 
             # Convert PDF to Markdown
             logger.info("Converting PDF to Markdown...")
-            full_text, images, out_meta = convert_single_pdf(
-                str(input_pdf),
-                model_lst
-            )
+            converter = PdfConverter(model_dict=model_dict)
+            rendered = converter(str(input_pdf))
+            full_text, images, out_meta = rendered.markdown, rendered.images, rendered.metadata
             logger.info(f"Conversion complete. Output length: {len(full_text)} characters")
 
             # Write markdown to file
