@@ -25,6 +25,7 @@ help:
 	@echo "  make aws-logs LOGGROUP=<name>      - Tail CloudWatch logs"
 	@echo "  make aws-s3-ls                     - List S3 buckets"
 	@echo "  make aws-stepfunctions-list        - List Step Functions state machines"
+	@echo "  make aws-ecs-force-new-deployment  - Force ECS to pull latest container image"
 	@echo ""
 	@echo "Build Commands:"
 	@echo "  make base-image-build              - Build Rust Lambda builder base image (runs in CodeBuild)"
@@ -167,6 +168,18 @@ aws-s3-ls:
 aws-stepfunctions-list:
 	@echo "Listing Step Functions state machines with AWS_PROFILE=arch..."
 	AWS_PROFILE=arch aws stepfunctions list-state-machines
+
+aws-ecs-force-new-deployment:
+	@echo "Forcing new ECS task definition to pull latest container image..."
+	@echo "This updates the task definition to force ECS to pull the latest :latest image"
+	AWS_PROFILE=arch aws ecs register-task-definition \
+		--cli-input-json "$$(AWS_PROFILE=arch aws ecs describe-task-definition --task-definition pdf-models-marker --query 'taskDefinition' | \
+		python3 -c 'import sys, json; td = json.load(sys.stdin); \
+		del td["taskDefinitionArn"]; del td["revision"]; del td["status"]; \
+		del td["requiresAttributes"]; del td["compatibilities"]; del td["registeredAt"]; del td["registeredBy"]; \
+		print(json.dumps(td))')" \
+		--query 'taskDefinition.taskDefinitionArn' --output text
+	@echo "New task definition revision created. ECS will now pull the latest container image."
 
 # Container Commands (triggers CodeBuild)
 container-build:
