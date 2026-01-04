@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/Users/steven/code/pdf-models/backend/.venv/bin/python3
 """Check which container image ECS tasks are using."""
 
 import boto3
@@ -6,8 +6,9 @@ import json
 
 def check_task_images():
     """Check the container image used by recent ECS tasks."""
-    ecs = boto3.client('ecs', region_name='us-east-1')
-    ecr = boto3.client('ecr', region_name='us-east-1')
+    session = boto3.Session(profile_name='arch', region_name='us-east-1')
+    ecs = session.client('ecs')
+    ecr = session.client('ecr')
 
     cluster = 'pdf-models-marker-cluster'
 

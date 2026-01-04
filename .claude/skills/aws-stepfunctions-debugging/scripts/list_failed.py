@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/Users/steven/code/pdf-models/backend/.venv/bin/python3
 """List recent failed Step Functions executions."""
 
 import boto3
@@ -6,7 +6,8 @@ import json
 
 def list_failed_executions():
     """List recent failed executions with details."""
-    sfn = boto3.client('stepfunctions', region_name='us-east-1')
+    session = boto3.Session(profile_name='arch', region_name='us-east-1')
+    sfn = session.client('stepfunctions')
 
     state_machine_arn = 'arn:aws:states:us-east-1:496830984285:stateMachine:pdf-models-marker'
 

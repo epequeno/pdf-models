@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/Users/steven/code/pdf-models/backend/.venv/bin/python3
 """Get the latest CodeBuild logs for marker container build."""
 
 import boto3
@@ -6,8 +6,9 @@ import sys
 
 def get_latest_build_logs(project_name='pdf-models-marker-container-build', lines=100):
     """Fetch the latest build logs."""
-    codebuild = boto3.client('codebuild', region_name='us-east-1')
-    logs_client = boto3.client('logs', region_name='us-east-1')
+    session = boto3.Session(profile_name='arch', region_name='us-east-1')
+    codebuild = session.client('codebuild')
+    logs_client = session.client('logs')
 
     # Get latest build ID
     builds_response = codebuild.list_builds_for_project(

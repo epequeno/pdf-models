@@ -1,11 +1,12 @@
-#!/usr/bin/env python3
+#!/Users/steven/code/pdf-models/backend/.venv/bin/python3
 """Get stopped ECS tasks and their stop reasons."""
 
 import boto3
 
 def get_stopped_tasks():
     """Get recent stopped tasks and why they stopped."""
-    ecs = boto3.client('ecs', region_name='us-east-1')
+    session = boto3.Session(profile_name='arch', region_name='us-east-1')
+    ecs = session.client('ecs')
     cluster = 'pdf-models-marker-cluster'
 
     # Get stopped tasks

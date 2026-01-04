@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/Users/steven/code/pdf-models/backend/.venv/bin/python3
 """Get Step Functions execution details including all events and outputs."""
 
 import boto3
@@ -7,7 +7,8 @@ import sys
 
 def get_execution_details(execution_name_or_arn):
     """Get detailed execution information."""
-    sfn = boto3.client('stepfunctions', region_name='us-east-1')
+    session = boto3.Session(profile_name='arch', region_name='us-east-1')
+    sfn = session.client('stepfunctions')
 
     # If just name provided, construct full ARN
     if not execution_name_or_arn.startswith('arn:'):
