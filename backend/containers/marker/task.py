@@ -25,6 +25,12 @@ os.environ['FONT_DIR'] = '/app/marker_data/static'
 
 import pypdfium2  # Must be imported first to avoid warnings
 import boto3
+
+# Import marker settings and configure paths before importing other marker modules
+from marker import settings
+settings.FONT_PATH = '/app/marker_data/static/GoNotoCurrent.ttf'
+settings.MARKER_DATA_DIR = '/app/marker_data'
+
 from marker.converters.pdf import PdfConverter
 from marker.models import create_model_dict
 
