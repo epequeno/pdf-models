@@ -93,6 +93,8 @@ type alias Job =
     , status : JobStatus
     , s3InputKey : String
     , s3OutputKey : Maybe String
+    , completedAt : Maybe Time.Posix
+    , error : Maybe String
     }
 
 

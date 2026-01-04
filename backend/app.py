@@ -7,6 +7,7 @@ The Makefile ensures all CDK commands use AWS_PROFILE=arch.
 import aws_cdk as cdk
 
 from backend.foundation_stack import FoundationStack
+from backend.networking_stack import NetworkingStack
 from backend.core_infrastructure_stack import CoreInfrastructureStack
 from backend.cicd_stack import CiCdStack
 from backend.marker_stack import MarkerStack
@@ -25,7 +26,14 @@ foundation_stack = FoundationStack(
     description="Foundation infrastructure: ECR repositories, DNS (future)",
 )
 
-# Stack 2: Core Infrastructure (S3, DynamoDB, Cognito)
+# Stack 2: Networking (VPC with VPC endpoints for secure AWS service access)
+networking_stack = NetworkingStack(
+    app,
+    "NetworkingStack",
+    description="Networking infrastructure: VPC with VPC endpoints for ECS tasks",
+)
+
+# Stack 3: Core Infrastructure (S3, DynamoDB, Cognito)
 core_stack = CoreInfrastructureStack(
     app,
     "CoreInfrastructureStack",
@@ -41,7 +49,7 @@ cicd_stack = CiCdStack(
 )
 
 # Stack 4: Marker Processing (ECS cluster, Fargate task, Step Functions)
-# Depends on: Foundation (ECR), Core (S3, DynamoDB)
+# Depends on: Foundation (ECR), Core (S3, DynamoDB), Networking (VPC via hardcoded values)
 marker_stack = MarkerStack(
     app,
     "MarkerStack",
@@ -57,22 +65,23 @@ api_v2_stack = ApiV2Stack(
     description="HTTP API Gateway with Cognito JWT authorizer and Lambda functions",
 )
 
-# Stack 6: Monitoring (CloudWatch dashboards and alarms)
-# Depends on: API (for metrics)
-monitoring_stack = MonitoringStack(
-    app,
-    "MonitoringStack",
-    description="CloudWatch dashboards and alarms for operational visibility",
-)
+# COMMENTED OUT: Deploy API stack first, then uncomment these stacks
+# # Stack 6: Monitoring (CloudWatch dashboards and alarms)
+# # Depends on: API (for metrics)
+# monitoring_stack = MonitoringStack(
+#     app,
+#     "MonitoringStack",
+#     description="CloudWatch dashboards and alarms for operational visibility",
+# )
 
-# Stack 7: Frontend (S3 + CloudFront static site hosting)
-# Independent stack - serves the Elm frontend
-# Requires frontend/dst to be built before deployment
-frontend_stack = FrontendStack(
-    app,
-    "FrontendStack",
-    description="Frontend deployment: S3 bucket, CloudFront CDN, and Route53 DNS for epequeno.app",
-)
+# # Stack 7: Frontend (S3 + CloudFront static site hosting)
+# # Independent stack - serves the Elm frontend
+# # Requires frontend/dst to be built before deployment
+# frontend_stack = FrontendStack(
+#     app,
+#     "FrontendStack",
+#     description="Frontend deployment: S3 bucket, CloudFront CDN, and Route53 DNS for epequeno.app",
+# )
 
 # Note: Foundation and Core are independent in Phase 1
 # CiCdStack reads ECR URI from Foundation via SSM

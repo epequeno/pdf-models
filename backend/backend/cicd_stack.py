@@ -153,7 +153,7 @@ class CiCdStack(Stack):
             environment=codebuild.BuildEnvironment(
                 build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
                 privileged=True,  # Required for Docker builds
-                compute_type=codebuild.ComputeType.SMALL,
+                compute_type=codebuild.ComputeType.X_LARGE,  # X_LARGE (32GB) for model downloads
                 environment_variables={
                     "ECR_REPOSITORY_URI": codebuild.BuildEnvironmentVariable(
                         value=ecr_marker_uri

@@ -3,15 +3,12 @@ module Views.Jobs exposing (view)
 import Browser
 import Components.Button as Button
 import Components.StatusBadge as StatusBadge
-import Components.Table as Table
+import Components.Timeline as Timeline
 import Css exposing (..)
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (css, href)
-import Html.Styled.Events exposing (onClick)
 import Styles
-import Time
 import Types exposing (..)
-import Url
 
 
 view : Model -> Html Msg
@@ -117,32 +114,113 @@ viewJobsSection jobsState =
                         [ text (if jobsState.loading then "Loading jobs..." else "No jobs yet. Upload a PDF to get started.") ]
 
                 else
-                    Table.table
-                        [ { header = "Job ID", view = \job -> text (truncateJobId job.id) }
-                        , { header = "Submitted", view = \job -> text (formatTime job.submittedAt) }
-                        , { header = "Status", view = \job -> StatusBadge.statusBadge job.status }
-                        , { header = "Actions", view = viewJobActions }
+                    div
+                        [ css
+                            [ displayFlex
+                            , flexDirection column
+                            , property "gap" "16px"
+                            ]
                         ]
-                        jobsState.jobs
+                        (List.map viewJobCard jobsState.jobs)
         ]
 
 
-viewJobActions : Job -> Html Msg
-viewJobActions job =
-    case job.status of
-        Complete ->
-            case job.s3OutputKey of
-                Just _ ->
-                    Button.button Button.Primary "Download" (DownloadResult job.id)
+viewJobCard : Job -> Html Msg
+viewJobCard job =
+    div
+        [ css
+            [ border3 (px 1) solid Styles.colors.border
+            , backgroundColor Styles.colors.surface
+            , padding Styles.spacing.lg
+            , property "border-radius" "4px"
+            ]
+        ]
+        [ -- Header with job ID and status
+          div
+            [ css
+                [ displayFlex
+                , justifyContent spaceBetween
+                , alignItems center
+                , marginBottom Styles.spacing.md
+                , paddingBottom Styles.spacing.md
+                , borderBottom3 (px 1) solid Styles.colors.border
+                ]
+            ]
+            [ div []
+                [ div
+                    [ css
+                        [ fontWeight Styles.fontWeight.semibold
+                        , color Styles.colors.textPrimary
+                        , marginBottom (px 4)
+                        ]
+                    ]
+                    [ text ("Job " ++ truncateJobId job.id) ]
+                , div
+                    [ css
+                        [ fontSize Styles.fontSize.small
+                        , color Styles.colors.textSecondary
+                        , fontFamily monospace
+                        ]
+                    ]
+                    [ text job.s3InputKey ]
+                ]
+            , div
+                [ css
+                    [ displayFlex
+                    , alignItems center
+                    , property "gap" "12px"
+                    ]
+                ]
+                [ StatusBadge.statusBadge job.status
+                , case job.status of
+                    Complete ->
+                        case job.s3OutputKey of
+                            Just _ ->
+                                Button.button Button.Primary "Download" (DownloadResult job.id)
 
-                Nothing ->
-                    text "—"
+                            Nothing ->
+                                text ""
 
-        Failed ->
-            text "—"
+                    _ ->
+                        text ""
+                ]
+            ]
+        , -- Timeline
+          Timeline.timeline job
+        , -- Error message if present
+          case job.error of
+            Just errorMsg ->
+                div
+                    [ css
+                        [ marginTop Styles.spacing.md
+                        , padding Styles.spacing.md
+                        , backgroundColor (hex "2d1f1f")
+                        , border3 (px 1) solid Styles.colors.accentError
+                        , property "border-radius" "4px"
+                        ]
+                    ]
+                    [ div
+                        [ css
+                            [ fontWeight Styles.fontWeight.semibold
+                            , color Styles.colors.accentError
+                            , marginBottom (px 4)
+                            ]
+                        ]
+                        [ text "Error Details" ]
+                    , div
+                        [ css
+                            [ fontSize Styles.fontSize.small
+                            , color Styles.colors.accentError
+                            , fontFamily monospace
+                            , whiteSpace preWrap
+                            ]
+                        ]
+                        [ text errorMsg ]
+                    ]
 
-        _ ->
-            text "—"
+            Nothing ->
+                text ""
+        ]
 
 
 truncateJobId : String -> String
@@ -152,10 +230,3 @@ truncateJobId jobId =
 
     else
         jobId
-
-
-formatTime : Time.Posix -> String
-formatTime time =
-    -- Simple formatting for now - just show "N minutes ago"
-    -- In production, you'd use a proper time formatting library
-    "recently"

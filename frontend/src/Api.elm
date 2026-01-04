@@ -64,12 +64,14 @@ getJobs accessToken toMsg =
 
 jobDecoder : Decoder Job
 jobDecoder =
-    Decode.map5 Job
+    Decode.map7 Job
         (Decode.field "job_id" Decode.string)
         (Decode.field "created_at" iso8601Decoder)
         (Decode.field "status" jobStatusDecoder)
         (Decode.field "s3_input_key" Decode.string)
         (Decode.maybe (Decode.field "s3_result_key" Decode.string))
+        (Decode.maybe (Decode.field "completed_at" iso8601Decoder))
+        (Decode.maybe (Decode.field "error" Decode.string))
 
 
 jobsListDecoder : Decoder (List Job)

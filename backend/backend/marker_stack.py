@@ -13,6 +13,9 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
 )
 from aws_cdk import (
+    aws_ec2 as ec2,
+)
+from aws_cdk import (
     aws_ecs as ecs,
 )
 from aws_cdk import (
@@ -62,12 +65,18 @@ class MarkerStack(Stack):
             self, CONFIG.SSM_DYNAMODB_TABLE_NAME
         )
         # Get the image tag from SSM (updated by CodeBuild after each build)
-        # Use a timestamp-based parameter name to force CDK to re-read the value
         image_tag = ssm.StringParameter.value_for_string_parameter(
             self, CONFIG.SSM_MARKER_IMAGE_TAG
         )
+        
+        # VPC and networking information from deployed NetworkingStack
+        # These values are from the deployed NetworkingStack SSM parameters
+        vpc_id = "vpc-0dde40d8bf398e14c"
+        isolated_subnet_ids = ["subnet-04a204ceff9880907", "subnet-0c304190e2352482f"]
+        ecs_security_group_id = "sg-0a8df0846d1a6fc96"
 
-        # Create ECS cluster
+        # Create ECS cluster without VPC specification (uses default VPC)
+        # The actual networking will be specified in the Step Functions task definition
         cluster = ecs.Cluster(
             self,
             "MarkerCluster",
@@ -331,7 +340,8 @@ def handler(event, context):
                 "PlatformVersion": "LATEST",
                 "NetworkConfiguration": {
                     "AwsvpcConfiguration": {
-                        "Subnets": [subnet.subnet_id for subnet in cluster.vpc.private_subnets],
+                        "Subnets": isolated_subnet_ids,
+                        "SecurityGroups": [ecs_security_group_id],
                         "AssignPublicIp": "DISABLED"
                     }
                 },

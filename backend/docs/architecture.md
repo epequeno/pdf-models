@@ -358,22 +358,58 @@ table = os.environ['DYNAMODB_TABLE']
 
 ### CI/CD
 
-**CodeBuild: marker-container-build**
-- Triggered: Manually (initially)
-- Source: `backend/containers/marker/`
-- Steps:
-  1. Build Docker image
+**CodeBuild Projects**
+
+The system uses AWS CodeBuild for building containers and Lambda functions. Builds are **triggered manually** to avoid wasting build time on unrelated code changes (this is a monorepo).
+
+**CodeBuild: pdf-models-marker-container-build**
+- **Trigger**: Manual only
+- **Source**: CodeCommit `backend/containers/marker/`
+- **Build Spec**: `backend/containers/marker/buildspec.yml`
+- **Purpose**: Build Marker container with pre-downloaded models
+- **Compute**: X_LARGE (32GB) - required for downloading 1.34GB of ML models
+- **Steps**:
+  1. Build Docker image with model pre-downloading
   2. Tag: `pdf-models/marker:latest`
   3. Push to ECR
-- Independent of CDK deployment
+  4. Update SSM parameter with image digest
+- **How to Trigger**:
+  ```bash
+  AWS_PROFILE=arch aws codebuild start-build --project-name pdf-models-marker-container-build
+  ```
+- **Monitor Build**:
+  ```bash
+  # Check status
+  AWS_PROFILE=arch aws codebuild batch-get-builds \
+    --ids pdf-models-marker-container-build:<build-id> \
+    --query 'builds[0].[buildStatus,currentPhase]'
 
-**CodeBuild: cdk-deploy** (future)
-- Builds and deploys CDK stacks
-- Separate from container builds
+  # Tail logs
+  AWS_PROFILE=arch aws logs tail /aws/codebuild/pdf-models-marker-container-build --follow
+  ```
+
+**CodeBuild: pdf-models-rust-lambda-builder-build**
+- **Trigger**: Manual only
+- **Source**: CodeCommit `backend/containers/rust-lambda-builder/`
+- **Purpose**: Build base image with Rust and cargo-lambda pre-installed
+- **Rarely needs rebuilding** (only when Rust/cargo-lambda versions change)
+
+**CodeBuild: pdf-models-rust-lambda-build**
+- **Trigger**: Manual only
+- **Source**: CodeCommit `backend/lambdas/`
+- **Purpose**: Build Rust Lambda functions using the builder base image
+- **Outputs**: Uploads compiled Lambda .zip files to S3
+
+**Why Manual Triggers?**
+- Avoids wasting build resources on commits unrelated to containers/lambdas
+- Container builds are expensive (X_LARGE instance, 10+ minute builds)
+- Most commits change CDK infrastructure, not containers
+- Explicit triggering makes intent clear
 
 **Container Registry**
 - ECR repositories (one per model)
 - Repository: `pdf-models/marker`
+- Images tagged with `:latest` and digest stored in SSM
 
 ## CDK Stack Organization
 

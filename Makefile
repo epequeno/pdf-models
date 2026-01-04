@@ -1,4 +1,4 @@
-.PHONY: help test test-watch test-integration test-integration-setup cdk-synth cdk-diff cdk-deploy cdk-destroy aws-logs aws-s3-ls container-build base-image-build lambda-build lambda-clean setup
+.PHONY: help test test-watch test-integration test-integration-setup cdk-synth cdk-diff cdk-deploy cdk-destroy aws-logs aws-s3-ls container-build base-image-build lambda-build lambda-clean frontend-build frontend-deploy frontend-deploy-quick setup
 
 # AWS Profile to use for all commands
 AWS_PROFILE := arch
@@ -34,13 +34,19 @@ help:
 	@echo "  make lambda-build-status           - Check status of latest Lambda build"
 	@echo "  make lambda-clean                  - Clean local Lambda build artifacts"
 	@echo ""
+	@echo "Frontend Commands:"
+	@echo "  make frontend-build                - Build Elm frontend (compiles to frontend/dst)"
+	@echo "  make frontend-deploy               - Build and deploy frontend to S3+CloudFront"
+	@echo "  make frontend-deploy-quick         - Deploy frontend (assumes already built)"
+	@echo ""
 	@echo "Stack Deployment Order:"
 	@echo "  1. make cdk-deploy STACK=FoundationStack"
-	@echo "  2. make cdk-deploy STACK=CoreInfrastructureStack"
-	@echo "  3. make cdk-deploy STACK=MarkerStack"
-	@echo "  4. make cdk-deploy STACK=ApiStack"
-	@echo "  5. make cdk-deploy STACK=CiCdStack"
-	@echo "  6. make cdk-deploy STACK=MonitoringStack"
+	@echo "  2. make cdk-deploy STACK=NetworkingStack"
+	@echo "  3. make cdk-deploy STACK=CoreInfrastructureStack"
+	@echo "  4. make cdk-deploy STACK=MarkerStack"
+	@echo "  5. make cdk-deploy STACK=ApiStack"
+	@echo "  6. make cdk-deploy STACK=CiCdStack"
+	@echo "  7. make cdk-deploy STACK=MonitoringStack"
 	@echo ""
 	@echo "Note: All commands automatically use AWS_PROFILE=arch and uv"
 
@@ -136,19 +142,21 @@ cdk-destroy:
 
 cdk-deploy-all:
 	@echo "Deploying all stacks in correct order with AWS_PROFILE=arch..."
-	@echo "Step 1/7: Deploying FoundationStack..."
+	@echo "Step 1/8: Deploying FoundationStack..."
 	cd backend && AWS_PROFILE=arch uv run cdk deploy FoundationStack --require-approval never
-	@echo "Step 2/7: Deploying CoreInfrastructureStack..."
+	@echo "Step 2/8: Deploying NetworkingStack..."
+	cd backend && AWS_PROFILE=arch uv run cdk deploy NetworkingStack --require-approval never
+	@echo "Step 3/8: Deploying CoreInfrastructureStack..."
 	cd backend && AWS_PROFILE=arch uv run cdk deploy CoreInfrastructureStack --require-approval never
-	@echo "Step 3/7: Deploying CiCdStack..."
+	@echo "Step 4/8: Deploying CiCdStack..."
 	cd backend && AWS_PROFILE=arch uv run cdk deploy CiCdStack --require-approval never
-	@echo "Step 4/7: Deploying MarkerStack..."
+	@echo "Step 5/8: Deploying MarkerStack..."
 	cd backend && AWS_PROFILE=arch uv run cdk deploy MarkerStack --require-approval never
-	@echo "Step 5/7: Deploying ApiV2Stack..."
+	@echo "Step 6/8: Deploying ApiV2Stack..."
 	cd backend && AWS_PROFILE=arch uv run cdk deploy ApiV2Stack --require-approval never
-	@echo "Step 6/7: Deploying MonitoringStack..."
+	@echo "Step 7/8: Deploying MonitoringStack..."
 	cd backend && AWS_PROFILE=arch uv run cdk deploy MonitoringStack --require-approval never
-	@echo "Step 7/7: Deploying FrontendStack..."
+	@echo "Step 8/8: Deploying FrontendStack..."
 	cd backend && AWS_PROFILE=arch uv run cdk deploy FrontendStack --require-approval never
 	@echo "All stacks deployed successfully!"
 
@@ -220,6 +228,32 @@ lambda-clean:
 	rm -rf backend/lambdas/*/target/
 	rm -rf backend/lambdas/backend/
 	@echo "Lambda build artifacts cleaned."
+
+# Frontend Commands
+frontend-build:
+	@echo "Building Elm frontend..."
+	cd frontend && ./build.sh
+	@echo "Frontend build complete! Output in frontend/dst/"
+
+frontend-deploy:
+	@echo "Building and deploying frontend..."
+	@echo "Step 1/2: Building Elm frontend..."
+	cd frontend && ./build.sh
+	@echo "Step 2/2: Deploying to S3 + CloudFront via CDK..."
+	cd backend && AWS_PROFILE=arch uv run cdk deploy FrontendStack --require-approval never
+	@echo "Frontend deployed successfully!"
+	@echo "Note: CloudFront cache invalidation may take a few minutes to propagate."
+
+frontend-deploy-quick:
+	@echo "Deploying pre-built frontend (skipping build)..."
+	@if [ ! -d "frontend/dst" ] || [ -z "$$(ls -A frontend/dst)" ]; then \
+		echo "Error: frontend/dst is empty or doesn't exist. Run 'make frontend-build' first."; \
+		exit 1; \
+	fi
+	@echo "Deploying to S3 + CloudFront via CDK..."
+	cd backend && AWS_PROFILE=arch uv run cdk deploy FrontendStack --require-approval never
+	@echo "Frontend deployed successfully!"
+	@echo "Note: CloudFront cache invalidation may take a few minutes to propagate."
 
 # Development setup
 setup:
