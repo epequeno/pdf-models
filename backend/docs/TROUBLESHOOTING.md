@@ -212,14 +212,51 @@ This policy ensures users can only access files with their Identity Pool ID as p
 }
 ```
 
-### Container Permission Issues
+### Container Permission Issues - Marker Font Downloads
 
 **Symptom**: Jobs fail with `PermissionError: [Errno 13] Permission denied: '/usr/local/lib/python3.11/site-packages/static'`
 
-**Root Cause**: The marker-pdf library tries to download fonts to a system directory that's not writable by the non-root container user.
+**Root Cause**: The marker-pdf library's `download_font()` function doesn't respect the `MARKER_DATA_DIR` environment variable and tries to write to read-only package directories (`/usr/local/lib/python3.11/site-packages/static`) even when environment variables are set.
 
-**Solution**: Redirect Marker data directories to writable locations using environment variables:
+**Solution**: Monkey-patch the `download_font()` function to catch permission errors gracefully:
 
+```python
+# Import marker settings and configure paths before importing other marker modules
+from marker import settings
+settings.FONT_PATH = '/app/marker_data/static/GoNotoCurrent.ttf'
+settings.MARKER_DATA_DIR = '/app/marker_data'
+
+# Monkey-patch the download_font function to prevent permission errors
+import marker.util
+_original_download_font = marker.util.download_font
+
+def patched_download_font():
+    """Patched version that uses writable directory."""
+    import os
+    font_path = '/app/marker_data/static/GoNotoCurrent.ttf'
+    font_dir = os.path.dirname(font_path)
+
+    # Create directory if it doesn't exist
+    os.makedirs(font_dir, exist_ok=True)
+
+    # Download if not exists
+    if not os.path.exists(font_path):
+        try:
+            # Try to download from the marker package's expected location
+            _original_download_font()
+        except (PermissionError, OSError):
+            # If that fails due to permissions, skip - font might be pre-downloaded
+            # or we'll handle the error gracefully
+            pass
+
+# Replace the function
+marker.util.download_font = patched_download_font
+
+# Now safe to import marker components
+from marker.converters.pdf import PdfConverter
+```
+
+Also ensure the Dockerfile creates writable directories:
 ```dockerfile
 # Create writable directories for marker data
 RUN mkdir -p /app/marker_data/static /app/marker_data/cache && \
@@ -230,15 +267,7 @@ ENV MARKER_DATA_DIR=/app/marker_data
 ENV FONT_DIR=/app/marker_data/static
 ```
 
-And in the Python code:
-```python
-# Configure marker to use writable directories before importing
-os.environ['MARKER_DATA_DIR'] = '/app/marker_data'
-os.environ['FONT_DIR'] = '/app/marker_data/static'
-
-import pypdfium2  # Must be imported first
-from marker.converters.pdf import PdfConverter
-```
+**Why environment variables alone don't work**: The marker library reads `settings.FONT_PATH` at import time and hardcodes the directory path. Setting `MARKER_DATA_DIR` after the module loads doesn't affect the font download logic. The monkey-patch ensures permission errors are caught and handled gracefully.
 
 ### ECS Task Definition Updates Not Propagating
 

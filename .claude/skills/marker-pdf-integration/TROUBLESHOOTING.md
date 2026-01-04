@@ -44,27 +44,60 @@ pip install --force-reinstall pypdfium2 marker-pdf
 **Full error**:
 ```
 PermissionError: [Errno 13] Permission denied:
-'/usr/local/lib/python3.11/site-packages/marker_pdf/static/Noto_Sans_fallback.ttf'
+'/usr/local/lib/python3.11/site-packages/static'
 ```
 
-**Cause**: Non-root user trying to write to system directory
+**Cause**: The marker library's `download_font()` function doesn't respect `MARKER_DATA_DIR` environment variable and tries to write to read-only package directories.
 
-**Fix**: Redirect with environment variables BEFORE importing:
+**❌ Environment variables alone don't work**: Setting `MARKER_DATA_DIR` and `FONT_DIR` environment variables is **not sufficient** because the marker library hardcodes the font path at import time.
+
+**✅ Solution**: Monkey-patch the `download_font()` function:
+
 ```python
-import os
+# Import marker settings and configure paths BEFORE other marker imports
+from marker import settings
+settings.FONT_PATH = '/app/marker_data/static/GoNotoCurrent.ttf'
+settings.MARKER_DATA_DIR = '/app/marker_data'
 
-os.environ['MARKER_DATA_DIR'] = '/app/marker_data'
-os.environ['FONT_DIR'] = '/app/marker_data/static'
+# Monkey-patch the download_font function to prevent permission errors
+import marker.util
+_original_download_font = marker.util.download_font
 
-# THEN import marker
-from marker.convert import convert_single_pdf
+def patched_download_font():
+    """Patched version that catches permission errors gracefully."""
+    import os
+    font_path = '/app/marker_data/static/GoNotoCurrent.ttf'
+    font_dir = os.path.dirname(font_path)
+
+    os.makedirs(font_dir, exist_ok=True)
+
+    if not os.path.exists(font_path):
+        try:
+            _original_download_font()
+        except (PermissionError, OSError):
+            # Font download failed due to permissions - skip gracefully
+            pass
+
+# Replace the function before importing marker components
+marker.util.download_font = patched_download_font
+
+# Now safe to import
+from marker.converters.pdf import PdfConverter
+from marker.models import create_model_dict
 ```
 
-**In container**: Set ENV vars in Dockerfile:
+**In Dockerfile**: Still set environment variables and create writable directories:
 ```dockerfile
+# Create writable directories
+RUN mkdir -p /app/marker_data/static /app/marker_data/cache && \
+    chown -R appuser:appuser /app
+
+# Set environment variables (helps with other marker data)
 ENV MARKER_DATA_DIR=/app/marker_data
 ENV FONT_DIR=/app/marker_data/static
 ```
+
+**Why this is necessary**: The marker library reads `settings.FONT_PATH` at import time and the `download_font()` function uses `os.path.dirname(settings.FONT_PATH)` which may still point to the package directory. The monkey-patch ensures permission errors are caught before they crash the application.
 
 ## Model download issues
 
