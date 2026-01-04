@@ -37,9 +37,12 @@ USER appuser
 
 # Pre-download Marker models during build to avoid runtime downloads
 # This downloads ~1.34GB of models but makes runtime much faster
-# Also pre-download fonts to avoid runtime permission issues
 RUN MARKER_DATA_DIR=/app/marker_data python -c "from marker.models import create_model_dict; create_model_dict()" && \
-    MARKER_DATA_DIR=/app/marker_data python -c "from marker.util import download_font; download_font()" && \
-    echo "Models and fonts pre-downloaded successfully"
+    echo "Models pre-downloaded successfully"
+
+# Manually download the font to avoid permission issues with marker's download_font()
+# The font is downloaded from GitHub and placed in the writable directory
+RUN python -c "import urllib.request; urllib.request.urlretrieve('https://github.com/VikParuchuri/surya/raw/master/static/GoNotoCurrent.ttf', '/app/marker_data/static/GoNotoCurrent.ttf')" && \
+    echo "Font downloaded successfully"
 
 ENTRYPOINT ["python", "task.py"]
