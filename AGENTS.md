@@ -185,10 +185,11 @@ Run tests with: `make test-integration-auto`
 **Root Cause**: Lambda defaults to `start_processing: false`
 **Solution**: Include `"start_processing": true` in job submission payload
 
-### ❌ Using jq in CodeBuild buildspec
-**Symptom**: CodeBuild fails with "jq: command not found"
-**Root Cause**: jq is not available in the CodeBuild environment
-**Solution**: Use Python's built-in JSON parsing instead
+### ❌ Using jq or python3 in CodeBuild buildspec
+**Symptom**: CodeBuild fails with "jq: command not found" or "python3: command not found" (exit status 127)
+**Root Cause**: jq and python3 are not available in the CodeBuild environment
+**Solution**: Use AWS CLI's built-in `--query` parameter for JSON parsing
+**Example**: Replace `python3 -c "import sys, json; print(json.load(sys.stdin)['VersionId'])"` with `--query 'VersionId' --output text`
 
 ### ❌ Runtime model downloads in containers
 **Symptom**: Container jobs take 10+ minutes, timeout frequently
