@@ -18,6 +18,12 @@ phases:
       - cargo lambda build --release --arm64
       - cd ..
 
+      # Build get-upload-url Lambda
+      - echo "Building get-upload-url Lambda..."
+      - cd get-upload-url
+      - cargo lambda build --release --arm64
+      - cd ..
+
       - echo "Lambda builds complete"
 
   post_build:
@@ -42,6 +48,15 @@ phases:
       - aws ssm put-parameter --name /pdf-models/lambda/get-job-version --value ${GET_JOB_VERSION} --type String --overwrite || echo "Warning Could not update SSM parameter"
       - cd ../../../..
 
+      # Create get-upload-url.zip
+      - cd get-upload-url/target/lambda/get-upload-url
+      - zip get-upload-url.zip bootstrap
+      - GET_UPLOAD_URL_UPLOAD=$(aws s3api put-object --bucket ${S3_BUCKET_NAME} --key lambda-artifacts/get-upload-url.zip --body get-upload-url.zip --output json)
+      - GET_UPLOAD_URL_VERSION=$(echo "$GET_UPLOAD_URL_UPLOAD" | python3 -c "import sys, json; print(json.load(sys.stdin)['VersionId'])")
+      - echo "get-upload-url.zip uploaded with version ${GET_UPLOAD_URL_VERSION}"
+      - aws ssm put-parameter --name /pdf-models/lambda/get-upload-url-version --value ${GET_UPLOAD_URL_VERSION} --type String --overwrite || echo "Warning Could not update SSM parameter"
+      - cd ../../../..
+
       - echo "Lambda artifacts uploaded to S3"
 
 artifacts:
@@ -49,4 +64,5 @@ artifacts:
     # Include the bootstrap binaries from cargo-lambda output
     - backend/lambdas/submit-job/target/lambda/submit-job/bootstrap
     - backend/lambdas/get-job/target/lambda/get-job/bootstrap
+    - backend/lambdas/get-upload-url/target/lambda/get-upload-url/bootstrap
   name: rust-lambda-builds

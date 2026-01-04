@@ -45,10 +45,7 @@ view model =
                 [ viewFileInput model.upload
                 , case model.upload.selectedFile of
                     Just file ->
-                        div []
-                            [ viewSelectedFile file model.upload
-                            , viewUploadButton model.upload
-                            ]
+                        viewSelectedFile file model.upload
 
                     Nothing ->
                         text ""
@@ -174,39 +171,17 @@ viewSelectedFile file uploadState =
                     [ text ("Uploading... " ++ String.fromInt (Basics.round (progress * 100)) ++ "%") ]
 
             Nothing ->
-                text ""
-        , case uploadState.s3Key of
-            Just key ->
-                div
-                    [ css
-                        [ marginTop Styles.spacing.sm
-                        , Css.fontSize Styles.fontSize.small
-                        , color Styles.colors.textSecondary
+                if uploadState.submitting then
+                    div
+                        [ css
+                            [ marginTop Styles.spacing.sm
+                            , color Styles.colors.accentSuccess
+                            ]
                         ]
-                    ]
-                    [ text ("S3 Key: " ++ key) ]
+                        [ text "Submitting job..." ]
 
-            Nothing ->
-                text ""
-        ]
-
-
-viewUploadButton : UploadState -> Html Msg
-viewUploadButton uploadState =
-    div [ css [ marginTop Styles.spacing.lg ] ]
-        [ case uploadState.s3Key of
-            Just _ ->
-                Button.button Button.Primary
-                    (if uploadState.submitting then
-                        "Submitting..."
-
-                     else
-                        "Submit Job"
-                    )
-                    SubmitJobClicked
-
-            Nothing ->
-                Button.button Button.Primary "Upload to S3" UploadToS3
+                else
+                    text ""
         ]
 
 

@@ -4,17 +4,17 @@ CDK App for pdf-models serverless platform.
 CRITICAL: Account and region are determined by AWS_PROFILE at deployment time.
 The Makefile ensures all CDK commands use AWS_PROFILE=arch.
 """
+
 import aws_cdk as cdk
 
-from backend.foundation_stack import FoundationStack
-from backend.networking_stack import NetworkingStack
-from backend.core_infrastructure_stack import CoreInfrastructureStack
-from backend.cicd_stack import CiCdStack
-from backend.marker_stack import MarkerStack
 from backend.api_v2_stack import ApiV2Stack
-from backend.monitoring_stack import MonitoringStack
+from backend.cicd_stack import CiCdStack
+from backend.core_infrastructure_stack import CoreInfrastructureStack
+from backend.foundation_stack import FoundationStack
 from backend.frontend_stack import FrontendStack
-
+from backend.marker_stack import MarkerStack
+from backend.monitoring_stack import MonitoringStack
+from backend.networking_stack import NetworkingStack
 
 app = cdk.App()
 
@@ -65,23 +65,23 @@ api_v2_stack = ApiV2Stack(
     description="HTTP API Gateway with Cognito JWT authorizer and Lambda functions",
 )
 
-# COMMENTED OUT: Deploy API stack first, then uncomment these stacks
-# # Stack 6: Monitoring (CloudWatch dashboards and alarms)
-# # Depends on: API (for metrics)
-# monitoring_stack = MonitoringStack(
-#     app,
-#     "MonitoringStack",
-#     description="CloudWatch dashboards and alarms for operational visibility",
-# )
 
-# # Stack 7: Frontend (S3 + CloudFront static site hosting)
-# # Independent stack - serves the Elm frontend
-# # Requires frontend/dst to be built before deployment
-# frontend_stack = FrontendStack(
-#     app,
-#     "FrontendStack",
-#     description="Frontend deployment: S3 bucket, CloudFront CDN, and Route53 DNS for epequeno.app",
-# )
+# Stack 6: Monitoring (CloudWatch dashboards and alarms)
+# Depends on: API (for metrics)
+monitoring_stack = MonitoringStack(
+    app,
+    "MonitoringStack",
+    description="CloudWatch dashboards and alarms for operational visibility",
+)
+
+# Stack 7: Frontend (S3 + CloudFront static site hosting)
+# Independent stack - serves the Elm frontend
+# Requires frontend/dst to be built before deployment
+frontend_stack = FrontendStack(
+    app,
+    "FrontendStack",
+    description="Frontend deployment: S3 bucket, CloudFront CDN, and Route53 DNS for epequeno.app",
+)
 
 # Note: Foundation and Core are independent in Phase 1
 # CiCdStack reads ECR URI from Foundation via SSM

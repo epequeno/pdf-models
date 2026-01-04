@@ -3,17 +3,21 @@ port module Auth exposing
     , ConfirmSignUpResponse
     , SignUpResponse
     , authResponseDecoder
+    , clearSession
     , confirmSignUp
     , confirmSignUpResponseDecoder
     , receiveAuthResponse
     , receiveConfirmSignUpResponse
+    , receiveRestoredSession
     , receiveSignUpResponse
+    , restoreSession
     , signIn
     , signUp
     , signUpResponseDecoder
     )
 
 import Json.Decode as Decode exposing (Decoder)
+import Json.Decode.Pipeline exposing (required, optional)
 import Json.Encode as Encode
 
 
@@ -36,6 +40,15 @@ port receiveSignUpResponse : (Encode.Value -> msg) -> Sub msg
 
 
 port receiveConfirmSignUpResponse : (Encode.Value -> msg) -> Sub msg
+
+
+port restoreSessionPort : () -> Cmd msg
+
+
+port receiveRestoredSession : (Encode.Value -> msg) -> Sub msg
+
+
+port clearSessionPort : () -> Cmd msg
 
 
 
@@ -72,6 +85,16 @@ confirmSignUp email code =
         )
 
 
+restoreSession : Cmd msg
+restoreSession =
+    restoreSessionPort ()
+
+
+clearSession : Cmd msg
+clearSession =
+    clearSessionPort ()
+
+
 
 -- TYPES
 
@@ -80,7 +103,8 @@ type alias AuthResponse =
     { success : Bool
     , accessToken : Maybe String
     , idToken : Maybe String
-    , identityId : Maybe String
+    , refreshToken : Maybe String
+    , expiresAt : Maybe Int
     , error : Maybe String
     }
 
@@ -104,12 +128,13 @@ type alias ConfirmSignUpResponse =
 
 authResponseDecoder : Decoder AuthResponse
 authResponseDecoder =
-    Decode.map5 AuthResponse
-        (Decode.field "success" Decode.bool)
-        (Decode.maybe (Decode.field "accessToken" Decode.string))
-        (Decode.maybe (Decode.field "idToken" Decode.string))
-        (Decode.maybe (Decode.field "identityId" Decode.string))
-        (Decode.maybe (Decode.field "error" Decode.string))
+    Decode.succeed AuthResponse
+        |> required "success" Decode.bool
+        |> optional "accessToken" (Decode.maybe Decode.string) Nothing
+        |> optional "idToken" (Decode.maybe Decode.string) Nothing
+        |> optional "refreshToken" (Decode.maybe Decode.string) Nothing
+        |> optional "expiresAt" (Decode.maybe Decode.int) Nothing
+        |> optional "error" (Decode.maybe Decode.string) Nothing
 
 
 signUpResponseDecoder : Decoder SignUpResponse

@@ -52,9 +52,12 @@ cat > dst/index.html << 'EOF'
 </html>
 EOF
 
-# Create interop.js for AWS SDK
-echo "Creating interop.js..."
-cat > dst/interop.js << 'EOF'
+# Copy interop.js from source
+echo "Copying interop.js..."
+cp interop.js dst/interop.js
+
+# The following heredoc is kept for reference but no longer used
+: << 'DEPRECATED_EOF'
 // AWS SDK Interop
 // Handles Cognito authentication and S3 uploads
 
@@ -315,7 +318,7 @@ async function authenticateWithCognito(email, password) {
         identityId: identityId
     };
 }
-EOF
+DEPRECATED_EOF
 
 echo "Build complete! Output in dst/"
 echo "To serve locally: cd dst && python3 -m http.server 8000"

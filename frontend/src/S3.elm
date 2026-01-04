@@ -4,7 +4,6 @@ port module S3 exposing
     , receiveUploadProgress
     , receiveUploadResponse
     , uploadFile
-    , uploadProgressDecoder
     , uploadResponseDecoder
     )
 
@@ -31,8 +30,7 @@ port receiveUploadResponse : (Encode.Value -> msg) -> Sub msg
 
 type alias UploadRequest =
     { file : File
-    , identityId : String
-    , jobId : String
+    , accessToken : String
     }
 
 
@@ -40,8 +38,7 @@ uploadFile : UploadRequest -> Cmd msg
 uploadFile request =
     uploadFilePort
         (Encode.object
-            [ ( "identityId", Encode.string request.identityId )
-            , ( "jobId", Encode.string request.jobId )
+            [ ( "accessToken", Encode.string request.accessToken )
             ]
         )
 
@@ -67,8 +64,3 @@ uploadResponseDecoder =
         (Decode.field "success" Decode.bool)
         (Decode.maybe (Decode.field "s3Key" Decode.string))
         (Decode.maybe (Decode.field "error" Decode.string))
-
-
-uploadProgressDecoder : Decoder Float
-uploadProgressDecoder =
-    Decode.float

@@ -47,7 +47,8 @@ init _ url key =
         model =
             Types.initModel key route
     in
-    ( model, Cmd.none )
+    -- Attempt to restore authentication session from localStorage
+    ( model, Auth.restoreSession )
 
 
 
@@ -78,6 +79,48 @@ parseUrl url =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        SessionRestored jsonString ->
+            case Decode.decodeString Auth.authResponseDecoder jsonString of
+                Ok response ->
+                    if response.success then
+                        case response.accessToken of
+                            Just accessToken ->
+                                case response.idToken of
+                                    Just idToken ->
+                                        case response.refreshToken of
+                                            Just refreshToken ->
+                                                case response.expiresAt of
+                                                    Just expiresAt ->
+                                                        ( { model
+                                                            | auth =
+                                                                Authenticated
+                                                                    { accessToken = accessToken
+                                                                    , idToken = idToken
+                                                                    , refreshToken = refreshToken
+                                                                    , expiresAt = expiresAt
+                                                                    }
+                                                          }
+                                                        , Cmd.none
+                                                        )
+
+                                                    Nothing ->
+                                                        ( model, Cmd.none )
+
+                                            Nothing ->
+                                                ( model, Cmd.none )
+
+                                    Nothing ->
+                                        ( model, Cmd.none )
+
+                            Nothing ->
+                                ( model, Cmd.none )
+
+                    else
+                        ( model, Cmd.none )
+
+                Err _ ->
+                    ( model, Cmd.none )
+
         UrlChanged url ->
             let
                 newRoute =
@@ -142,20 +185,72 @@ update msg model =
             case Decode.decodeString Auth.authResponseDecoder jsonString of
                 Ok response ->
                     if response.success then
-                        case ( response.accessToken, response.idToken, response.identityId ) of
-                            ( Just accessToken, Just idToken, Just identityId ) ->
-                                let
-                                    tokens =
-                                        { accessToken = accessToken
-                                        , idToken = idToken
-                                        , identityId = identityId
-                                        }
-                                in
-                                ( { model | auth = Authenticated tokens }
-                                , Nav.pushUrl model.key "/upload"
-                                )
+                        case response.accessToken of
+                            Just accessToken ->
+                                case response.idToken of
+                                    Just idToken ->
+                                        case response.refreshToken of
+                                            Just refreshToken ->
+                                                case response.expiresAt of
+                                                    Just expiresAt ->
+                                                        let
+                                                            tokens =
+                                                                { accessToken = accessToken
+                                                                , idToken = idToken
+                                                                , refreshToken = refreshToken
+                                                                , expiresAt = expiresAt
+                                                                }
+                                                        in
+                                                        ( { model | auth = Authenticated tokens }
+                                                        , Nav.pushUrl model.key "/upload"
+                                                        )
 
-                            _ ->
+                                                    Nothing ->
+                                                        let
+                                                            oldForm =
+                                                                model.loginForm
+
+                                                            newForm =
+                                                                { oldForm | error = Just "Invalid authentication response" }
+                                                        in
+                                                        ( { model
+                                                            | auth = NotAuthenticated
+                                                            , loginForm = newForm
+                                                          }
+                                                        , Cmd.none
+                                                        )
+
+                                            Nothing ->
+                                                let
+                                                    oldForm =
+                                                        model.loginForm
+
+                                                    newForm =
+                                                        { oldForm | error = Just "Invalid authentication response" }
+                                                in
+                                                ( { model
+                                                    | auth = NotAuthenticated
+                                                    , loginForm = newForm
+                                                  }
+                                                , Cmd.none
+                                                )
+
+                                    Nothing ->
+                                        let
+                                            oldForm =
+                                                model.loginForm
+
+                                            newForm =
+                                                { oldForm | error = Just "Invalid authentication response" }
+                                        in
+                                        ( { model
+                                            | auth = NotAuthenticated
+                                            , loginForm = newForm
+                                          }
+                                        , Cmd.none
+                                        )
+
+                            Nothing ->
                                 let
                                     oldForm =
                                         model.loginForm
@@ -209,7 +304,10 @@ update msg model =
 
         SignOutClicked ->
             ( { model | auth = NotAuthenticated }
-            , Nav.pushUrl model.key "/login"
+            , Cmd.batch
+                [ Auth.clearSession
+                , Nav.pushUrl model.key "/login"
+                ]
             )
 
         SignUpEmailChanged email ->
@@ -402,31 +500,50 @@ update msg model =
                     ( { model | signUpForm = newForm }, Cmd.none )
 
         FileSelected file ->
-            let
-                oldUpload =
-                    model.upload
+            -- Automatically upload to S3 when file is selected
+            case model.auth of
+                Authenticated tokens ->
+                    let
+                        oldUpload =
+                            model.upload
 
-                newUpload =
-                    { oldUpload
-                        | selectedFile = Just file
-                        , uploadProgress = Nothing
-                        , s3Key = Nothing
-                        , error = Nothing
-                    }
-            in
-            ( { model | upload = newUpload }, Cmd.none )
+                        newUpload =
+                            { oldUpload
+                                | selectedFile = Just file
+                                , uploadProgress = Nothing
+                                , s3Key = Nothing
+                                , error = Nothing
+                            }
+
+                        request =
+                            { file = file
+                            , accessToken = tokens.accessToken
+                            }
+                    in
+                    ( { model | upload = newUpload }, S3.uploadFile request )
+
+                _ ->
+                    let
+                        oldUpload =
+                            model.upload
+
+                        newUpload =
+                            { oldUpload
+                                | selectedFile = Just file
+                                , uploadProgress = Nothing
+                                , s3Key = Nothing
+                                , error = Nothing
+                            }
+                    in
+                    ( { model | upload = newUpload }, Cmd.none )
 
         UploadToS3 ->
             case ( model.upload.selectedFile, model.auth ) of
                 ( Just file, Authenticated tokens ) ->
                     let
-                        jobId =
-                            generateJobId ()
-
                         request =
                             { file = file
-                            , identityId = tokens.identityId
-                            , jobId = jobId
+                            , accessToken = tokens.accessToken
                             }
                     in
                     ( model, S3.uploadFile request )
@@ -450,17 +567,36 @@ update msg model =
                     if response.success then
                         case response.s3Key of
                             Just s3Key ->
-                                let
-                                    oldUpload =
-                                        model.upload
+                                -- Automatically submit job after successful S3 upload
+                                case model.auth of
+                                    Authenticated tokens ->
+                                        let
+                                            oldUpload =
+                                                model.upload
 
-                                    newUpload =
-                                        { oldUpload
-                                            | s3Key = Just s3Key
-                                            , uploadProgress = Nothing
-                                        }
-                                in
-                                ( { model | upload = newUpload }, Cmd.none )
+                                            newUpload =
+                                                { oldUpload
+                                                    | s3Key = Just s3Key
+                                                    , uploadProgress = Nothing
+                                                    , submitting = True
+                                                }
+                                        in
+                                        ( { model | upload = newUpload }
+                                        , Api.submitJob tokens.accessToken s3Key JobSubmitted
+                                        )
+
+                                    _ ->
+                                        let
+                                            oldUpload =
+                                                model.upload
+
+                                            newUpload =
+                                                { oldUpload
+                                                    | s3Key = Just s3Key
+                                                    , uploadProgress = Nothing
+                                                }
+                                        in
+                                        ( { model | upload = newUpload }, Cmd.none )
 
                             Nothing ->
                                 let
@@ -618,6 +754,17 @@ update msg model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     let
+        restoredSessionSub =
+            Auth.receiveRestoredSession
+                (\value ->
+                    case Decode.decodeValue Decode.string value of
+                        Ok jsonString ->
+                            SessionRestored jsonString
+
+                        Err _ ->
+                            SessionRestored "{}"
+                )
+
         authSub =
             Auth.receiveAuthResponse
                 (\value ->
@@ -677,7 +824,7 @@ subscriptions model =
                     else
                         Sub.none
     in
-    Sub.batch [ authSub, signUpSub, confirmSignUpSub, uploadProgressSub, uploadResponseSub, pollSub ]
+    Sub.batch [ restoredSessionSub, authSub, signUpSub, confirmSignUpSub, uploadProgressSub, uploadResponseSub, pollSub ]
 
 
 

@@ -82,6 +82,9 @@ class ApiV2Stack(Stack):
         get_job_version = ssm.StringParameter.value_for_string_parameter(
             self, "/pdf-models/lambda/get-job-version"
         )
+        get_upload_url_version = ssm.StringParameter.value_for_string_parameter(
+            self, "/pdf-models/lambda/get-upload-url-version"
+        )
 
         # Create CloudWatch log groups for Lambdas
         submit_job_log_group = logs.LogGroup(
@@ -96,6 +99,14 @@ class ApiV2Stack(Stack):
             self,
             "GetJobLogGroup",
             log_group_name=f"/aws/lambda/{CONFIG.PROJECT_NAME}-get-job-v2",
+            retention=logs.RetentionDays.ONE_WEEK,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+
+        get_upload_url_log_group = logs.LogGroup(
+            self,
+            "GetUploadUrlLogGroup",
+            log_group_name=f"/aws/lambda/{CONFIG.PROJECT_NAME}-get-upload-url",
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY,
         )
@@ -174,6 +185,27 @@ class ApiV2Stack(Stack):
             )
         )
 
+        # Create Lambda execution role for get-upload-url
+        get_upload_url_role = iam.Role(
+            self,
+            "GetUploadUrlLambdaRole",
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name(
+                    "service-role/AWSLambdaBasicExecutionRole"
+                )
+            ],
+        )
+
+        # Grant S3 permissions for generating pre-signed upload URLs
+        get_upload_url_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["s3:PutObject"],
+                resources=[f"{s3_bucket_arn}/*"],
+            )
+        )
+
         # Create submit-job Lambda function
         submit_job_function = lambda_.Function(
             self,
@@ -225,6 +257,30 @@ class ApiV2Stack(Stack):
             },
         )
 
+        # Create get-upload-url Lambda function
+        get_upload_url_function = lambda_.Function(
+            self,
+            "GetUploadUrlFunction",
+            function_name=f"{CONFIG.PROJECT_NAME}-get-upload-url",
+            runtime=lambda_.Runtime.PROVIDED_AL2023,
+            handler="bootstrap",
+            code=lambda_.Code.from_bucket(
+                bucket=s3.Bucket.from_bucket_name(
+                    self, "LambdaArtifactsBucket3", s3_bucket_name
+                ),
+                key="lambda-artifacts/get-upload-url.zip",
+                object_version=get_upload_url_version,
+            ),
+            architecture=lambda_.Architecture.ARM_64,
+            role=get_upload_url_role,
+            timeout=Duration.seconds(10),
+            memory_size=256,
+            log_group=get_upload_url_log_group,
+            environment={
+                "S3_BUCKET_NAME": s3_bucket_name,
+            },
+        )
+
         # Create HTTP API Gateway (v2)
         http_api = apigwv2.HttpApi(
             self,
@@ -271,7 +327,20 @@ class ApiV2Stack(Stack):
             get_job_function,
         )
 
+        get_upload_url_integration = apigwv2_integrations.HttpLambdaIntegration(
+            "GetUploadUrlIntegration",
+            get_upload_url_function,
+        )
+
         # Add routes with Cognito authorizer
+        # POST /v1/models/{model}/upload-url - get pre-signed upload URL
+        http_api.add_routes(
+            path="/v1/models/{model}/upload-url",
+            methods=[apigwv2.HttpMethod.POST],
+            integration=get_upload_url_integration,
+            authorizer=authorizer,
+        )
+
         # POST /v1/models/{model}/jobs - submit job
         http_api.add_routes(
             path="/v1/models/{model}/jobs",

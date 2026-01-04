@@ -47,7 +47,8 @@ type AuthState
 type alias AuthTokens =
     { accessToken : String
     , idToken : String
-    , identityId : String
+    , refreshToken : String
+    , expiresAt : Int
     }
 
 
@@ -112,6 +113,7 @@ type JobStatus
 type Msg
     = UrlChanged Url.Url
     | LinkClicked Browser.UrlRequest
+    | SessionRestored String
       -- Auth - Login
     | EmailChanged String
     | PasswordChanged String
