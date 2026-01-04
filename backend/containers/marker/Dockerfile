@@ -40,9 +40,8 @@ USER appuser
 RUN MARKER_DATA_DIR=/app/marker_data python -c "from marker.models import create_model_dict; create_model_dict()" && \
     echo "Models pre-downloaded successfully"
 
-# Manually download the font to avoid permission issues with marker's download_font()
-# The font is downloaded from GitHub and placed in the writable directory
-RUN python -c "import urllib.request; urllib.request.urlretrieve('https://github.com/VikParuchuri/surya/raw/master/static/GoNotoCurrent.ttf', '/app/marker_data/static/GoNotoCurrent.ttf')" && \
-    echo "Font downloaded successfully"
+# Note: Font will be downloaded at runtime to /app/marker_data/static (writable location)
+# The MARKER_DATA_DIR env var ensures fonts are downloaded to the writable directory
+# rather than trying to write to read-only package directories
 
 ENTRYPOINT ["python", "task.py"]
