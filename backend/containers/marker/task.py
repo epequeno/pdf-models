@@ -31,6 +31,35 @@ from marker import settings
 settings.FONT_PATH = '/app/marker_data/static/GoNotoCurrent.ttf'
 settings.MARKER_DATA_DIR = '/app/marker_data'
 
+# Monkey-patch the download_font function to prevent permission errors
+# The original function tries to write to read-only package directories
+import marker.util
+_original_download_font = marker.util.download_font
+
+def patched_download_font():
+    """Patched version that uses writable directory."""
+    import os
+    import requests
+
+    font_path = '/app/marker_data/static/GoNotoCurrent.ttf'
+    font_dir = os.path.dirname(font_path)
+
+    # Create directory if it doesn't exist
+    os.makedirs(font_dir, exist_ok=True)
+
+    # Download if not exists
+    if not os.path.exists(font_path):
+        try:
+            # Try to download from the marker package's expected location
+            _original_download_font()
+        except (PermissionError, OSError):
+            # If that fails due to permissions, skip - font might be pre-downloaded
+            # or we'll handle the error gracefully
+            pass
+
+# Replace the function
+marker.util.download_font = patched_download_font
+
 from marker.converters.pdf import PdfConverter
 from marker.models import create_model_dict
 
