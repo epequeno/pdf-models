@@ -236,7 +236,7 @@ class CiCdStack(Stack):
                         CONFIG.ECR_RUST_LAMBDA_BUILDER_REPO_NAME,
                     )
                 ),
-                compute_type=codebuild.ComputeType.SMALL,
+                compute_type=codebuild.ComputeType.MEDIUM,  # MEDIUM for SSM SDK compilation with LTO
                 environment_variables={
                     "S3_BUCKET_NAME": codebuild.BuildEnvironmentVariable(
                         value=s3_bucket_name
@@ -260,6 +260,17 @@ class CiCdStack(Stack):
                 effect=iam.Effect.ALLOW,
                 actions=["s3:PutObject"],
                 resources=[f"arn:aws:s3:::{s3_bucket_name}/lambda-artifacts/*"],
+            )
+        )
+
+        # Grant SSM permissions to Lambda build for updating version parameters
+        lambda_build.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["ssm:PutParameter"],
+                resources=[
+                    f"arn:aws:ssm:{self.region}:{self.account}:parameter/pdf-models/lambda/*-version"
+                ],
             )
         )
 
