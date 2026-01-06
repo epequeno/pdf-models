@@ -17,11 +17,19 @@ class ModelConfig:
     """
 
     name: str  # Model identifier: "marker", "dolphin"
-    cpu: int  # Fargate vCPU units (256, 512, 1024, 2048, 4096)
-    memory_mib: int  # Fargate memory in MiB
+    cpu: int  # Fargate vCPU units or EC2 vCPU count
+    memory_mib: int  # Fargate memory in MiB or EC2 memory limit
     container_path: str  # Directory under backend/containers/
     output_formats: tuple[str, ...]  # ("markdown",) or ("json", "markdown")
     timeout_minutes: int = 120  # Task timeout
+
+    # GPU/EC2 configuration (defaults to Fargate CPU)
+    use_gpu: bool = False  # If True, use EC2 with GPU instead of Fargate
+    gpu_count: int = 0  # Number of GPUs per task (typically 1 for GPU models)
+    instance_type: str = ""  # EC2 instance type (e.g., "g4dn.xlarge")
+    spot_enabled: bool = True  # Use Spot instances for cost savings
+    min_capacity: int = 0  # ASG min capacity (0 = scale to zero when idle)
+    max_capacity: int = 2  # ASG max capacity
 
 
 # Model registry - add new models here
@@ -36,11 +44,17 @@ MODELS: dict[str, ModelConfig] = {
     ),
     "dolphin": ModelConfig(
         name="dolphin",
-        cpu=4096,  # Max Fargate vCPU
-        memory_mib=30720,  # 30GB - max for 4 vCPU Fargate (4B model needs it)
+        cpu=4096,  # 4 vCPU on g4dn.xlarge
+        memory_mib=15360,  # 15GB (leave headroom from 16GB instance)
         container_path="dolphin",
         output_formats=("json", "markdown"),
-        timeout_minutes=120,
+        timeout_minutes=30,  # Reduced from 120 - GPU is much faster
+        use_gpu=True,
+        gpu_count=1,
+        instance_type="g4dn.xlarge",  # 1 T4 GPU, 4 vCPU, 16GB RAM
+        spot_enabled=True,
+        min_capacity=0,  # Scale to zero when idle
+        max_capacity=2,
     ),
 }
 

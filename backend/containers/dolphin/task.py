@@ -2,8 +2,12 @@
 """
 Dolphin PDF Processing Task
 
-This script runs inside a Fargate container to process PDFs using ByteDance's Dolphin model.
+This script runs inside an ECS container to process PDFs using ByteDance's Dolphin model.
 It converts PDF pages to images, processes with Dolphin VLM, and outputs both JSON and Markdown.
+
+Supports both CPU (Fargate) and GPU (EC2 with g4dn.xlarge) execution:
+- GPU: Uses float16 for faster inference (~10-15s per page)
+- CPU: Uses float32 for compatibility (~1-2 min per page)
 
 Environment Variables:
     JOB_ID: Unique job identifier
@@ -89,11 +93,26 @@ def update_job_status(
 
 
 def load_dolphin_model():
-    """Load the Dolphin model and processor."""
+    """Load the Dolphin model and processor with GPU support if available.
+
+    Returns:
+        tuple: (model, processor, device) where device is 'cuda' or 'cpu'
+    """
     from transformers import AutoModelForVision2Seq, AutoProcessor
     import torch
 
+    # Detect device - use GPU if available
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    logger.info(f"Using device: {device}")
+
+    if device == "cuda":
+        gpu_name = torch.cuda.get_device_name(0)
+        gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1e9
+        logger.info(f"GPU: {gpu_name}")
+        logger.info(f"GPU Memory: {gpu_memory:.1f} GB")
+
     logger.info("Loading Dolphin model...")
+
     # Use local_files_only=True to prevent any network requests
     # Model is pre-downloaded in Docker build
     processor = AutoProcessor.from_pretrained(
@@ -101,18 +120,38 @@ def load_dolphin_model():
         trust_remote_code=True,
         local_files_only=True
     )
+
+    # Use FP16 on GPU for faster inference, FP32 on CPU
+    dtype = torch.float16 if device == "cuda" else torch.float32
+    logger.info(f"Using dtype: {dtype}")
+
     model = AutoModelForVision2Seq.from_pretrained(
         'ByteDance/Dolphin',
         trust_remote_code=True,
-        torch_dtype=torch.float32,  # CPU uses float32
+        torch_dtype=dtype,
         local_files_only=True
     )
+
+    # Move model to GPU if available
+    model = model.to(device)
+
     logger.info("Dolphin model loaded successfully")
-    return model, processor
+    return model, processor, device
 
 
-def process_page_with_dolphin(model, processor, image: Image.Image, page_num: int) -> dict:
-    """Process a single page image with Dolphin model."""
+def process_page_with_dolphin(model, processor, image: Image.Image, page_num: int, device: str) -> dict:
+    """Process a single page image with Dolphin model.
+
+    Args:
+        model: The Dolphin model
+        processor: The Dolphin processor
+        image: PIL Image of the page
+        page_num: Page number (1-indexed)
+        device: Device to run inference on ('cuda' or 'cpu')
+
+    Returns:
+        dict with page number, content, and dimensions
+    """
     import torch
 
     logger.info(f"Processing page {page_num}...")
@@ -126,6 +165,9 @@ def process_page_with_dolphin(model, processor, image: Image.Image, page_num: in
         images=image,
         return_tensors="pt"
     )
+
+    # Move inputs to device (GPU or CPU)
+    inputs = {k: v.to(device) for k, v in inputs.items()}
 
     # Generate output
     # Note: Dolphin uses mbart decoder with max 1024 positions
@@ -207,13 +249,13 @@ def main():
             images = convert_from_path(str(input_pdf), dpi=150)
             logger.info(f"Converted {len(images)} pages to images")
 
-            # Load Dolphin model
-            model, processor = load_dolphin_model()
+            # Load Dolphin model (with GPU support if available)
+            model, processor, device = load_dolphin_model()
 
             # Process each page
             pages_data = []
             for i, image in enumerate(images, start=1):
-                page_result = process_page_with_dolphin(model, processor, image, i)
+                page_result = process_page_with_dolphin(model, processor, image, i, device)
                 pages_data.append(page_result)
                 logger.info(f"Page {i}/{len(images)} processed")
 

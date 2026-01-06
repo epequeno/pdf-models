@@ -1,8 +1,12 @@
 """
-ModelStack: Generic ECS cluster, Fargate task definition, and Step Functions orchestration.
+ModelStack: Generic ECS cluster, task definition, and Step Functions orchestration.
 
 This stack creates the compute infrastructure for processing PDFs with any model.
 It is parameterized by ModelConfig to support multiple models (marker, dolphin, etc).
+
+Supports two launch types:
+- Fargate (default): Serverless containers, CPU-only
+- EC2 with GPU: Auto Scaling Group with GPU instances (g4dn.xlarge)
 """
 
 from aws_cdk import (
@@ -11,7 +15,13 @@ from aws_cdk import (
     Stack,
 )
 from aws_cdk import (
+    aws_autoscaling as autoscaling,
+)
+from aws_cdk import (
     aws_dynamodb as dynamodb,
+)
+from aws_cdk import (
+    aws_ec2 as ec2,
 )
 from aws_cdk import (
     aws_ecs as ecs,
@@ -43,8 +53,9 @@ class ModelStack(Stack):
     """Generic model processing infrastructure.
 
     Creates:
-    - ECS Cluster for Fargate tasks
-    - Fargate Task Definition for model container
+    - ECS Cluster for container tasks
+    - Task Definition (Fargate or EC2 based on model_config.use_gpu)
+    - For GPU models: Auto Scaling Group with GPU instances + Capacity Provider
     - Step Functions state machine for orchestration
     - IAM roles for task execution and task runtime
 
@@ -79,13 +90,32 @@ class ModelStack(Stack):
         isolated_subnet_ids = ["subnet-04a204ceff9880907", "subnet-0c304190e2352482f"]
         ecs_security_group_id = "sg-0a8df0846d1a6fc96"
 
+        # Import security group
+        ecs_security_group = ec2.SecurityGroup.from_security_group_id(
+            self, "ImportedSecurityGroup", ecs_security_group_id
+        )
+
+        # Import VPC with attributes (avoids context lookup which requires env-aware synthesis)
+        vpc = ec2.Vpc.from_vpc_attributes(
+            self,
+            "ImportedVpc",
+            vpc_id=vpc_id,
+            availability_zones=["us-east-1a", "us-east-1b"],  # Must match subnet AZs
+            isolated_subnet_ids=isolated_subnet_ids,
+        )
+
         # Create ECS cluster
+        # Note: VPC is not specified - cluster uses default VPC for EC2 capacity providers
+        # The ASG explicitly specifies the isolated subnets
         cluster = ecs.Cluster(
             self,
             f"{model_name.title()}Cluster",
             cluster_name=f"{CONFIG.PROJECT_NAME}-{model_name}-cluster",
             container_insights_v2=ecs.ContainerInsights.ENHANCED,
         )
+
+        # Track capacity provider name for GPU models (used in Step Functions)
+        capacity_provider_name = None
 
         # Create task execution role (used by ECS to pull image, write logs)
         execution_role = iam.Role(
@@ -144,31 +174,119 @@ class ModelStack(Stack):
             removal_policy=RemovalPolicy.DESTROY,
         )
 
-        # Create Fargate task definition with model-specific resources
-        task_definition = ecs.FargateTaskDefinition(
-            self,
-            f"{model_name.title()}TaskDefinition",
-            family=f"{CONFIG.PROJECT_NAME}-{model_name}",
-            cpu=model_config.cpu,
-            memory_limit_mib=model_config.memory_mib,
-            execution_role=execution_role,
-            task_role=task_role,
-        )
+        # Create task definition based on launch type (GPU vs Fargate)
+        if model_config.use_gpu:
+            # ========== EC2 GPU Path ==========
 
-        # Add container to task definition
-        container = task_definition.add_container(
-            model_name,
-            container_name=model_name,
-            image=ecs.ContainerImage.from_registry(f"{ecr_repo_uri}:{image_tag}"),
-            logging=ecs.LogDriver.aws_logs(
-                stream_prefix=model_name,
-                log_group=log_group,
-            ),
-            environment={
-                "S3_BUCKET": s3_bucket_name,
-                "DYNAMODB_TABLE": dynamodb_table_name,
-            },
-        )
+            # Create instance role for EC2 (ECS agent communication)
+            instance_role = iam.Role(
+                self,
+                f"{model_name.title()}InstanceRole",
+                assumed_by=iam.ServicePrincipal("ec2.amazonaws.com"),
+                managed_policies=[
+                    iam.ManagedPolicy.from_aws_managed_policy_name(
+                        "service-role/AmazonEC2ContainerServiceforEC2Role"
+                    ),
+                    iam.ManagedPolicy.from_aws_managed_policy_name(
+                        "AmazonSSMManagedInstanceCore"  # For SSM access in isolated subnets
+                    ),
+                ],
+            )
+
+            # Create Auto Scaling Group with GPU instances
+            asg = autoscaling.AutoScalingGroup(
+                self,
+                f"{model_name.title()}Asg",
+                auto_scaling_group_name=f"{CONFIG.PROJECT_NAME}-{model_name}-asg",
+                vpc=vpc,
+                vpc_subnets=ec2.SubnetSelection(
+                    subnet_type=ec2.SubnetType.PRIVATE_ISOLATED
+                ),
+                instance_type=ec2.InstanceType(model_config.instance_type),
+                machine_image=ecs.EcsOptimizedImage.amazon_linux2(
+                    hardware_type=ecs.AmiHardwareType.GPU
+                ),
+                min_capacity=model_config.min_capacity,
+                max_capacity=model_config.max_capacity,
+                security_group=ecs_security_group,
+                role=instance_role,
+                spot_price=str(0.20) if model_config.spot_enabled else None,  # ~25% above typical spot
+            )
+
+            # Add user data to configure ECS agent
+            asg.add_user_data(
+                f"echo ECS_CLUSTER={cluster.cluster_name} >> /etc/ecs/ecs.config",
+                "echo ECS_ENABLE_GPU_SUPPORT=true >> /etc/ecs/ecs.config",
+            )
+
+            # Create Capacity Provider
+            capacity_provider = ecs.AsgCapacityProvider(
+                self,
+                f"{model_name.title()}CapacityProvider",
+                capacity_provider_name=f"{CONFIG.PROJECT_NAME}-{model_name}-cp",
+                auto_scaling_group=asg,
+                enable_managed_scaling=True,
+                enable_managed_termination_protection=False,  # Allow scale-in
+                target_capacity_percent=100,
+            )
+            cluster.add_asg_capacity_provider(capacity_provider)
+            capacity_provider_name = capacity_provider.capacity_provider_name
+
+            # Create EC2 Task Definition (not Fargate)
+            task_definition = ecs.Ec2TaskDefinition(
+                self,
+                f"{model_name.title()}TaskDefinition",
+                family=f"{CONFIG.PROJECT_NAME}-{model_name}",
+                network_mode=ecs.NetworkMode.AWS_VPC,  # Required for isolated subnets
+                execution_role=execution_role,
+                task_role=task_role,
+            )
+
+            # Add container with GPU
+            container = task_definition.add_container(
+                model_name,
+                container_name=model_name,
+                image=ecs.ContainerImage.from_registry(f"{ecr_repo_uri}:{image_tag}"),
+                memory_limit_mib=model_config.memory_mib,
+                cpu=model_config.cpu,
+                gpu_count=model_config.gpu_count,  # GPU resource requirement
+                logging=ecs.LogDriver.aws_logs(
+                    stream_prefix=model_name,
+                    log_group=log_group,
+                ),
+                environment={
+                    "S3_BUCKET": s3_bucket_name,
+                    "DYNAMODB_TABLE": dynamodb_table_name,
+                },
+            )
+        else:
+            # ========== Fargate Path (existing) ==========
+
+            # Create Fargate task definition with model-specific resources
+            task_definition = ecs.FargateTaskDefinition(
+                self,
+                f"{model_name.title()}TaskDefinition",
+                family=f"{CONFIG.PROJECT_NAME}-{model_name}",
+                cpu=model_config.cpu,
+                memory_limit_mib=model_config.memory_mib,
+                execution_role=execution_role,
+                task_role=task_role,
+            )
+
+            # Add container to task definition
+            container = task_definition.add_container(
+                model_name,
+                container_name=model_name,
+                image=ecs.ContainerImage.from_registry(f"{ecr_repo_uri}:{image_tag}"),
+                logging=ecs.LogDriver.aws_logs(
+                    stream_prefix=model_name,
+                    log_group=log_group,
+                ),
+                environment={
+                    "S3_BUCKET": s3_bucket_name,
+                    "DYNAMODB_TABLE": dynamodb_table_name,
+                },
+            )
 
         # Export task definition ARN to SSM
         ssm.StringParameter(
@@ -333,10 +451,41 @@ def handler(event, context):
         )
 
         # Step 2: Use the resolved ARN in a custom ECS RunTask state
-        run_task_state = {
-            "Type": "Task",
-            "Resource": "arn:aws:states:::ecs:runTask.sync",
-            "Parameters": {
+        # Build different parameters for EC2 vs Fargate
+        if model_config.use_gpu:
+            # EC2 with GPU: Use CapacityProviderStrategy instead of LaunchType
+            run_task_params = {
+                "Cluster": cluster.cluster_arn,
+                "TaskDefinition.$": "$.task_definition_arn",
+                "CapacityProviderStrategy": [
+                    {
+                        "CapacityProvider": capacity_provider_name,
+                        "Weight": 1,
+                    }
+                ],
+                "NetworkConfiguration": {
+                    "AwsvpcConfiguration": {
+                        "Subnets": isolated_subnet_ids,
+                        "SecurityGroups": [ecs_security_group_id],
+                    }
+                },
+                "Overrides": {
+                    "ContainerOverrides": [
+                        {
+                            "Name": model_name,
+                            "Environment": [
+                                {"Name": "JOB_ID", "Value.$": "$.job_id"},
+                                {"Name": "S3_INPUT_KEY", "Value.$": "$.s3_input_key"},
+                                {"Name": "S3_BUCKET", "Value": s3_bucket_name},
+                                {"Name": "DYNAMODB_TABLE", "Value": dynamodb_table_name},
+                            ],
+                        }
+                    ]
+                },
+            }
+        else:
+            # Fargate: Use LaunchType
+            run_task_params = {
                 "Cluster": cluster.cluster_arn,
                 "TaskDefinition.$": "$.task_definition_arn",
                 "LaunchType": "FARGATE",
@@ -361,7 +510,12 @@ def handler(event, context):
                         }
                     ]
                 },
-            },
+            }
+
+        run_task_state = {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::ecs:runTask.sync",
+            "Parameters": run_task_params,
             "Retry": [
                 {
                     "ErrorEquals": ["States.TaskFailed"],

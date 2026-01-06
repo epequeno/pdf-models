@@ -132,6 +132,30 @@ class NetworkingStack(Stack):
             security_groups=[self.ecs_security_group],
         )
 
+        # ECS Agent endpoint (required for EC2 instances in isolated subnets)
+        self.ecs_agent_endpoint = self.vpc.add_interface_endpoint(
+            "EcsAgentEndpoint",
+            service=ec2.InterfaceVpcEndpointAwsService.ECS_AGENT,
+            subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED),
+            security_groups=[self.ecs_security_group],
+        )
+
+        # ECS Telemetry endpoint (required for container metrics from EC2)
+        self.ecs_telemetry_endpoint = self.vpc.add_interface_endpoint(
+            "EcsTelemetryEndpoint",
+            service=ec2.InterfaceVpcEndpointAwsService.ECS_TELEMETRY,
+            subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED),
+            security_groups=[self.ecs_security_group],
+        )
+
+        # ECS endpoint (for ECS API calls from EC2 instances)
+        self.ecs_endpoint = self.vpc.add_interface_endpoint(
+            "EcsEndpoint",
+            service=ec2.InterfaceVpcEndpointAwsService.ECS,
+            subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED),
+            security_groups=[self.ecs_security_group],
+        )
+
         # ========================================
         # Export VPC Information to SSM
         # ========================================
