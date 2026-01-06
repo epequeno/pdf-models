@@ -35,6 +35,7 @@ type alias Model =
     , signUpForm : SignUpForm
     , upload : UploadState
     , jobs : JobsState
+    , currentTime : Time.Posix
     }
 
 
@@ -96,6 +97,7 @@ type alias Job =
     , s3OutputKey : Maybe String
     , completedAt : Maybe Time.Posix
     , error : Maybe String
+    , downloadUrl : Maybe String
     }
 
 
@@ -143,7 +145,9 @@ type Msg
     | JobsFetched (Result Http.Error (List Job))
     | RefreshClicked
     | DownloadResult String
+    | JobWithDownloadFetched (Result Http.Error Job)
     | PollTick Time.Posix
+    | CurrentTimeReceived Time.Posix
 
 
 
@@ -183,6 +187,7 @@ initModel key route =
         , error = Nothing
         , lastRefresh = Nothing
         }
+    , currentTime = Time.millisToPosix 0
     }
 
 

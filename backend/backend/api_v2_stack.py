@@ -19,6 +19,9 @@ from aws_cdk import (
     aws_apigatewayv2_integrations as apigwv2_integrations,
 )
 from aws_cdk import (
+    aws_certificatemanager as acm,
+)
+from aws_cdk import (
     aws_cognito as cognito,
 )
 from aws_cdk import (
@@ -29,6 +32,12 @@ from aws_cdk import (
 )
 from aws_cdk import (
     aws_logs as logs,
+)
+from aws_cdk import (
+    aws_route53 as route53,
+)
+from aws_cdk import (
+    aws_route53_targets as route53_targets,
 )
 from aws_cdk import (
     aws_s3 as s3,
@@ -73,6 +82,10 @@ class ApiV2Stack(Stack):
         s3_bucket_arn = ssm.StringParameter.value_for_string_parameter(
             self, "/pdf-models/core/s3-bucket-arn"
         )
+
+        # Use the same hosted zone as FrontendStack (hardcoded ID)
+        hosted_zone_id = "Z04774573K4OEWVFBEMS5"
+        domain_name = "epequeno.app"
 
         # Get Lambda S3 object versions from SSM
         # These are updated by CodeBuild after each Lambda build
@@ -288,7 +301,7 @@ class ApiV2Stack(Stack):
             api_name=f"{CONFIG.PROJECT_NAME}-http-api",
             description="PDF Models HTTP API for job submission and status queries",
             cors_preflight=apigwv2.CorsPreflightOptions(
-                allow_origins=["*"],
+                allow_origins=["https://epequeno.app"],  # Restrict to our domain
                 allow_methods=[
                     apigwv2.CorsHttpMethod.GET,
                     apigwv2.CorsHttpMethod.POST,
@@ -296,6 +309,52 @@ class ApiV2Stack(Stack):
                 ],
                 allow_headers=["Content-Type", "Authorization"],
                 max_age=Duration.hours(1),
+            ),
+        )
+
+        # Import the existing hosted zone (same pattern as FrontendStack)
+        hosted_zone = route53.HostedZone.from_hosted_zone_attributes(
+            self,
+            "HostedZone",
+            hosted_zone_id=hosted_zone_id,
+            zone_name=domain_name,
+        )
+
+        # Create certificate for api.epequeno.app
+        certificate = acm.Certificate(
+            self,
+            "ApiCertificate",
+            domain_name="api.epequeno.app",
+            validation=acm.CertificateValidation.from_dns(hosted_zone),
+        )
+
+        # Create custom domain for API
+        domain_name_resource = apigwv2.DomainName(
+            self,
+            "ApiDomainName",
+            domain_name="api.epequeno.app",
+            certificate=certificate,
+        )
+
+        # Map the custom domain to the HTTP API
+        apigwv2.ApiMapping(
+            self,
+            "ApiMapping",
+            api=http_api,
+            domain_name=domain_name_resource,
+        )
+
+        # Create Route53 A record for api.epequeno.app
+        route53.ARecord(
+            self,
+            "ApiARecord",
+            zone=hosted_zone,
+            record_name="api",
+            target=route53.RecordTarget.from_alias(
+                route53_targets.ApiGatewayv2DomainProperties(
+                    regional_domain_name=domain_name_resource.regional_domain_name,
+                    regional_hosted_zone_id=domain_name_resource.regional_hosted_zone_id,
+                )
             ),
         )
 

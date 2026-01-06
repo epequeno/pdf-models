@@ -3,8 +3,6 @@ FoundationStack: Rarely-changing infrastructure.
 
 Resources:
 - ECR repositories for container images
-- (Future) Route53 hosted zone for custom domain
-- (Future) ACM certificate for HTTPS
 
 Change Frequency: Rare
 Replaceability: Hard (especially DNS/certs)
@@ -31,7 +29,6 @@ class FoundationStack(Stack):
 
     This stack contains long-lived resources that rarely change:
     - ECR repositories for model container images
-    - (Future) DNS and SSL/TLS certificates
 
     All resources export their identifiers to SSM Parameter Store
     for loose coupling with dependent stacks.
@@ -100,20 +97,3 @@ class FoundationStack(Stack):
         Tags.of(self).add("Project", CONFIG.PROJECT_NAME)
         Tags.of(self).add("Stack", "Foundation")
         Tags.of(self).add("Environment", "dev")
-
-        # FUTURE: Route53 and ACM will go here
-        # Deferred until custom domain is needed for production
-        # API Gateway provides default HTTPS endpoints for MVP
-        #
-        # Example (when ready):
-        # hosted_zone = route53.HostedZone(
-        #     self, "HostedZone",
-        #     zone_name="pdf-models.example.com",
-        # )
-        # certificate = acm.Certificate(
-        #     self, "Certificate",
-        #     domain_name="pdf-models.example.com",
-        #     validation=acm.CertificateValidation.from_dns(hosted_zone),
-        # )
-        # ssm.StringParameter(..., CONFIG.SSM_HOSTED_ZONE_ID, hosted_zone.zone_id)
-        # ssm.StringParameter(..., CONFIG.SSM_CERTIFICATE_ARN, certificate.arn)

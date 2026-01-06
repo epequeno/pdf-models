@@ -23,11 +23,11 @@ type EventStatus
     | EventFailed
 
 
-timeline : Job -> Html Msg
-timeline job =
+timeline : Time.Posix -> Job -> Html Msg
+timeline currentTime job =
     let
         events =
-            buildTimeline job
+            buildTimeline currentTime job
     in
     div
         [ css
@@ -53,12 +53,12 @@ timeline job =
                 , property "gap" "12px"
                 ]
             ]
-            (List.map viewEvent events)
+            (List.map (viewEvent currentTime) events)
         ]
 
 
-buildTimeline : Job -> List TimelineEvent
-buildTimeline job =
+buildTimeline : Time.Posix -> Job -> List TimelineEvent
+buildTimeline currentTime job =
     let
         -- Event 1: Job submitted
         submittedEvent =
@@ -126,8 +126,8 @@ buildTimeline job =
     [ submittedEvent, processingEvent, completedEvent ]
 
 
-viewEvent : TimelineEvent -> Html Msg
-viewEvent event =
+viewEvent : Time.Posix -> TimelineEvent -> Html Msg
+viewEvent currentTime event =
     div
         [ css
             [ displayFlex
@@ -190,7 +190,7 @@ viewEvent event =
                             , color Styles.colors.textSecondary
                             ]
                         ]
-                        [ text (formatTimestamp event.timestamp) ]
+                        [ text (formatTimestamp currentTime event.timestamp) ]
 
                 Nothing ->
                     text ""
@@ -234,13 +234,38 @@ eventColor status =
             Styles.colors.accentError
 
 
-formatTimestamp : Maybe Time.Posix -> String
-formatTimestamp maybeTime =
+formatTimestamp : Time.Posix -> Maybe Time.Posix -> String
+formatTimestamp currentTime maybeTime =
     case maybeTime of
-        Just _ ->
-            -- TODO: Implement proper timestamp formatting
-            -- For now, return a placeholder
-            "Just now"
+        Just time ->
+            let
+                currentMillis = Time.posixToMillis currentTime
+                timeMillis = Time.posixToMillis time
+                diffMillis = currentMillis - timeMillis
+                diffSeconds = diffMillis // 1000
+                diffMinutes = diffSeconds // 60
+                diffHours = diffMinutes // 60
+                diffDays = diffHours // 24
+            in
+            if diffSeconds < 60 then
+                if diffSeconds < 10 then
+                    "Just now"
+                else
+                    String.fromInt diffSeconds ++ " seconds ago"
+            else if diffMinutes < 60 then
+                if diffMinutes == 1 then
+                    "1 minute ago"
+                else
+                    String.fromInt diffMinutes ++ " minutes ago"
+            else if diffHours < 24 then
+                if diffHours == 1 then
+                    "1 hour ago"
+                else
+                    String.fromInt diffHours ++ " hours ago"
+            else if diffDays == 1 then
+                "1 day ago"
+            else
+                String.fromInt diffDays ++ " days ago"
 
         Nothing ->
             ""

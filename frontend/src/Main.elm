@@ -12,6 +12,7 @@ import Http
 import Json.Decode as Decode
 import S3
 import Styles
+import Task
 import Time
 import Types exposing (..)
 import Url
@@ -47,8 +48,8 @@ init _ url key =
         model =
             Types.initModel key route
     in
-    -- Attempt to restore authentication session from localStorage
-    ( model, Auth.restoreSession )
+    -- Attempt to restore authentication session from localStorage and get current time
+    ( model, Cmd.batch [ Auth.restoreSession, Task.perform CurrentTimeReceived Time.now ] )
 
 
 
@@ -739,12 +740,39 @@ update msg model =
             update FetchJobs model
 
         DownloadResult jobId ->
-            -- TODO: Implement download (get presigned URL from API)
-            ( model, Cmd.none )
+            -- Fetch the job with download URL, then trigger download
+            case model.auth of
+                Authenticated tokens ->
+                    ( model, Api.getJob tokens.accessToken jobId JobWithDownloadFetched )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        JobWithDownloadFetched result ->
+            case result of
+                Ok job ->
+                    case job.downloadUrl of
+                        Just url ->
+                            -- Trigger download by navigating to the presigned URL
+                            ( model, Nav.load url )
+
+                        Nothing ->
+                            -- No download URL available
+                            ( model, Cmd.none )
+
+                Err _ ->
+                    -- Handle error - could show a message to user
+                    ( model, Cmd.none )
 
         PollTick time ->
-            -- Poll for job updates if any jobs are processing
-            update FetchJobs model
+            -- Poll for job updates if any jobs are processing and update current time
+            let
+                updatedModel = { model | currentTime = time }
+            in
+            update FetchJobs updatedModel
+
+        CurrentTimeReceived time ->
+            ( { model | currentTime = time }, Cmd.none )
 
 
 
@@ -823,8 +851,15 @@ subscriptions model =
 
                     else
                         Sub.none
+
+        -- Update current time every 30 seconds to keep relative timestamps fresh
+        timeUpdateSub =
+            if model.route == Jobs then
+                Time.every (30 * 1000) CurrentTimeReceived
+            else
+                Sub.none
     in
-    Sub.batch [ restoredSessionSub, authSub, signUpSub, confirmSignUpSub, uploadProgressSub, uploadResponseSub, pollSub ]
+    Sub.batch [ restoredSessionSub, authSub, signUpSub, confirmSignUpSub, uploadProgressSub, uploadResponseSub, pollSub, timeUpdateSub ]
 
 
 

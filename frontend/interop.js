@@ -6,7 +6,7 @@ const AWS_CONFIG = {
     region: 'us-east-1',
     userPoolId: 'us-east-1_wslqPOxQd',
     clientId: '4tmf8s58738hrbrp4ff2utqg5',
-    apiBaseUrl: 'https://eykwwhrt16.execute-api.us-east-1.amazonaws.com'
+    apiBaseUrl: 'https://api.epequeno.app'
 };
 
 window.AwsInterop = {

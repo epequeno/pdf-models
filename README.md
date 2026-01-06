@@ -150,20 +150,7 @@ curl -H "Authorization: Bearer $ACCESS_TOKEN" \
   https://eykwwhrt16.execute-api.us-east-1.amazonaws.com/v1/models/marker/jobs/your-job-id
 ```
 
-## Next Steps
+# Potential additional models
+- https://huggingface.co/deepseek-ai/DeepSeek-OCR
+- https://huggingface.co/docling-project/docling-models
 
-**System is fully functional!** 🎉
-
-The integration tests confirm the complete workflow is working:
-1. Users authenticate with Cognito
-2. Upload files to S3 using Identity Pool credentials  
-3. Submit jobs via API referencing S3 keys
-4. Jobs are processed by Step Functions + ECS Fargate
-5. Results are stored back to S3 and accessible via API
-
-**For production readiness:**
-- Set up monitoring and alerting
-- Configure custom domain and SSL certificate
-- Implement rate limiting and usage quotas
-- Add more comprehensive error handling
-- Scale ECS cluster based on demand

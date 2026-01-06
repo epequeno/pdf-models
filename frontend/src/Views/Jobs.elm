@@ -8,6 +8,7 @@ import Css exposing (..)
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (css, href)
 import Styles
+import Time
 import Types exposing (..)
 
 
@@ -25,7 +26,7 @@ view model =
                 [ marginTop Styles.spacing.xl
                 ]
             ]
-            [ viewJobsSection model.jobs
+            [ viewJobsSection model
             ]
         ]
 
@@ -67,8 +68,8 @@ viewHeader =
         ]
 
 
-viewJobsSection : JobsState -> Html Msg
-viewJobsSection jobsState =
+viewJobsSection : Model -> Html Msg
+viewJobsSection model =
     div []
         [ div
             [ css
@@ -88,7 +89,7 @@ viewJobsSection jobsState =
                 [ text "Your Jobs" ]
             , Button.button Button.Secondary "Refresh" RefreshClicked
             ]
-        , case jobsState.error of
+        , case model.jobs.error of
             Just err ->
                 div
                     [ css
@@ -101,7 +102,7 @@ viewJobsSection jobsState =
                     [ text err ]
 
             Nothing ->
-                if List.isEmpty jobsState.jobs then
+                if List.isEmpty model.jobs.jobs then
                     div
                         [ css
                             [ color Styles.colors.textSecondary
@@ -111,7 +112,7 @@ viewJobsSection jobsState =
                             , border3 (px 1) solid Styles.colors.border
                             ]
                         ]
-                        [ text (if jobsState.loading then "Loading jobs..." else "No jobs yet. Upload a PDF to get started.") ]
+                        [ text (if model.jobs.loading then "Loading jobs..." else "No jobs yet. Upload a PDF to get started.") ]
 
                 else
                     div
@@ -121,12 +122,12 @@ viewJobsSection jobsState =
                             , property "gap" "16px"
                             ]
                         ]
-                        (List.map viewJobCard jobsState.jobs)
+                        (List.map (viewJobCard model.currentTime) model.jobs.jobs)
         ]
 
 
-viewJobCard : Job -> Html Msg
-viewJobCard job =
+viewJobCard : Time.Posix -> Job -> Html Msg
+viewJobCard currentTime job =
     div
         [ css
             [ border3 (px 1) solid Styles.colors.border
@@ -186,7 +187,7 @@ viewJobCard job =
                 ]
             ]
         , -- Timeline
-          Timeline.timeline job
+          Timeline.timeline currentTime job
         , -- Error message if present
           case job.error of
             Just errorMsg ->
