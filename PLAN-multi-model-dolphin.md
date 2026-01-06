@@ -10,7 +10,9 @@ Refactor from single-model (Marker) to modular multi-model architecture, then ad
 
 ---
 
-## Phase 1: Refactor for Modularity
+## Phase 1: Refactor for Modularity ✅ COMPLETED
+
+**Status:** All tasks completed and tested on 2026-01-05
 
 ### 1.1 Model Registry (`backend/backend/stack_config.py`)
 Add `ModelConfig` dataclass and `MODELS` registry:
@@ -111,15 +113,15 @@ s3_result_keys: {"json": "...", "markdown": "..."}
 ## Implementation Order
 
 ```
-Phase 1 (Refactor):
-1. stack_config.py - Add ModelConfig, MODELS registry (marker only initially)
-2. model_stack.py - Create generic stack factory
-3. foundation_stack.py - Dynamic ECR repo creation
-4. cicd_stack.py - Dynamic CodeBuild projects
-5. Lambda changes - SSM-based model validation
-6. api_v2_stack.py - Multi-model permissions
-7. app.py - Dynamic stack creation
-8. Deploy & test marker still works
+Phase 1 (Refactor): ✅ COMPLETED
+1. ✅ stack_config.py - Add ModelConfig, MODELS registry (marker only initially)
+2. ✅ model_stack.py - Create generic stack factory
+3. ✅ foundation_stack.py - Dynamic ECR repo creation
+4. ✅ cicd_stack.py - Dynamic CodeBuild projects + SSM permissions + MEDIUM compute
+5. ✅ Lambda changes - SSM-based model validation (added aws-sdk-ssm)
+6. ✅ api_v2_stack.py - Multi-model permissions (wildcard Step Functions, SSM read)
+7. ✅ app.py - Dynamic stack creation
+8. ✅ Deploy & test marker still works (all 4 integration tests pass)
 
 Phase 2 (Dolphin):
 9. Add dolphin to CONFIG.MODELS
@@ -181,7 +183,11 @@ Phase 2 (Dolphin):
 
 ## Testing Checkpoints
 
-1. After Phase 1: Marker regression test (should work identically)
+1. After Phase 1: ✅ Marker regression test PASSED
+   - `test_submit_and_process_pdf` - Full E2E with Marker processing
+   - `test_list_jobs` - List jobs for model
+   - `test_unauthorized_access_to_other_user_job` - 404 for non-existent job
+   - `test_s3_permissions_enforced` - S3 key validation
 2. After Phase 2:
    - Submit job with `model=dolphin`
    - Verify both JSON and MD outputs in S3
