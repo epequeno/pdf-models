@@ -198,6 +198,22 @@ Run tests with: `make test-integration-auto`
 **Example**: `RUN python -c "from marker.models import create_model_dict; create_model_dict()"`
 **This pattern should be applied to all ML model containers**
 
+### ❌ Using Docker Hub base images in Dockerfiles
+**Symptom**: CodeBuild fails with "429 Too Many Requests" or "toomanyrequests: You have reached your unauthenticated pull rate limit"
+**Root Cause**: Docker Hub has rate limits for unauthenticated pulls (100 pulls/6hr for anonymous, 200/6hr for free accounts)
+**Solution**: Use AWS ECR Public Gallery instead of Docker Hub for base images
+**Examples**:
+```dockerfile
+# ❌ WRONG - Docker Hub (will hit rate limits)
+FROM python:3.11-slim
+FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+
+# ✅ CORRECT - AWS ECR Public Gallery
+FROM public.ecr.aws/docker/library/python:3.11-slim
+FROM nvcr.io/nvidia/cuda:12.1.0-runtime-ubuntu22.04  # NVIDIA NGC for CUDA
+```
+**Note**: This happens consistently when adding new containers - always use ECR Public or NGC
+
 ## Quick Reference
 
 | Task | Command |
