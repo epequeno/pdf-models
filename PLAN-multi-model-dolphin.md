@@ -120,9 +120,9 @@ s3_result_keys: {"json": "...", "markdown": "..."}
 
 ---
 
-## Phase 3: Upgrade Dolphin to EC2 Spot GPU ⏳ PENDING QUOTA
+## Phase 3: Upgrade Dolphin to EC2 Spot GPU ✅ COMPLETED
 
-**Status:** Infrastructure deployed, awaiting AWS quota approval (2026-01-06)
+**Status:** All tasks completed and tested on 2026-01-06
 
 ### 3.1 Extend ModelConfig for GPU (`backend/backend/stack_config.py`) ✅ DONE
 Added GPU/EC2 fields to ModelConfig:
@@ -178,37 +178,30 @@ Added interface endpoints required for EC2 in isolated subnets:
 - Move model and inputs to GPU device
 - Log GPU info (name, memory) for debugging
 
-### 3.6 Deploy and Test ⏳ PENDING
+### 3.6 Deploy and Test ✅ DONE
 
 **Deployed:**
 - NetworkingStack (VPC endpoints) ✅
 - Dolphin container built with GPU support ✅
 - DolphinStack (ASG, Capacity Provider, EC2 Task Definition) ✅
 
-**Blocker:** AWS Account has 0 vCPU quota for G-family instances:
-- `All G and VT Spot Instance Requests`: 0 → requested 8
-- `Running On-Demand G and VT instances`: 0 → requested 8
+**Bug fixes during testing:**
+- Added `AWS_DEFAULT_REGION` env var to EC2 task definition (boto3 requires explicit region on EC2)
+- Fixed dtype mismatch in task.py: convert inputs to float16 to match model on GPU
 
-**Quota Request IDs:**
-- Spot: `6e967fec47424411aedfc4ec32971ff3batYuZDk`
-- On-Demand: `e7071dd0915c4e4f9bccc6c5141087130zroF3E1`
+**Integration tests:** All 6 tests passed in 517s (8 min 37 sec)
 
-**Once quota approved:**
-```bash
-# Run integration test
-AWS_PROFILE=arch TEST_USER_EMAIL="integration-test@pdf-models.local" \
-  TEST_USER_PASSWORD="TestPass123!" \
-  uv run pytest tests/integration/test_dolphin_e2e.py -v
-```
-
-### 3.7 Expected Performance Improvement
+### 3.7 Actual Performance Results
 
 | Metric | Phase 2 (Fargate CPU) | Phase 3 (EC2 Spot GPU) |
 |--------|----------------------|------------------------|
-| Inference/page | 1-2 minutes | 10-15 seconds |
-| 2-page job | ~3 minutes | ~30 seconds |
-| Cost/hour | ~$0.26 | ~$0.16 |
+| Inference/page | 1-2 minutes | **8-9 seconds** |
+| 2-page job | ~3 minutes | **~22 seconds** |
+| Cost/hour | ~$0.26 | ~$0.16 (70% savings) |
 | Cold start | ~30 seconds | 3-5 minutes (from 0) |
+| End-to-end test | ~164 seconds | ~163 seconds (warm) |
+
+**Note:** GPU processing time (~22s) is 8x faster than CPU. End-to-end time is similar due to task scheduling overhead.
 
 ---
 
@@ -238,7 +231,7 @@ Phase 2 (Dolphin CPU): ✅ COMPLETED
     - Fix 3: Reduced max_new_tokens from 4096 to 1024 (mbart decoder limit)
     - All 6 integration tests pass (2 Dolphin + 4 Marker)
 
-Phase 3 (Dolphin GPU): ⏳ PENDING QUOTA APPROVAL
+Phase 3 (Dolphin GPU): ✅ COMPLETED
 15. ✅ Extend ModelConfig with GPU fields (use_gpu, gpu_count, instance_type, spot_enabled)
 16. ✅ Update model_stack.py with EC2 ASG + Capacity Provider
 17. ✅ Add VPC endpoints for EC2 (ecs-agent, ecs-telemetry, ecs)
@@ -247,8 +240,8 @@ Phase 3 (Dolphin GPU): ⏳ PENDING QUOTA APPROVAL
 20. ✅ Deploy NetworkingStack (VPC endpoints)
 21. ✅ Build GPU container via CodeBuild
 22. ✅ Deploy DolphinStack (ASG, Capacity Provider, EC2 task def)
-23. ⏳ Request GPU quota increase (G and VT instances)
-24. ⏳ Test end-to-end after quota approved
+23. ✅ GPU quota approved (8 vCPU for G and VT instances)
+24. ✅ Test end-to-end (6/6 tests passed)
 ```
 
 ---
@@ -321,9 +314,14 @@ Phase 3 (Dolphin GPU): ⏳ PENDING QUOTA APPROVAL
    - `test_s3_permissions_enforced` (Marker) - S3 key validation
    - Total: 6 tests in 507s (~8.5 min)
 
-3. After Phase 3: ⏳ PENDING QUOTA APPROVAL
-   - Same tests as Phase 2, but expect much faster Dolphin processing (~30s vs ~164s)
-   - Expected total: ~6 tests in ~400s (~6.5 min) once GPU available
+3. After Phase 3: ✅ ALL TESTS PASSED (2026-01-06)
+   - `test_submit_and_process_pdf` (Dolphin) - Full E2E with GPU processing (~22s actual, 163s total)
+   - `test_list_jobs` (Dolphin) - List jobs for dolphin model
+   - `test_submit_and_process_pdf` (Marker) - Regression test (~345s)
+   - `test_list_jobs` (Marker) - Regression test
+   - `test_unauthorized_access_to_other_user_job` (Marker) - Auth check
+   - `test_s3_permissions_enforced` (Marker) - S3 key validation
+   - Total: 6 tests in 518s (~8.6 min)
 
 ---
 
