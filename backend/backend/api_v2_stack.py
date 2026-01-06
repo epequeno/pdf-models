@@ -47,7 +47,7 @@ from aws_cdk import (
 )
 from constructs import Construct
 
-from backend.stack_config import CONFIG
+from backend.stack_config import CONFIG, MODELS
 
 
 class ApiV2Stack(Stack):
@@ -66,9 +66,6 @@ class ApiV2Stack(Stack):
         # Get dependencies from SSM
         dynamodb_table_name = ssm.StringParameter.value_for_string_parameter(
             self, CONFIG.SSM_DYNAMODB_TABLE_NAME
-        )
-        state_machine_arn = ssm.StringParameter.value_for_string_parameter(
-            self, "/pdf-models/marker/state-machine-arn"
         )
         user_pool_id = ssm.StringParameter.value_for_string_parameter(
             self, CONFIG.SSM_COGNITO_USER_POOL_ID
@@ -147,14 +144,21 @@ class ApiV2Stack(Stack):
             )
         )
 
-        # Grant Step Functions permissions to submit-job role
+        # Grant Step Functions permissions to submit-job role (all model state machines)
         submit_job_role.add_to_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 actions=["states:StartExecution"],
-                resources=[state_machine_arn],
+                resources=[
+                    f"arn:aws:states:{self.region}:{self.account}:stateMachine:{CONFIG.PROJECT_NAME}-*"
+                ],
             )
         )
+
+        # Grant SSM read permissions for model validation (submit-job, get-job, get-upload-url)
+        ssm_model_param_resources = [
+            f"arn:aws:ssm:{self.region}:{self.account}:parameter/pdf-models/*/state-machine-arn"
+        ]
 
         # Grant S3 permissions for generating pre-signed URLs
         submit_job_role.add_to_policy(
@@ -219,6 +223,16 @@ class ApiV2Stack(Stack):
             )
         )
 
+        # Grant SSM read permissions to all Lambda roles for model validation
+        for role in [submit_job_role, get_job_role, get_upload_url_role]:
+            role.add_to_policy(
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=["ssm:GetParameter"],
+                    resources=ssm_model_param_resources,
+                )
+            )
+
         # Create submit-job Lambda function
         submit_job_function = lambda_.Function(
             self,
@@ -240,7 +254,6 @@ class ApiV2Stack(Stack):
             log_group=submit_job_log_group,
             environment={
                 "DYNAMODB_TABLE_NAME": dynamodb_table_name,
-                "STATE_MACHINE_ARN": state_machine_arn,
                 "S3_BUCKET_NAME": s3_bucket_name,
             },
         )

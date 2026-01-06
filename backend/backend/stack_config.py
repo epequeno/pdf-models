@@ -9,6 +9,35 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
+class ModelConfig:
+    """Configuration for a PDF processing model.
+
+    Each model has its own ECS task, Step Functions state machine,
+    and container image. This dataclass defines the resources needed.
+    """
+
+    name: str  # Model identifier: "marker", "dolphin"
+    cpu: int  # Fargate vCPU units (256, 512, 1024, 2048, 4096)
+    memory_mib: int  # Fargate memory in MiB
+    container_path: str  # Directory under backend/containers/
+    output_formats: tuple[str, ...]  # ("markdown",) or ("json", "markdown")
+    timeout_minutes: int = 120  # Task timeout
+
+
+# Model registry - add new models here
+MODELS: dict[str, ModelConfig] = {
+    "marker": ModelConfig(
+        name="marker",
+        cpu=4096,
+        memory_mib=16384,
+        container_path="marker",
+        output_formats=("markdown",),
+        timeout_minutes=120,
+    ),
+}
+
+
+@dataclass(frozen=True)
 class StackConfig:
     """Centralized configuration for all CDK stacks.
 

@@ -163,10 +163,19 @@ Phase 2 (Dolphin):
 
 ## Dolphin-v2 Resource Requirements
 
+### Option A: Fargate CPU (Simple, slower)
 - **CPU**: 4096 (4 vCPU) - max Fargate
 - **Memory**: 30720 MiB (30 GB) - max Fargate for BF16 inference
 - **Timeout**: 2 hours (CPU inference is slow)
 - **Build**: X_LARGE CodeBuild (~8GB model download)
+
+### Option B: EC2 Spot GPU (Recommended - faster, cost-effective)
+- **Instance**: g4dn.xlarge (1 T4 GPU, 4 vCPU, 16GB RAM)
+- **Compute**: ECS Capacity Provider with Auto Scaling Group (min=0, max=2)
+- **Cost**: ~$0.16/hr Spot vs $0.526/hr On-Demand (~70% savings)
+- **Cold start**: ~3-5 minutes when scaling from zero
+- **Timeout**: 30 minutes (GPU inference much faster)
+- **Note**: Requires model_stack.py changes to support EC2 launch type
 
 ---
 

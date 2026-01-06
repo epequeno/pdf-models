@@ -29,7 +29,7 @@ from aws_cdk import (
 )
 from constructs import Construct
 
-from backend.stack_config import CONFIG
+from backend.stack_config import CONFIG, MODELS
 
 
 class CiCdStack(Stack):
@@ -70,10 +70,7 @@ class CiCdStack(Stack):
             description="CodeCommit repository SSH clone URL",
         )
 
-        # Get ECR repository URIs from SSM (created by FoundationStack)
-        ecr_marker_uri = ssm.StringParameter.value_for_string_parameter(
-            self, CONFIG.SSM_ECR_MARKER_URI
-        )
+        # Get ECR repository URI for Rust builder from SSM (created by FoundationStack)
         ecr_rust_builder_uri = ssm.StringParameter.value_for_string_parameter(
             self, CONFIG.SSM_ECR_RUST_LAMBDA_BUILDER_URI
         )
@@ -140,70 +137,76 @@ class CiCdStack(Stack):
             description="CodeBuild project name for Rust Lambda builder base image",
         )
 
-        # Create CodeBuild project for Marker container
-        marker_build = codebuild.Project(
-            self,
-            "MarkerContainerBuild",
-            project_name=f"{CONFIG.PROJECT_NAME}-marker-container-build",
-            description="Build and push Marker PDF processing container to ECR",
-            source=codebuild.Source.code_commit(
-                repository=repo,
-                branch_or_ref="main",
-            ),
-            environment=codebuild.BuildEnvironment(
-                build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
-                privileged=True,  # Required for Docker builds
-                compute_type=codebuild.ComputeType.X_LARGE,  # X_LARGE (32GB) for model downloads
-                environment_variables={
-                    "ECR_REPOSITORY_URI": codebuild.BuildEnvironmentVariable(
-                        value=ecr_marker_uri
-                    ),
-                },
-            ),
-            build_spec=codebuild.BuildSpec.from_source_filename(
-                "backend/containers/marker/buildspec.yml"
-            ),
-        )
-
-        # Grant ECR permissions to CodeBuild
-        marker_build.add_to_role_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "ecr:GetAuthorizationToken",
-                ],
-                resources=["*"],
+        # Create CodeBuild projects for all registered models
+        for model_name, model_config in MODELS.items():
+            # Get ECR repository URI for this model
+            ecr_model_uri = ssm.StringParameter.value_for_string_parameter(
+                self, f"/pdf-models/foundation/ecr-repo-uri-{model_name}"
             )
-        )
 
-        marker_build.add_to_role_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "ecr:BatchCheckLayerAvailability",
-                    "ecr:GetDownloadUrlForLayer",
-                    "ecr:BatchGetImage",
-                    "ecr:PutImage",
-                    "ecr:InitiateLayerUpload",
-                    "ecr:UploadLayerPart",
-                    "ecr:CompleteLayerUpload",
-                ],
-                resources=[
-                    f"arn:aws:ecr:{self.region}:{self.account}:repository/{CONFIG.ECR_MARKER_REPO_NAME}"
-                ],
+            model_build = codebuild.Project(
+                self,
+                f"{model_name.title()}ContainerBuild",
+                project_name=f"{CONFIG.PROJECT_NAME}-{model_name}-container-build",
+                description=f"Build and push {model_name.title()} PDF processing container to ECR",
+                source=codebuild.Source.code_commit(
+                    repository=repo,
+                    branch_or_ref="main",
+                ),
+                environment=codebuild.BuildEnvironment(
+                    build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
+                    privileged=True,  # Required for Docker builds
+                    compute_type=codebuild.ComputeType.X_LARGE,  # X_LARGE (32GB) for model downloads
+                    environment_variables={
+                        "ECR_REPOSITORY_URI": codebuild.BuildEnvironmentVariable(
+                            value=ecr_model_uri
+                        ),
+                    },
+                ),
+                build_spec=codebuild.BuildSpec.from_source_filename(
+                    f"backend/containers/{model_config.container_path}/buildspec.yml"
+                ),
             )
-        )
 
-        # Grant SSM permissions to write image tag
-        marker_build.add_to_role_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=["ssm:PutParameter"],
-                resources=[
-                    f"arn:aws:ssm:{self.region}:{self.account}:parameter{CONFIG.SSM_MARKER_IMAGE_TAG}"
-                ],
+            # Grant ECR permissions to CodeBuild
+            model_build.add_to_role_policy(
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=[
+                        "ecr:GetAuthorizationToken",
+                    ],
+                    resources=["*"],
+                )
             )
-        )
+
+            model_build.add_to_role_policy(
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=[
+                        "ecr:BatchCheckLayerAvailability",
+                        "ecr:GetDownloadUrlForLayer",
+                        "ecr:BatchGetImage",
+                        "ecr:PutImage",
+                        "ecr:InitiateLayerUpload",
+                        "ecr:UploadLayerPart",
+                        "ecr:CompleteLayerUpload",
+                    ],
+                    resources=[
+                        f"arn:aws:ecr:{self.region}:{self.account}:repository/{CONFIG.PROJECT_NAME}/{model_name}"
+                    ],
+                )
+            )
+
+            # Grant SSM permissions to write image tag
+            model_build.add_to_role_policy(
+                iam.PolicyStatement(
+                    effect=iam.Effect.ALLOW,
+                    actions=["ssm:PutParameter"],
+                    resources=[
+                        f"arn:aws:ssm:{self.region}:{self.account}:parameter/pdf-models/cicd/{model_name}-image-tag"
+                    ],
+                )
+            )
 
         # Get S3 bucket name from SSM and import bucket
         s3_bucket_name = ssm.StringParameter.value_for_string_parameter(

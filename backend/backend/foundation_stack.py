@@ -21,7 +21,7 @@ from aws_cdk import (
 )
 from constructs import Construct
 
-from .stack_config import CONFIG
+from .stack_config import CONFIG, MODELS
 
 
 class FoundationStack(Stack):
@@ -37,35 +37,36 @@ class FoundationStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # ECR Repository for Marker container
-        marker_repo = ecr.Repository(
-            self,
-            "MarkerEcrRepo",
-            repository_name=CONFIG.ECR_MARKER_REPO_NAME,
-            # MVP: Allow deletion of repository
-            removal_policy=RemovalPolicy.DESTROY,
-            # Automatically empty repository before deletion (prevents failure)
-            empty_on_delete=True,
-            # Security: Scan images on push for vulnerabilities
-            image_scan_on_push=True,
-            # Lifecycle: Keep only last 5 images to control costs
-            lifecycle_rules=[
-                ecr.LifecycleRule(
-                    description="Keep last 5 images only",
-                    max_image_count=5,
-                    rule_priority=1,
-                )
-            ],
-        )
+        # Create ECR repositories for all registered models
+        for model_name, model_config in MODELS.items():
+            repo = ecr.Repository(
+                self,
+                f"{model_name.title()}EcrRepo",
+                repository_name=f"{CONFIG.PROJECT_NAME}/{model_name}",
+                # MVP: Allow deletion of repository
+                removal_policy=RemovalPolicy.DESTROY,
+                # Automatically empty repository before deletion (prevents failure)
+                empty_on_delete=True,
+                # Security: Scan images on push for vulnerabilities
+                image_scan_on_push=True,
+                # Lifecycle: Keep only last 5 images to control costs
+                lifecycle_rules=[
+                    ecr.LifecycleRule(
+                        description="Keep last 5 images only",
+                        max_image_count=5,
+                        rule_priority=1,
+                    )
+                ],
+            )
 
-        # Export ECR URI to SSM Parameter Store
-        ssm.StringParameter(
-            self,
-            "MarkerEcrUriParam",
-            parameter_name=CONFIG.SSM_ECR_MARKER_URI,
-            string_value=marker_repo.repository_uri,
-            description="ECR repository URI for Marker container",
-        )
+            # Export ECR URI to SSM Parameter Store
+            ssm.StringParameter(
+                self,
+                f"{model_name.title()}EcrUriParam",
+                parameter_name=f"/pdf-models/foundation/ecr-repo-uri-{model_name}",
+                string_value=repo.repository_uri,
+                description=f"ECR repository URI for {model_name.title()} container",
+            )
 
         # ECR Repository for Rust Lambda builder base image
         rust_builder_repo = ecr.Repository(

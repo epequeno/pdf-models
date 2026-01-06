@@ -3,6 +3,7 @@ use aws_sdk_dynamodb::Client as DynamoDbClient;
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::Client as S3Client;
 use aws_sdk_sfn::Client as SfnClient;
+use aws_sdk_ssm::Client as SsmClient;
 use chrono::Utc;
 use lambda_runtime::{service_fn, Error, LambdaEvent};
 use serde::{Deserialize, Serialize};
@@ -113,9 +114,6 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
 
     // Extract model from path
     let model = &request.path_parameters.model;
-    if model != "marker" {
-        return Ok(Response::error(400, "Invalid model. Only 'marker' is supported"));
-    }
 
     // Extract user ID from Cognito claims (supports both REST API and HTTP API v2 formats)
     let user_id = match &request.request_context.authorizer {
@@ -168,7 +166,6 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
 
     // Get environment variables
     let table_name = env::var("DYNAMODB_TABLE_NAME")?;
-    let state_machine_arn = env::var("STATE_MACHINE_ARN")?;
     let bucket_name = env::var("S3_BUCKET_NAME")?;
 
     // Initialize AWS clients
@@ -176,6 +173,30 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
     let dynamodb_client = DynamoDbClient::new(&config);
     let sfn_client = SfnClient::new(&config);
     let s3_client = S3Client::new(&config);
+    let ssm_client = SsmClient::new(&config);
+
+    // Look up state machine ARN from SSM (validates model exists)
+    let ssm_param_name = format!("/pdf-models/{}/state-machine-arn", model);
+    let state_machine_arn = match ssm_client
+        .get_parameter()
+        .name(&ssm_param_name)
+        .send()
+        .await
+    {
+        Ok(response) => {
+            response
+                .parameter()
+                .and_then(|p| p.value().map(|v| v.to_string()))
+                .ok_or_else(|| format!("SSM parameter {} has no value", ssm_param_name))?
+        }
+        Err(e) => {
+            info!("Model '{}' not found in SSM: {}", model, e);
+            return Ok(Response::error(
+                400,
+                &format!("Invalid model '{}'. Model not supported.", model),
+            ));
+        }
+    };
 
     // Generate pre-signed URL for upload only if no S3 key was provided
     let upload_url = if body.s3_input_key.is_none() {

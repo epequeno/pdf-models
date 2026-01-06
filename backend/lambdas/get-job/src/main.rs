@@ -2,6 +2,7 @@ use aws_config::BehaviorVersion;
 use aws_sdk_dynamodb::Client as DynamoDbClient;
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::Client as S3Client;
+use aws_sdk_ssm::Client as SsmClient;
 use lambda_runtime::{service_fn, Error, LambdaEvent};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -119,9 +120,6 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
     let path_params = request.path_parameters.ok_or("Missing path parameters")?;
 
     let model = &path_params.model;
-    if model != "marker" {
-        return Ok(Response::error(400, "Invalid model. Only 'marker' is supported"));
-    }
 
     // Get environment variables
     let table_name = env::var("DYNAMODB_TABLE_NAME")?;
@@ -131,6 +129,22 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
     let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
     let dynamodb_client = DynamoDbClient::new(&config);
     let s3_client = S3Client::new(&config);
+    let ssm_client = SsmClient::new(&config);
+
+    // Validate model exists via SSM lookup
+    let ssm_param_name = format!("/pdf-models/{}/state-machine-arn", model);
+    if ssm_client
+        .get_parameter()
+        .name(&ssm_param_name)
+        .send()
+        .await
+        .is_err()
+    {
+        return Ok(Response::error(
+            400,
+            &format!("Invalid model '{}'. Model not supported.", model),
+        ));
+    }
 
     // If job_id is present, return single job; otherwise list user's jobs
     if let Some(job_id) = &path_params.job_id {

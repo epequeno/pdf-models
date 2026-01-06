@@ -12,9 +12,10 @@ from backend.cicd_stack import CiCdStack
 from backend.core_infrastructure_stack import CoreInfrastructureStack
 from backend.foundation_stack import FoundationStack
 from backend.frontend_stack import FrontendStack
-from backend.marker_stack import MarkerStack
+from backend.model_stack import ModelStack
 from backend.monitoring_stack import MonitoringStack
 from backend.networking_stack import NetworkingStack
+from backend.stack_config import MODELS
 
 app = cdk.App()
 
@@ -48,13 +49,16 @@ cicd_stack = CiCdStack(
     description="CI/CD: CodeCommit repository and CodeBuild for container builds",
 )
 
-# Stack 4: Marker Processing (ECS cluster, Fargate task, Step Functions)
+# Stack 4: Model Processing Stacks (ECS cluster, Fargate task, Step Functions)
+# Creates one stack per registered model
 # Depends on: Foundation (ECR), Core (S3, DynamoDB), Networking (VPC via hardcoded values)
-marker_stack = MarkerStack(
-    app,
-    "MarkerStack",
-    description="Marker processing: ECS cluster, Fargate task definition, Step Functions orchestration",
-)
+for model_name, model_config in MODELS.items():
+    ModelStack(
+        app,
+        f"{model_name.title()}Stack",
+        model_config=model_config,
+        description=f"{model_name.title()} processing: ECS cluster, Fargate task definition, Step Functions orchestration",
+    )
 
 # Stack 5: API (HTTP API Gateway with Cognito JWT authorizer)
 # Depends on: Core (Cognito, DynamoDB), Marker (Step Functions)
@@ -83,10 +87,10 @@ frontend_stack = FrontendStack(
     description="Frontend deployment: S3 bucket, CloudFront CDN, and Route53 DNS for epequeno.app",
 )
 
-# Note: Foundation and Core are independent in Phase 1
-# CiCdStack reads ECR URI from Foundation via SSM
-# MarkerStack reads from Foundation (ECR) and Core (S3, DynamoDB) via SSM
-# ApiV2Stack reads from Core (Cognito, DynamoDB) and Marker (Step Functions) via SSM
+# Note: Foundation and Core are independent
+# CiCdStack reads ECR URIs from Foundation via SSM (one per model)
+# ModelStack (one per model) reads from Foundation (ECR) and Core (S3, DynamoDB) via SSM
+# ApiV2Stack reads from Core (Cognito, DynamoDB) via SSM; validates models via SSM at runtime
 # FrontendStack is independent and deploys from frontend/dst
 
 app.synth()

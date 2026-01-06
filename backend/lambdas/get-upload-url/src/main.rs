@@ -9,6 +9,7 @@
 use aws_config::BehaviorVersion;
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::Client as S3Client;
+use aws_sdk_ssm::Client as SsmClient;
 use lambda_runtime::{service_fn, Error, LambdaEvent};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -101,12 +102,13 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
 
     info!("Processing upload URL request");
 
-    // Validate model from path
-    if let Some(ref path_params) = request.path_parameters {
-        if path_params.model != "marker" {
-            return Ok(Response::error(400, "Invalid model. Only 'marker' is supported"));
+    // Get model from path
+    let model = match &request.path_parameters {
+        Some(path_params) => &path_params.model,
+        None => {
+            return Ok(Response::error(400, "Missing model parameter"));
         }
-    }
+    };
 
     // Extract user ID from JWT claims
     let user_id = match &request.request_context.authorizer {
@@ -142,9 +144,25 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
     // Get environment variables
     let bucket_name = env::var("S3_BUCKET_NAME")?;
 
-    // Initialize S3 client
+    // Initialize AWS clients
     let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
     let s3_client = S3Client::new(&config);
+    let ssm_client = SsmClient::new(&config);
+
+    // Validate model exists via SSM lookup
+    let ssm_param_name = format!("/pdf-models/{}/state-machine-arn", model);
+    if ssm_client
+        .get_parameter()
+        .name(&ssm_param_name)
+        .send()
+        .await
+        .is_err()
+    {
+        return Ok(Response::error(
+            400,
+            &format!("Invalid model '{}'. Model not supported.", model),
+        ));
+    }
 
     // Generate pre-signed URL (15 minutes validity)
     let presigning_config = PresigningConfig::expires_in(Duration::from_secs(900))?;
