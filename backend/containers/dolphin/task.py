@@ -128,10 +128,11 @@ def process_page_with_dolphin(model, processor, image: Image.Image, page_num: in
     )
 
     # Generate output
+    # Note: Dolphin uses mbart decoder with max 1024 positions
     with torch.no_grad():
         generated_ids = model.generate(
             **inputs,
-            max_new_tokens=4096,
+            max_new_tokens=1024,
             do_sample=False
         )
 
