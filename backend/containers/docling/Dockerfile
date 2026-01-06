@@ -15,14 +15,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-# Use CPU-only PyTorch to reduce image size
-RUN pip install --no-cache-dir \
-    torch --index-url https://download.pytorch.org/whl/cpu
-
-RUN pip install --no-cache-dir \
-    docling \
-    boto3
+# Install docling with all dependencies
+# Let docling manage its own torch/torchvision versions for compatibility
+RUN pip install --no-cache-dir docling boto3
 
 # Pre-download models at build time to avoid runtime downloads
 # This initializes Docling and downloads the granite-docling model
