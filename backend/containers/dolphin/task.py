@@ -20,6 +20,10 @@ import logging
 from pathlib import Path
 from datetime import datetime, timezone
 
+# Force offline mode - model is pre-downloaded, no need to check HuggingFace
+os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+
 import boto3
 from pdf2image import convert_from_path
 from PIL import Image
