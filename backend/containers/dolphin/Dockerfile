@@ -1,5 +1,5 @@
-# Use NVIDIA CUDA base image for GPU support
-FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+# Use NVIDIA CUDA base image from NGC (avoids Docker Hub rate limits)
+FROM nvcr.io/nvidia/cuda:12.1.0-runtime-ubuntu22.04
 
 # Install Python and system dependencies
 RUN apt-get update && apt-get install -y \
