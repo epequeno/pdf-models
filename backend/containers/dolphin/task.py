@@ -166,8 +166,12 @@ def process_page_with_dolphin(model, processor, image: Image.Image, page_num: in
         return_tensors="pt"
     )
 
-    # Move inputs to device (GPU or CPU)
-    inputs = {k: v.to(device) for k, v in inputs.items()}
+    # Move inputs to device and match model dtype (float16 on GPU, float32 on CPU)
+    dtype = torch.float16 if device == "cuda" else torch.float32
+    inputs = {
+        k: v.to(device, dtype=dtype) if v.dtype.is_floating_point else v.to(device)
+        for k, v in inputs.items()
+    }
 
     # Generate output
     # Note: Dolphin uses mbart decoder with max 1024 positions

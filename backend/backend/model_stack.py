@@ -257,6 +257,7 @@ class ModelStack(Stack):
                 environment={
                     "S3_BUCKET": s3_bucket_name,
                     "DYNAMODB_TABLE": dynamodb_table_name,
+                    "AWS_DEFAULT_REGION": self.region,  # Required for EC2 (Fargate infers from task metadata)
                 },
             )
         else:
@@ -478,6 +479,7 @@ def handler(event, context):
                                 {"Name": "S3_INPUT_KEY", "Value.$": "$.s3_input_key"},
                                 {"Name": "S3_BUCKET", "Value": s3_bucket_name},
                                 {"Name": "DYNAMODB_TABLE", "Value": dynamodb_table_name},
+                                {"Name": "AWS_DEFAULT_REGION", "Value": self.region},
                             ],
                         }
                     ]
