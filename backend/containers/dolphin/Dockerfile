@@ -34,7 +34,7 @@ RUN pip install --no-cache-dir \
 COPY task.py /app/task.py
 WORKDIR /app
 
-# Set environment variables for Hugging Face cache
+# Set environment variables for Hugging Face cache (needed for download)
 ENV HF_HOME=/app/cache
 ENV TRANSFORMERS_CACHE=/app/cache
 
@@ -49,5 +49,10 @@ print('Downloading ByteDance/Dolphin model...'); \
 processor = AutoProcessor.from_pretrained('ByteDance/Dolphin', trust_remote_code=True); \
 model = AutoModelForVision2Seq.from_pretrained('ByteDance/Dolphin', trust_remote_code=True); \
 print('Model pre-downloaded successfully')"
+
+# Force offline mode AFTER model is downloaded - prevents any runtime network requests
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
+ENV HF_DATASETS_OFFLINE=1
 
 ENTRYPOINT ["python", "task.py"]

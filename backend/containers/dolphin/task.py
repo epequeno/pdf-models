@@ -94,14 +94,18 @@ def load_dolphin_model():
     import torch
 
     logger.info("Loading Dolphin model...")
+    # Use local_files_only=True to prevent any network requests
+    # Model is pre-downloaded in Docker build
     processor = AutoProcessor.from_pretrained(
         'ByteDance/Dolphin',
-        trust_remote_code=True
+        trust_remote_code=True,
+        local_files_only=True
     )
     model = AutoModelForVision2Seq.from_pretrained(
         'ByteDance/Dolphin',
         trust_remote_code=True,
-        torch_dtype=torch.float32  # CPU uses float32
+        torch_dtype=torch.float32,  # CPU uses float32
+        local_files_only=True
     )
     logger.info("Dolphin model loaded successfully")
     return model, processor
