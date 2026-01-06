@@ -56,6 +56,14 @@ MODELS: dict[str, ModelConfig] = {
         min_capacity=0,  # Scale to zero when idle
         max_capacity=2,
     ),
+    "docling": ModelConfig(
+        name="docling",
+        cpu=4096,  # 4 vCPU
+        memory_mib=16384,  # 16GB (PyTorch + model overhead)
+        container_path="docling",
+        output_formats=("json", "markdown"),
+        timeout_minutes=30,  # CPU is fast for this small model (~0.8s/page)
+    ),
 }
 
 
