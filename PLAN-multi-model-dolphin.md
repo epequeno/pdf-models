@@ -70,9 +70,9 @@ for model_name, config in CONFIG.MODELS.items():
 
 ---
 
-## Phase 2: Add Dolphin-v2 🚧 IN PROGRESS
+## Phase 2: Add Dolphin-v2 ✅ COMPLETED
 
-**Status:** Container rebuild in progress (2026-01-05)
+**Status:** All tasks completed and tested on 2026-01-06
 
 ### 2.1 Add to Registry (`backend/backend/stack_config.py`) ✅ DONE
 ```python
@@ -91,6 +91,7 @@ for model_name, config in CONFIG.MODELS.items():
 - Base: `python:3.11-slim`
 - Install: PyTorch (CPU), transformers, accelerate, pdf2image
 - Pre-download: `ByteDance/Dolphin` model (~8GB)
+- Offline environment variables set after model download
 
 **task.py:**
 - Convert PDF pages to images
@@ -99,17 +100,23 @@ for model_name, config in CONFIG.MODELS.items():
 - Convert to Markdown
 - Upload both to S3: `{job_id}-result.json`, `{job_id}-result.md`
 - Update DynamoDB with both result keys
-- **IMPORTANT:** Sets `HF_HUB_OFFLINE=1` and `TRANSFORMERS_OFFLINE=1` to prevent runtime HuggingFace requests (container runs in isolated subnets)
+- **IMPORTANT:** Uses `local_files_only=True` in `from_pretrained()` calls + offline env vars to prevent runtime HuggingFace requests (container runs in isolated subnets)
+- **IMPORTANT:** Uses `max_new_tokens=1024` (mbart decoder limit)
 
 **buildspec.yml:**
 - Build and push container
 - Update SSM: `/pdf-models/cicd/dolphin-image-tag`
 
-### 2.3 DynamoDB Schema Addition
+### 2.3 DynamoDB Schema Addition ✅ DONE
 Add `s3_result_keys` map field for multiple output formats:
 ```
 s3_result_keys: {"json": "...", "markdown": "..."}
 ```
+
+### 2.4 Performance Notes
+- CPU inference: ~1-2 minutes per page on Fargate (4 vCPU, 30GB RAM)
+- 2-page test PDF: ~3 minutes total processing time
+- Model load time: ~2 seconds (cached in container image)
 
 ---
 
@@ -126,22 +133,18 @@ Phase 1 (Refactor): ✅ COMPLETED
 7. ✅ app.py - Dynamic stack creation
 8. ✅ Deploy & test marker still works (all 4 integration tests pass)
 
-Phase 2 (Dolphin): 🚧 IN PROGRESS
+Phase 2 (Dolphin): ✅ COMPLETED
 9.  ✅ Add dolphin to CONFIG.MODELS
 10. ✅ Create backend/containers/dolphin/
 11. ✅ Deploy foundation (creates ECR)
 12. ✅ Build container via CodeBuild (first build)
 13. ✅ Deploy DolphinStack
-14. 🚧 Test end-to-end
-    - Initial test failed: container couldn't reach HuggingFace (isolated subnets)
-    - Fix applied: Added HF_HUB_OFFLINE=1 to task.py
-    - Container rebuild in progress (CodeBuild: baa6f3a6-3ac6-48f7-8d33-a532e8dba7c7)
-
-Next steps when resuming:
-1. Wait for container build to complete (~10-15 min)
-2. Redeploy DolphinStack to pick up new image tag
-3. Run integration test: `make test-integration-auto`
-4. Verify dolphin test passes (test file: backend/tests/integration/test_dolphin_e2e.py)
+14. ✅ Test end-to-end
+    - Initial issue: container couldn't reach HuggingFace (isolated subnets)
+    - Fix 1: Added HF_HUB_OFFLINE=1 env vars (not sufficient)
+    - Fix 2: Added local_files_only=True to from_pretrained() calls
+    - Fix 3: Reduced max_new_tokens from 4096 to 1024 (mbart decoder limit)
+    - All 6 integration tests pass (2 Dolphin + 4 Marker)
 ```
 
 ---
@@ -200,10 +203,15 @@ Next steps when resuming:
    - `test_list_jobs` - List jobs for model
    - `test_unauthorized_access_to_other_user_job` - 404 for non-existent job
    - `test_s3_permissions_enforced` - S3 key validation
-2. After Phase 2:
-   - Submit job with `model=dolphin`
-   - Verify both JSON and MD outputs in S3
-   - Verify download URLs work for both formats
+
+2. After Phase 2: ✅ ALL TESTS PASSED (2026-01-06)
+   - `test_submit_and_process_pdf` (Dolphin) - Full E2E with Dolphin processing (~164s)
+   - `test_list_jobs` (Dolphin) - List jobs for dolphin model
+   - `test_submit_and_process_pdf` (Marker) - Regression test (~335s)
+   - `test_list_jobs` (Marker) - Regression test
+   - `test_unauthorized_access_to_other_user_job` (Marker) - Auth check
+   - `test_s3_permissions_enforced` (Marker) - S3 key validation
+   - Total: 6 tests in 507s (~8.5 min)
 
 ---
 
