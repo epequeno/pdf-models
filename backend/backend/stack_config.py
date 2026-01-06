@@ -34,6 +34,14 @@ MODELS: dict[str, ModelConfig] = {
         output_formats=("markdown",),
         timeout_minutes=120,
     ),
+    "dolphin": ModelConfig(
+        name="dolphin",
+        cpu=4096,  # Max Fargate vCPU
+        memory_mib=30720,  # 30GB - max for 4 vCPU Fargate (4B model needs it)
+        container_path="dolphin",
+        output_formats=("json", "markdown"),
+        timeout_minutes=120,
+    ),
 }
 
 
