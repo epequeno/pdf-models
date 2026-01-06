@@ -5,7 +5,8 @@
 #
 # Model: granite-docling-258M (pre-downloaded at build time)
 
-FROM python:3.11-slim
+# Use AWS ECR Public Gallery to avoid Docker Hub rate limits
+FROM public.ecr.aws/docker/library/python:3.11-slim
 
 # Install system dependencies for PDF processing
 RUN apt-get update && apt-get install -y --no-install-recommends \
