@@ -70,9 +70,11 @@ for model_name, config in CONFIG.MODELS.items():
 
 ---
 
-## Phase 2: Add Dolphin-v2
+## Phase 2: Add Dolphin-v2 🚧 IN PROGRESS
 
-### 2.1 Add to Registry (`backend/backend/stack_config.py`)
+**Status:** Container rebuild in progress (2026-01-05)
+
+### 2.1 Add to Registry (`backend/backend/stack_config.py`) ✅ DONE
 ```python
 "dolphin": ModelConfig(
     name="dolphin",
@@ -83,20 +85,21 @@ for model_name, config in CONFIG.MODELS.items():
 )
 ```
 
-### 2.2 Container (`backend/containers/dolphin/`) - NEW DIRECTORY
+### 2.2 Container (`backend/containers/dolphin/`) ✅ DONE
 
 **Dockerfile:**
 - Base: `python:3.11-slim`
 - Install: PyTorch (CPU), transformers, accelerate, pdf2image
-- Pre-download: `ByteDance/Dolphin-v2` model (~8GB)
+- Pre-download: `ByteDance/Dolphin` model (~8GB)
 
 **task.py:**
 - Convert PDF pages to images
-- Process with Dolphin-v2 VLM
+- Process with Dolphin VLM
 - Output structured JSON (elements, bounding boxes)
 - Convert to Markdown
 - Upload both to S3: `{job_id}-result.json`, `{job_id}-result.md`
 - Update DynamoDB with both result keys
+- **IMPORTANT:** Sets `HF_HUB_OFFLINE=1` and `TRANSFORMERS_OFFLINE=1` to prevent runtime HuggingFace requests (container runs in isolated subnets)
 
 **buildspec.yml:**
 - Build and push container
@@ -123,13 +126,22 @@ Phase 1 (Refactor): ✅ COMPLETED
 7. ✅ app.py - Dynamic stack creation
 8. ✅ Deploy & test marker still works (all 4 integration tests pass)
 
-Phase 2 (Dolphin):
-9. Add dolphin to CONFIG.MODELS
-10. Create backend/containers/dolphin/
-11. Deploy foundation (creates ECR)
-12. Build container via CodeBuild
-13. Deploy DolphinStack
-14. Test end-to-end
+Phase 2 (Dolphin): 🚧 IN PROGRESS
+9.  ✅ Add dolphin to CONFIG.MODELS
+10. ✅ Create backend/containers/dolphin/
+11. ✅ Deploy foundation (creates ECR)
+12. ✅ Build container via CodeBuild (first build)
+13. ✅ Deploy DolphinStack
+14. 🚧 Test end-to-end
+    - Initial test failed: container couldn't reach HuggingFace (isolated subnets)
+    - Fix applied: Added HF_HUB_OFFLINE=1 to task.py
+    - Container rebuild in progress (CodeBuild: baa6f3a6-3ac6-48f7-8d33-a532e8dba7c7)
+
+Next steps when resuming:
+1. Wait for container build to complete (~10-15 min)
+2. Redeploy DolphinStack to pick up new image tag
+3. Run integration test: `make test-integration-auto`
+4. Verify dolphin test passes (test file: backend/tests/integration/test_dolphin_e2e.py)
 ```
 
 ---
