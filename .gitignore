@@ -1,5 +1,6 @@
 backend/lambdas/backend/
 backend/lambdas/*/target/
+backend/lambdas/target/
 
 # Integration test credentials
 backend/tests/integration/.env.test

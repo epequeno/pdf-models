@@ -3,66 +3,53 @@ version: 0.2
 phases:
   build:
     commands:
-      - echo "Building Rust Lambda functions..."
+      - echo "Building Rust Lambda functions as workspace..."
       - cd backend/lambdas
 
-      # Build submit-job Lambda
-      - echo "Building submit-job Lambda..."
-      - cd submit-job
-      - cargo lambda build --release --arm64
-      - cd ..
-
-      # Build get-job Lambda
-      - echo "Building get-job Lambda..."
-      - cd get-job
-      - cargo lambda build --release --arm64
-      - cd ..
-
-      # Build get-upload-url Lambda
-      - echo "Building get-upload-url Lambda..."
-      - cd get-upload-url
-      - cargo lambda build --release --arm64
-      - cd ..
+      # Build all lambdas in one command - dependencies compile once
+      - cargo lambda build --release --arm64 --workspace
 
       - echo "Lambda builds complete"
 
   post_build:
     commands:
       - echo "Creating individual Lambda deployment packages..."
+      - cd backend/lambdas
 
+      # Workspace builds output to: target/lambda/{package-name}/bootstrap
       # Create submit-job.zip
-      - cd submit-job/target/lambda/submit-job
+      - cd target/lambda/submit-job
       - zip submit-job.zip bootstrap
-      - SUBMIT_JOB_UPLOAD=$(aws s3api put-object --bucket ${S3_BUCKET_NAME} --key lambda-artifacts/submit-job.zip --body submit-job.zip --output json)
       - SUBMIT_JOB_VERSION=$(aws s3api put-object --bucket ${S3_BUCKET_NAME} --key lambda-artifacts/submit-job.zip --body submit-job.zip --query 'VersionId' --output text)
       - echo "submit-job.zip uploaded with version ${SUBMIT_JOB_VERSION}"
-      - aws ssm put-parameter --name /pdf-models/lambda/submit-job-version --value ${SUBMIT_JOB_VERSION} --type String --overwrite || echo "Warning Could not update SSM parameter"
-      - cd ../../../..
+      - aws ssm put-parameter --name /pdf-models/lambda/submit-job-version --value ${SUBMIT_JOB_VERSION} --type String --overwrite
+      - cd ..
 
       # Create get-job.zip
-      - cd get-job/target/lambda/get-job
+      - cd get-job
       - zip get-job.zip bootstrap
-      - GET_JOB_UPLOAD=$(aws s3api put-object --bucket ${S3_BUCKET_NAME} --key lambda-artifacts/get-job.zip --body get-job.zip --output json)
       - GET_JOB_VERSION=$(aws s3api put-object --bucket ${S3_BUCKET_NAME} --key lambda-artifacts/get-job.zip --body get-job.zip --query 'VersionId' --output text)
       - echo "get-job.zip uploaded with version ${GET_JOB_VERSION}"
-      - aws ssm put-parameter --name /pdf-models/lambda/get-job-version --value ${GET_JOB_VERSION} --type String --overwrite || echo "Warning Could not update SSM parameter"
-      - cd ../../../..
+      - aws ssm put-parameter --name /pdf-models/lambda/get-job-version --value ${GET_JOB_VERSION} --type String --overwrite
+      - cd ..
 
       # Create get-upload-url.zip
-      - cd get-upload-url/target/lambda/get-upload-url
+      - cd get-upload-url
       - zip get-upload-url.zip bootstrap
-      - GET_UPLOAD_URL_UPLOAD=$(aws s3api put-object --bucket ${S3_BUCKET_NAME} --key lambda-artifacts/get-upload-url.zip --body get-upload-url.zip --output json)
       - GET_UPLOAD_URL_VERSION=$(aws s3api put-object --bucket ${S3_BUCKET_NAME} --key lambda-artifacts/get-upload-url.zip --body get-upload-url.zip --query 'VersionId' --output text)
       - echo "get-upload-url.zip uploaded with version ${GET_UPLOAD_URL_VERSION}"
-      - aws ssm put-parameter --name /pdf-models/lambda/get-upload-url-version --value ${GET_UPLOAD_URL_VERSION} --type String --overwrite || echo "Warning Could not update SSM parameter"
-      - cd ../../../..
+      - aws ssm put-parameter --name /pdf-models/lambda/get-upload-url-version --value ${GET_UPLOAD_URL_VERSION} --type String --overwrite
+      - cd ..
 
       - echo "Lambda artifacts uploaded to S3"
 
+cache:
+  paths:
+    - backend/lambdas/target/**/*
+
 artifacts:
   files:
-    # Include the bootstrap binaries from cargo-lambda output
-    - backend/lambdas/submit-job/target/lambda/submit-job/bootstrap
-    - backend/lambdas/get-job/target/lambda/get-job/bootstrap
-    - backend/lambdas/get-upload-url/target/lambda/get-upload-url/bootstrap
+    - backend/lambdas/target/lambda/submit-job/bootstrap
+    - backend/lambdas/target/lambda/get-job/bootstrap
+    - backend/lambdas/target/lambda/get-upload-url/bootstrap
   name: rust-lambda-builds

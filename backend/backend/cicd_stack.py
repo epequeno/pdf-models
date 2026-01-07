@@ -252,6 +252,11 @@ class CiCdStack(Stack):
                 package_zip=True,
                 name="rust-lambda-builds.zip",
             ),
+            # S3 cache for incremental builds - shared dependencies don't recompile
+            cache=codebuild.Cache.bucket(
+                artifacts_bucket,
+                prefix="codebuild-cache/lambda-build",
+            ),
         )
 
         # Grant S3 permissions to Lambda build for uploading individual Lambda packages

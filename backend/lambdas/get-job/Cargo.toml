@@ -14,9 +14,3 @@ aws-sdk-ssm = "1.60"
 aws-config = { version = "1.5", features = ["behavior-version-latest"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-[profile.release]
-strip = true
-opt-level = "z"
-lto = true
-codegen-units = 1

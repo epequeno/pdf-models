@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = [
+    "submit-job",
+    "get-job",
+    "get-upload-url",
+]
+
+# Shared release profile for all workspace members
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
+codegen-units = 1
