@@ -64,6 +64,20 @@ MODELS: dict[str, ModelConfig] = {
         output_formats=("json", "markdown"),
         timeout_minutes=30,  # CPU is fast for this small model (~0.8s/page)
     ),
+    "deepseek-ocr": ModelConfig(
+        name="deepseek-ocr",
+        cpu=4096,  # 4 vCPU on g4dn.xlarge
+        memory_mib=15360,  # 15GB (leave headroom from 16GB instance)
+        container_path="deepseek-ocr",
+        output_formats=("markdown",),
+        timeout_minutes=30,
+        use_gpu=True,
+        gpu_count=1,
+        instance_type="g4dn.xlarge",  # 1 T4 GPU, 4 vCPU, 16GB RAM
+        spot_enabled=True,
+        min_capacity=0,  # Scale to zero when idle
+        max_capacity=2,
+    ),
 }
 
 
