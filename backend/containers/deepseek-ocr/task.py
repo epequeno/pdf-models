@@ -5,7 +5,8 @@ DeepSeek-OCR PDF Processing Task
 This script runs inside an ECS container to process PDFs using DeepSeek-OCR model.
 It converts PDF pages to images, processes with the 3B parameter VLM, and outputs Markdown.
 
-Requires GPU with flash-attention support (g4dn.xlarge or better).
+GPU required (g4dn.xlarge or better). Uses FlashAttention2 on Ampere+ GPUs, falls back
+to eager attention on older GPUs (T4/Turing).
 
 Environment Variables:
     JOB_ID: Unique job identifier
@@ -109,10 +110,19 @@ def load_deepseek_ocr_model():
         local_files_only=True
     )
 
-    # Use flash_attention_2 for efficient inference, bfloat16 for memory efficiency
+    # Check GPU compute capability for attention implementation
+    # FlashAttention requires Ampere+ (sm_80+), T4 is Turing (sm_75)
+    compute_capability = torch.cuda.get_device_capability(0)
+    if compute_capability[0] >= 8:
+        attn_impl = 'flash_attention_2'
+        logger.info("Using FlashAttention2 (Ampere+ GPU detected)")
+    else:
+        attn_impl = 'eager'
+        logger.info(f"Using eager attention (compute capability {compute_capability[0]}.{compute_capability[1]} < 8.0)")
+
     model = AutoModel.from_pretrained(
         'deepseek-ai/DeepSeek-OCR',
-        _attn_implementation='flash_attention_2',
+        _attn_implementation=attn_impl,
         trust_remote_code=True,
         use_safetensors=True,
         local_files_only=True

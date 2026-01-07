@@ -211,6 +211,17 @@ class ModelStack(Stack):
                 security_group=ecs_security_group,
                 role=instance_role,
                 spot_price=str(0.20) if model_config.spot_enabled else None,  # ~25% above typical spot
+                # Configure root volume size for large container images
+                block_devices=[
+                    autoscaling.BlockDevice(
+                        device_name="/dev/xvda",  # Root volume for ECS GPU AMI
+                        volume=autoscaling.BlockDeviceVolume.ebs(
+                            volume_size=model_config.ebs_volume_size_gb,
+                            volume_type=autoscaling.EbsDeviceVolumeType.GP3,
+                            delete_on_termination=True,
+                        ),
+                    )
+                ],
             )
 
             # Add user data to configure ECS agent

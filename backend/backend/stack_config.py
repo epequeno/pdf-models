@@ -30,6 +30,7 @@ class ModelConfig:
     spot_enabled: bool = True  # Use Spot instances for cost savings
     min_capacity: int = 0  # ASG min capacity (0 = scale to zero when idle)
     max_capacity: int = 2  # ASG max capacity
+    ebs_volume_size_gb: int = 30  # Root EBS volume size (increase for large container images)
 
 
 # Model registry - add new models here
@@ -55,6 +56,7 @@ MODELS: dict[str, ModelConfig] = {
         spot_enabled=True,
         min_capacity=0,  # Scale to zero when idle
         max_capacity=2,
+        ebs_volume_size_gb=50,  # ~5GB image + headroom
     ),
     "docling": ModelConfig(
         name="docling",
@@ -77,6 +79,7 @@ MODELS: dict[str, ModelConfig] = {
         spot_enabled=True,
         min_capacity=0,  # Scale to zero when idle
         max_capacity=2,
+        ebs_volume_size_gb=100,  # 9.29GB image + Docker overhead + headroom
     ),
 }
 
