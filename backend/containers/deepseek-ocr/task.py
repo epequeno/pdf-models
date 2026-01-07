@@ -163,7 +163,8 @@ def process_page_with_deepseek(model, tokenizer, image: Image.Image, page_num: i
     # Run inference using the model's infer method
     # Using "Gundam" config (base_size=1024, image_size=640, crop_mode=True)
     # which balances quality and speed
-    result = model.infer(
+    # Note: model.infer() prints output and saves to file but returns None
+    model.infer(
         tokenizer,
         prompt=prompt,
         image_file=str(image_path),
@@ -171,11 +172,23 @@ def process_page_with_deepseek(model, tokenizer, image: Image.Image, page_num: i
         base_size=1024,
         image_size=640,
         crop_mode=True,
-        save_results=False,  # We'll handle saving ourselves
+        save_results=True,  # Save output to file so we can read it
         test_compress=False
     )
 
-    logger.info(f"Page {page_num} processed")
+    # Read the saved output file - DeepSeek-OCR saves as {image_name}_ocr.txt
+    output_file = output_dir / f"page_{page_num}_ocr.txt"
+    if not output_file.exists():
+        # Try alternate naming patterns
+        txt_files = list(output_dir.glob("*.txt"))
+        if txt_files:
+            output_file = txt_files[0]
+        else:
+            logger.warning(f"No output file found for page {page_num}, using empty string")
+            return ""
+
+    result = output_file.read_text(encoding="utf-8")
+    logger.info(f"Page {page_num} processed ({len(result)} chars)")
     return result
 
 
