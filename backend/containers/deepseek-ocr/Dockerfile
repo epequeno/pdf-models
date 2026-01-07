@@ -66,12 +66,13 @@ RUN pip3 install --no-cache-dir \
     torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
 # Install other dependencies
-# addict and matplotlib are required by DeepSeek-OCR's custom modeling code
+# addict, easydict, and matplotlib are required by DeepSeek-OCR's custom modeling code
 RUN pip3 install --no-cache-dir \
     transformers \
     accelerate \
     einops \
     addict \
+    easydict \
     matplotlib \
     pdf2image \
     pillow \
