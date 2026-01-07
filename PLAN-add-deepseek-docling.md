@@ -204,35 +204,22 @@ Phase 1 (Docling - CPU): ✅ COMPLETE
 6. [x] Create integration test
 7. [x] Test end-to-end
 
-Phase 2 (DeepSeek-OCR - GPU): 🔄 IN PROGRESS
+Phase 2 (DeepSeek-OCR - GPU): ✅ COMPLETE
 8. [x] Add deepseek-ocr to CONFIG.MODELS
 9. [x] Create backend/containers/deepseek-ocr/
 10. [x] Deploy FoundationStack (creates ECR)
-11. [~] Build container via CodeBuild  <-- BUILDING (build ID: 176290bf)
-12. [ ] Deploy Deepseek-OcrStack
+11. [x] Build container via CodeBuild
+12. [x] Deploy Deepseek-OcrStack
 13. [x] Create integration test
-14. [ ] Test end-to-end
+14. [x] Test end-to-end
 ```
 
-### To Resume DeepSeek-OCR Deployment
+### Issues Resolved During Deployment
 
-1. Check build status:
-   ```bash
-   AWS_PROFILE=arch aws codebuild batch-get-builds \
-     --ids "pdf-models-deepseek-ocr-container-build:176290bf-6b4f-4cd6-a516-50ca2072dcb2" \
-     --query 'builds[0].{status:buildStatus,phase:currentPhase}'
-   ```
-
-2. Once build succeeds, deploy stack:
-   ```bash
-   AWS_PROFILE=arch make cdk-deploy STACK=Deepseek-OcrStack
-   ```
-
-3. Run integration tests:
-   ```bash
-   cd backend && AWS_PROFILE=arch TEST_USER_EMAIL="integration-test@pdf-models.local" \
-     TEST_USER_PASSWORD="TestPass123!" uv run pytest tests/integration/test_deepseek_ocr_e2e.py -v
-   ```
+1. **AWS Quota Limits**: VPCs, Elastic IPs, Internet gateways - all approved
+2. **Disk Space**: 9.29GB image required 100GB EBS volume (added `ebs_volume_size_gb` to ModelConfig)
+3. **FlashAttention**: T4 GPUs don't support FlashAttention2 - added fallback to eager attention
+4. **Model Output**: `model.infer()` returns None - fixed to read from saved output file
 
 ---
 
