@@ -1,0 +1,37 @@
+version: 0.2
+
+env:
+  secrets-manager:
+    TEST_USER_EMAIL: "/pdf-models/test-credentials:TEST_USER_EMAIL"
+    TEST_USER_PASSWORD: "/pdf-models/test-credentials:TEST_USER_PASSWORD"
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.12
+    commands:
+      - curl -LsSf https://astral.sh/uv/install.sh | sh
+      - export PATH="$HOME/.local/bin:$PATH"
+
+  pre_build:
+    commands:
+      - cd backend
+      - uv sync
+      - uv run python tests/integration/setup_test_user.py "$TEST_USER_EMAIL" "$TEST_USER_PASSWORD"
+
+  build:
+    commands:
+      - cd backend
+      - |
+        if [ -n "$MODEL" ]; then
+          uv run pytest tests/integration/test_${MODEL}_e2e.py -v -s --tb=short --junitxml=test-results/integration-results.xml
+        else
+          uv run pytest tests/integration/ -v -s --tb=short --junitxml=test-results/integration-results.xml
+        fi
+
+reports:
+  integration-tests:
+    files:
+      - test-results/integration-results.xml
+    base-directory: backend
+    file-format: JUNITXML

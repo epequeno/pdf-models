@@ -282,3 +282,140 @@ class CiCdStack(Stack):
             string_value=lambda_build.project_name,
             description="CodeBuild project name for Rust Lambda builds",
         )
+
+        # ============================================================
+        # Test CodeBuild Projects
+        # ============================================================
+
+        # Unit Test Project - lightweight, no special AWS permissions needed
+        unit_test_build = codebuild.Project(
+            self,
+            "UnitTestBuild",
+            project_name=f"{CONFIG.PROJECT_NAME}-unit-tests",
+            description="Run unit tests for CDK stacks and Python code",
+            source=codebuild.Source.code_commit(
+                repository=repo,
+                branch_or_ref="main",
+            ),
+            environment=codebuild.BuildEnvironment(
+                build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
+                compute_type=codebuild.ComputeType.SMALL,
+            ),
+            build_spec=codebuild.BuildSpec.from_source_filename(
+                "backend/tests/buildspec-unit.yml"
+            ),
+            timeout=Duration.minutes(15),
+        )
+
+        # Integration Test Project - needs AWS permissions for E2E testing
+        integration_test_build = codebuild.Project(
+            self,
+            "IntegrationTestBuild",
+            project_name=f"{CONFIG.PROJECT_NAME}-integration-tests",
+            description="Run integration tests against deployed infrastructure",
+            source=codebuild.Source.code_commit(
+                repository=repo,
+                branch_or_ref="main",
+            ),
+            environment=codebuild.BuildEnvironment(
+                build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
+                compute_type=codebuild.ComputeType.MEDIUM,
+            ),
+            build_spec=codebuild.BuildSpec.from_source_filename(
+                "backend/tests/buildspec-integration.yml"
+            ),
+            timeout=Duration.minutes(30),
+        )
+
+        # Grant Secrets Manager access for test credentials
+        integration_test_build.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["secretsmanager:GetSecretValue"],
+                resources=[
+                    f"arn:aws:secretsmanager:{self.region}:{self.account}:secret:/pdf-models/test-credentials*"
+                ],
+            )
+        )
+
+        # Grant SSM access for reading configuration
+        integration_test_build.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["ssm:GetParameter", "ssm:GetParameters"],
+                resources=[
+                    f"arn:aws:ssm:{self.region}:{self.account}:parameter/pdf-models/*"
+                ],
+            )
+        )
+
+        # Grant Cognito access for user management during tests
+        integration_test_build.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "cognito-idp:AdminCreateUser",
+                    "cognito-idp:AdminSetUserPassword",
+                    "cognito-idp:AdminDeleteUser",
+                    "cognito-idp:InitiateAuth",
+                ],
+                resources=[
+                    f"arn:aws:cognito-idp:{self.region}:{self.account}:userpool/*"
+                ],
+            )
+        )
+
+        integration_test_build.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "cognito-identity:GetId",
+                    "cognito-identity:GetCredentialsForIdentity",
+                ],
+                resources=["*"],
+            )
+        )
+
+        # Grant S3 access for test file uploads/downloads
+        integration_test_build.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "s3:PutObject",
+                    "s3:GetObject",
+                    "s3:DeleteObject",
+                    "s3:HeadObject",
+                    "s3:ListBucket",
+                ],
+                resources=[
+                    f"arn:aws:s3:::{s3_bucket_name}",
+                    f"arn:aws:s3:::{s3_bucket_name}/*",
+                ],
+            )
+        )
+
+        # Grant DynamoDB access for checking job status
+        integration_test_build.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["dynamodb:GetItem", "dynamodb:DeleteItem", "dynamodb:Query"],
+                resources=[
+                    f"arn:aws:dynamodb:{self.region}:{self.account}:table/{CONFIG.PROJECT_NAME}-*"
+                ],
+            )
+        )
+
+        # Grant Step Functions access for execution monitoring
+        integration_test_build.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "states:DescribeExecution",
+                    "states:ListExecutions",
+                ],
+                resources=[
+                    f"arn:aws:states:{self.region}:{self.account}:stateMachine:{CONFIG.PROJECT_NAME}-*",
+                    f"arn:aws:states:{self.region}:{self.account}:execution:{CONFIG.PROJECT_NAME}-*:*",
+                ],
+            )
+        )
