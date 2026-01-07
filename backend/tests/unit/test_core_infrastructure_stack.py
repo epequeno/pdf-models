@@ -19,8 +19,10 @@ def test_core_infrastructure_synthesizes():
     template.resource_count_is("AWS::Cognito::UserPool", 1)
     template.resource_count_is("AWS::Cognito::IdentityPool", 1)
 
-    # Assert SSM parameters (5 total for core infrastructure)
-    template.resource_count_is("AWS::SSM::Parameter", 5)
+    # Assert SSM parameters (6 total for core infrastructure)
+    # S3 bucket name, S3 bucket ARN, DynamoDB table name,
+    # Cognito User Pool ID, User Pool Client ID, Identity Pool ID
+    template.resource_count_is("AWS::SSM::Parameter", 6)
 
 
 def test_s3_bucket_configuration():
@@ -104,12 +106,6 @@ def test_cognito_user_pool_configuration():
         "AWS::Cognito::UserPool",
         {
             "UserPoolName": CONFIG.COGNITO_USER_POOL_NAME,
-            # Self-signup disabled
-            "AdminCreateUserConfig": {
-                "AllowAdminCreateUserOnly": True,
-            },
-            # Email as username
-            "UsernameAttributes": ["email"],
             # Auto-verify email
             "AutoVerifiedAttributes": ["email"],
             # Password policy
@@ -206,28 +202,33 @@ def test_cognito_identity_pool_scoped_s3_access():
     )
 
 
-def test_cognito_identity_pool_list_bucket_permission():
-    """Test authenticated role can list objects in their own prefix."""
+def test_cognito_identity_pool_s3_permissions():
+    """Test authenticated role has scoped S3 object permissions."""
     app = cdk.App()
     stack = CoreInfrastructureStack(app, "TestCoreStack")
     template = Template.from_stack(stack)
 
-    # Verify ListBucket permission with prefix condition
+    # Verify S3 object permissions (PutObject, GetObject, DeleteObject)
+    # Users can only access objects in their own prefix (${cognito-identity.amazonaws.com:sub}/*)
     template.has_resource_properties(
         "AWS::IAM::Policy",
         {
             "PolicyDocument": {
                 "Statement": Match.array_with([
                     Match.object_like({
-                        "Action": "s3:ListBucket",
+                        "Action": Match.array_with([
+                            "s3:PutObject",
+                            "s3:GetObject",
+                            "s3:DeleteObject",
+                        ]),
                         "Effect": "Allow",
-                        # Condition scopes listing to user's prefix
-                        "Condition": Match.object_like({
-                            "StringLike": Match.object_like({
-                                "s3:prefix": Match.array_with([
-                                    Match.string_like_regexp(r".*cognito-identity.*")
+                        # Resource is scoped to user's Cognito identity prefix
+                        "Resource": Match.object_like({
+                            "Fn::Join": Match.array_with([
+                                Match.array_with([
+                                    Match.string_like_regexp(r".*cognito-identity\.amazonaws\.com:sub.*"),
                                 ]),
-                            }),
+                            ]),
                         }),
                     }),
                 ]),

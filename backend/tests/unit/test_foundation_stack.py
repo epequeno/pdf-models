@@ -4,7 +4,7 @@ import aws_cdk as cdk
 from aws_cdk.assertions import Template, Match
 
 from backend.foundation_stack import FoundationStack
-from backend.stack_config import CONFIG
+from backend.stack_config import CONFIG, MODELS
 
 
 def test_foundation_stack_synthesizes():
@@ -13,8 +13,9 @@ def test_foundation_stack_synthesizes():
     stack = FoundationStack(app, "TestFoundationStack")
     template = Template.from_stack(stack)
 
-    # Assert both ECR repositories exist (Marker + Rust Lambda Builder)
-    template.resource_count_is("AWS::ECR::Repository", 2)
+    # Assert ECR repositories exist (one per model + Rust Lambda Builder)
+    expected_ecr_repos = len(MODELS) + 1  # models + rust-lambda-builder
+    template.resource_count_is("AWS::ECR::Repository", expected_ecr_repos)
 
     # Assert SSM parameters created for both ECR URIs
     template.has_resource_properties(
@@ -82,8 +83,9 @@ def test_stack_has_correct_tags():
     stack = FoundationStack(app, "TestFoundationStack")
     template = Template.from_stack(stack)
 
-    # Stack should have resources (both ECR repos)
-    template.resource_count_is("AWS::ECR::Repository", 2)
+    # Stack should have resources (one ECR repo per model + rust-lambda-builder)
+    expected_ecr_repos = len(MODELS) + 1
+    template.resource_count_is("AWS::ECR::Repository", expected_ecr_repos)
 
     # Tags are applied at stack level via Tags.of(self)
     # CDK applies these to all taggable resources
