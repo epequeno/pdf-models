@@ -66,9 +66,10 @@ RUN pip3 install --no-cache-dir \
     torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
 # Install other dependencies
+# Pin transformers<=4.40.0 - DeepSeek-OCR imports LlamaFlashAttention2 which was removed in 4.43+
 # addict, easydict, and matplotlib are required by DeepSeek-OCR's custom modeling code
 RUN pip3 install --no-cache-dir \
-    transformers \
+    "transformers<=4.40.0" \
     accelerate \
     einops \
     addict \
