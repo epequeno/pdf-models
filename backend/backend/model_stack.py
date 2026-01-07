@@ -104,14 +104,13 @@ class ModelStack(Stack):
             isolated_subnet_ids=isolated_subnet_ids,
         )
 
-        # Create ECS cluster
-        # Note: VPC is not specified - cluster uses default VPC for EC2 capacity providers
-        # The ASG explicitly specifies the isolated subnets
+        # Create ECS cluster using the shared VPC from NetworkingStack
         cluster = ecs.Cluster(
             self,
             f"{model_name.title()}Cluster",
             cluster_name=f"{CONFIG.PROJECT_NAME}-{model_name}-cluster",
             container_insights_v2=ecs.ContainerInsights.ENHANCED,
+            vpc=vpc,  # Use shared VPC instead of creating a new one per model
         )
 
         # Track capacity provider name for GPU models (used in Step Functions)

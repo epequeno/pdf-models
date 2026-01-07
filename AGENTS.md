@@ -135,7 +135,11 @@ The system uses an **Identity Pool workflow** where:
 - Email: `integration-test@pdf-models.local`
 - Password: `TestPass123!`
 
-Run tests with: `make test-integration-auto`
+**Running tests**:
+- Local: `make test-integration-auto`
+- Cloud (CodeBuild): `make test-integration-cloud` - runs in AWS, can close laptop
+- Cloud for specific model: `make test-integration-cloud MODEL=marker`
+- Check cloud test status: `make test-cloud-status`
 
 ### Step Functions Use JSONata
 - Set `"QueryLanguage": "JSONata"` in all state machines
@@ -220,20 +224,28 @@ FROM nvcr.io/nvidia/cuda:12.1.0-runtime-ubuntu22.04  # NVIDIA NGC for CUDA
 |------|---------|
 | Synth all stacks | `make cdk-synth` |
 | Deploy a stack | `make cdk-deploy STACK=FoundationStack` |
+| Deploy all stacks | `make cdk-deploy-all` |
 | Check what will change | `make cdk-diff STACK=CoreInfrastructureStack` |
 | View logs | `make aws-logs LOGGROUP=/aws/lambda/function-name` |
 | List S3 buckets | `make aws-s3-ls` |
 | Build container | `make container-build MODEL=marker` |
+| Run unit tests (local) | `make test` |
+| Run unit tests (cloud) | `make test-unit-cloud` |
+| Run integration tests (cloud) | `make test-integration-cloud` |
+| Check cloud test status | `make test-cloud-status` |
 
 ## Stack Deployment Order
 
-Always deploy in this order to satisfy dependencies:
+Always deploy in this order to satisfy dependencies (or use `make cdk-deploy-all`):
 
-1. `FoundationStack` - ECR, certificates, Route53
-2. `CoreInfrastructureStack` - Cognito, S3, DynamoDB
-3. `MarkerStack` - Model-specific resources
-4. `ApiStack` - API Gateway, Lambda handlers
-5. `CiCdStack` - CodeBuild (can be deployed anytime)
+1. `FoundationStack` - ECR repositories, certificates, Route53
+2. `NetworkingStack` - VPC, subnets, security groups
+3. `CoreInfrastructureStack` - Cognito, S3, DynamoDB
+4. `CiCdStack` - CodeBuild projects for containers, Lambda, and tests
+5. `MarkerStack` - Model-specific ECS tasks and Step Functions
+6. `ApiV2Stack` - HTTP API Gateway, Lambda handlers
+7. `MonitoringStack` - CloudWatch dashboards and alarms
+8. `FrontendStack` - S3 static site, CloudFront distribution
 
 ## Getting Help
 
