@@ -27,8 +27,9 @@ RUN pip3 install --no-cache-dir \
     torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
 # Install flash-attention (needs CUDA dev tools to build)
+# Pin to 2.7.3 per DeepSeek-OCR requirements
 RUN pip3 install --no-cache-dir packaging wheel
-RUN pip3 install flash-attn --no-build-isolation
+RUN pip3 install flash-attn==2.7.3 --no-build-isolation
 
 # Runtime stage - smaller image without build tools
 FROM nvcr.io/nvidia/cuda:12.1.0-runtime-ubuntu22.04
@@ -65,11 +66,12 @@ COPY --from=builder /usr/local/lib/python3.11/dist-packages /usr/local/lib/pytho
 RUN pip3 install --no-cache-dir \
     torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
-# Install other dependencies
-# Pin transformers<=4.40.0 - DeepSeek-OCR imports LlamaFlashAttention2 which was removed in 4.43+
+# Install other dependencies with pinned versions per DeepSeek-OCR requirements
+# See https://huggingface.co/deepseek-ai/DeepSeek-OCR for version requirements
 # addict, easydict, and matplotlib are required by DeepSeek-OCR's custom modeling code
 RUN pip3 install --no-cache-dir \
-    "transformers<=4.40.0" \
+    transformers==4.46.3 \
+    tokenizers==0.20.3 \
     accelerate \
     einops \
     addict \
