@@ -3,7 +3,7 @@
 # Uses IBM's Docling library for document conversion with layout detection
 # and table structure recognition. Outputs JSON and Markdown.
 #
-# Model: granite-docling-258M (pre-downloaded at build time)
+# Models: granite-docling-258M + RapidOCR (pre-downloaded at build time)
 
 # Use AWS ECR Public Gallery to avoid Docker Hub rate limits
 FROM public.ecr.aws/docker/library/python:3.11-slim
@@ -19,16 +19,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Let docling manage its own torch/torchvision versions for compatibility
 RUN pip install --no-cache-dir docling boto3
 
-# Pre-download models at build time to avoid runtime downloads
-# This initializes Docling and downloads the granite-docling model
+# Set up model cache directories
 ENV HF_HOME=/app/hf_cache
 ENV TORCH_HOME=/app/torch_cache
+ENV DOCLING_ARTIFACTS_PATH=/app/docling_models
 
-RUN python -c "\
-from docling.document_converter import DocumentConverter; \
-print('Initializing Docling and downloading models...'); \
-converter = DocumentConverter(); \
-print('Models downloaded successfully')"
+# Pre-download ALL models at build time using docling-tools
+# This downloads: layout models, table models, AND RapidOCR models
+RUN docling-tools models download
 
 # Set offline mode after download
 ENV HF_HUB_OFFLINE=1

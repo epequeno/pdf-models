@@ -98,9 +98,18 @@ def process_pdf_with_docling(input_path: str) -> dict:
         dict with 'json' (structured document) and 'markdown' (text) content
     """
     from docling.document_converter import DocumentConverter
+    from docling.datamodel.pipeline_options import PdfPipelineOptions
 
     logger.info("Initializing Docling DocumentConverter...")
-    converter = DocumentConverter()
+
+    # Use pre-downloaded models from DOCLING_ARTIFACTS_PATH
+    artifacts_path = os.environ.get("DOCLING_ARTIFACTS_PATH")
+    if artifacts_path:
+        logger.info(f"Using artifacts from: {artifacts_path}")
+        pipeline_options = PdfPipelineOptions(artifacts_path=artifacts_path)
+        converter = DocumentConverter(pipeline_options=pipeline_options)
+    else:
+        converter = DocumentConverter()
 
     logger.info(f"Converting PDF: {input_path}")
     result = converter.convert(input_path)
