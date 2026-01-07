@@ -195,24 +195,44 @@ Mirror existing test structure from `test_dolphin_e2e.py`.
 ## Implementation Order
 
 ```
-Phase 1 (Docling - CPU):
-1. [ ] Add docling to CONFIG.MODELS
-2. [ ] Create backend/containers/docling/
-3. [ ] Deploy FoundationStack (creates ECR)
-4. [ ] Build container via CodeBuild
-5. [ ] Deploy DoclingStack
-6. [ ] Create integration test
-7. [ ] Test end-to-end
+Phase 1 (Docling - CPU): ✅ COMPLETE
+1. [x] Add docling to CONFIG.MODELS
+2. [x] Create backend/containers/docling/
+3. [x] Deploy FoundationStack (creates ECR)
+4. [x] Build container via CodeBuild
+5. [x] Deploy DoclingStack
+6. [x] Create integration test
+7. [x] Test end-to-end
 
-Phase 2 (DeepSeek-OCR - GPU):
-8. [ ] Add deepseek-ocr to CONFIG.MODELS
-9. [ ] Create backend/containers/deepseek-ocr/
-10. [ ] Deploy FoundationStack (creates ECR)
-11. [ ] Build container via CodeBuild
-12. [ ] Deploy DeepseekOcrStack
-13. [ ] Create integration test
+Phase 2 (DeepSeek-OCR - GPU): 🔄 IN PROGRESS
+8. [x] Add deepseek-ocr to CONFIG.MODELS
+9. [x] Create backend/containers/deepseek-ocr/
+10. [x] Deploy FoundationStack (creates ECR)
+11. [~] Build container via CodeBuild  <-- BUILDING (build ID: 176290bf)
+12. [ ] Deploy Deepseek-OcrStack
+13. [x] Create integration test
 14. [ ] Test end-to-end
 ```
+
+### To Resume DeepSeek-OCR Deployment
+
+1. Check build status:
+   ```bash
+   AWS_PROFILE=arch aws codebuild batch-get-builds \
+     --ids "pdf-models-deepseek-ocr-container-build:176290bf-6b4f-4cd6-a516-50ca2072dcb2" \
+     --query 'builds[0].{status:buildStatus,phase:currentPhase}'
+   ```
+
+2. Once build succeeds, deploy stack:
+   ```bash
+   AWS_PROFILE=arch make cdk-deploy STACK=Deepseek-OcrStack
+   ```
+
+3. Run integration tests:
+   ```bash
+   cd backend && AWS_PROFILE=arch TEST_USER_EMAIL="integration-test@pdf-models.local" \
+     TEST_USER_PASSWORD="TestPass123!" uv run pytest tests/integration/test_deepseek_ocr_e2e.py -v
+   ```
 
 ---
 
