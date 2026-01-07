@@ -22,11 +22,13 @@ RUN pip install --no-cache-dir docling boto3
 # Set up model cache directories
 ENV HF_HOME=/app/hf_cache
 ENV TORCH_HOME=/app/torch_cache
-ENV DOCLING_ARTIFACTS_PATH=/app/docling_models
 
 # Pre-download ALL models at build time using docling-tools
-# This downloads: layout models, table models, AND RapidOCR models
+# Downloads to ~/.cache/docling/models by default (which is /root/.cache/docling/models in Docker)
 RUN docling-tools models download
+
+# Point to the actual download location for runtime
+ENV DOCLING_ARTIFACTS_PATH=/root/.cache/docling/models
 
 # Set offline mode after download
 ENV HF_HUB_OFFLINE=1
