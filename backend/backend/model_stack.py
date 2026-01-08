@@ -202,7 +202,7 @@ class ModelStack(Stack):
                     subnet_type=ec2.SubnetType.PRIVATE_ISOLATED
                 ),
                 instance_type=ec2.InstanceType(model_config.instance_type),
-                machine_image=ecs.EcsOptimizedImage.amazon_linux2(
+                machine_image=ecs.EcsOptimizedImage.amazon_linux2023(
                     hardware_type=ecs.AmiHardwareType.GPU
                 ),
                 min_capacity=model_config.min_capacity,
