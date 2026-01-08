@@ -1,0 +1,25 @@
+flowchart TD
+    BUCKET[("pdf-models-docs")]
+
+    subgraph Users["User Isolation (by Identity Pool ID)"]
+        U1["us-east-1:abc123..."]
+        U2["us-east-1:def456..."]
+    end
+
+    subgraph U1Files["User 1 Files"]
+        U1PDF["job-1.pdf"]
+        U1RES["job-1-result.md"]
+        U1PDF2["job-2.pdf"]
+        U1RES2["job-2-result.md"]
+    end
+
+    subgraph U2Files["User 2 Files"]
+        U2PDF["job-3.pdf"]
+        U2RES["job-3-result.md"]
+    end
+
+    BUCKET --> U1 & U2
+    U1 --> U1Files
+    U2 --> U2Files
+
+    style BUCKET fill:#ff9800

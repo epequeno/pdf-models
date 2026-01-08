@@ -1,0 +1,38 @@
+flowchart LR
+    subgraph Source["Source"]
+        CC[CodeCommit<br/>Git Repository]
+    end
+
+    subgraph Build["CodeBuild Projects"]
+        CB1[rust-lambda-builder<br/>Base image build]
+        CB2[rust-lambda-build<br/>Lambda compilation]
+        CB3[marker-container-build]
+        CB4[dolphin-container-build]
+        CB5[docling-container-build]
+    end
+
+    subgraph Artifacts["Artifacts"]
+        ECR[(ECR<br/>Container Images)]
+        S3[(S3<br/>Lambda ZIPs)]
+        SSM[(SSM Parameters<br/>Version tracking)]
+    end
+
+    subgraph Deploy["Deployment"]
+        CDK[CDK Deploy<br/>Update Stacks]
+    end
+
+    CC -->|Manual trigger| CB1
+    CC -->|Manual trigger| CB2
+    CC -->|Manual trigger| CB3 & CB4 & CB5
+
+    CB1 --> ECR
+    CB2 --> S3
+    CB2 --> SSM
+    CB3 & CB4 & CB5 --> ECR
+    CB3 & CB4 & CB5 --> SSM
+
+    SSM --> CDK
+
+    style CC fill:#e1f5fe
+    style ECR fill:#fff3e0
+    style SSM fill:#e8f5e9

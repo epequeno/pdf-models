@@ -1,0 +1,30 @@
+flowchart LR
+    subgraph Client
+        APP[Application]
+    end
+
+    subgraph Cognito["AWS Cognito"]
+        UP[User Pool<br/>Authentication]
+        IP[Identity Pool<br/>Authorization]
+    end
+
+    subgraph Tokens
+        JWT[JWT Tokens<br/>AccessToken, IdToken]
+        CREDS[AWS Credentials<br/>AccessKey, SecretKey, SessionToken]
+    end
+
+    subgraph Resources
+        APIGW[API Gateway<br/>JWT Authorizer]
+        S3[(S3<br/>IAM Policy)]
+    end
+
+    APP -->|1. username/password| UP
+    UP -->|2. JWT tokens| JWT
+    APP -->|3. exchange IdToken| IP
+    IP -->|4. temp credentials| CREDS
+
+    JWT -->|5. Bearer token| APIGW
+    CREDS -->|6. signed requests| S3
+
+    style UP fill:#ff9800
+    style IP fill:#4caf50

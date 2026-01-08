@@ -1,0 +1,26 @@
+stateDiagram-v2
+    [*] --> ResolveTaskDefinition
+
+    ResolveTaskDefinition: Resolve Task Definition
+    note right of ResolveTaskDefinition
+        Lambda reads current
+        task def ARN from SSM
+    end note
+
+    ResolveTaskDefinition --> LaunchFargateTask
+
+    LaunchFargateTask: Launch Fargate Task
+    note right of LaunchFargateTask
+        ECS RunTask (sync)
+        Passes job_id, s3_input_key
+        via environment variables
+    end note
+
+    LaunchFargateTask --> TaskSuccess: Task Exits 0
+    LaunchFargateTask --> TaskFailed: Task Exits Non-Zero
+
+    TaskSuccess: Mark Job Completed
+    TaskFailed: Mark Job Failed
+
+    TaskSuccess --> [*]
+    TaskFailed --> [*]

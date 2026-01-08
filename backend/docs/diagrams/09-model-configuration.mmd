@@ -1,0 +1,30 @@
+flowchart TB
+    subgraph Config["stack_config.py"]
+        MC[Model Configuration]
+    end
+
+    subgraph CPUModels["CPU-Based Models<br/>(ECS Fargate)"]
+        M1["Marker<br/>4 vCPU | 16GB | 120min"]
+        M2["Docling<br/>4 vCPU | 16GB | 30min"]
+    end
+
+    subgraph GPUModels["GPU-Based Models<br/>(EC2 g4dn.xlarge + ASG)"]
+        M3["Dolphin<br/>4 vCPU | 15GB | 1x T4 | 30min"]
+        M4["DeepSeek-OCR<br/>4 vCPU | 15GB | 1x T4 | 30min"]
+    end
+
+    subgraph Outputs["Output Formats"]
+        MD[Markdown]
+        JSON[JSON]
+    end
+
+    MC --> CPUModels
+    MC --> GPUModels
+
+    M1 --> MD
+    M2 --> MD & JSON
+    M3 --> MD & JSON
+    M4 --> MD
+
+    style CPUModels fill:#e3f2fd
+    style GPUModels fill:#fff8e1

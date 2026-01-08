@@ -1,0 +1,25 @@
+flowchart LR
+    subgraph Request["Request Path"]
+        R1[Client Request]
+        R2[API Gateway]
+        R3[JWT Validation]
+        R4[Lambda Handler]
+        R5[Business Logic]
+    end
+
+    subgraph Response["Response Path"]
+        S1[JSON Response]
+        S2[Lambda Response]
+        S3[API Gateway]
+        S4[Client]
+    end
+
+    R1 --> R2 --> R3 --> R4 --> R5
+    R5 --> S1 --> S2 --> S3 --> S4
+
+    subgraph Endpoints["API Endpoints"]
+        E1["POST /v1/models/{model}/jobs<br/>Submit new job"]
+        E2["GET /v1/models/{model}/jobs<br/>List user's jobs"]
+        E3["GET /v1/models/{model}/jobs/{id}<br/>Get job status"]
+        E4["GET /upload-url<br/>Get presigned upload URL"]
+    end

@@ -1,0 +1,63 @@
+flowchart TD
+    subgraph Foundation["FoundationStack"]
+        ECR[ECR Repositories]
+        CERT[ACM Certificates]
+        HZ[Route53 Hosted Zone]
+    end
+
+    subgraph Network["NetworkingStack"]
+        VPC[VPC]
+        SUBNETS[Public/Private Subnets]
+        SG[Security Groups]
+    end
+
+    subgraph Core["CoreInfrastructureStack"]
+        S3[(S3 Bucket)]
+        DDB[(DynamoDB)]
+        UP[Cognito User Pool]
+        IP[Cognito Identity Pool]
+    end
+
+    subgraph Models["ModelStacks (per model)"]
+        TD[ECS Task Definition]
+        SFN[Step Functions<br/>State Machine]
+        ROLES[IAM Task Roles]
+    end
+
+    subgraph API["ApiV2Stack"]
+        APIGW[HTTP API Gateway]
+        LAMBDAS[Rust Lambdas]
+        AUTHZ[JWT Authorizer]
+    end
+
+    subgraph CICD["CiCdStack"]
+        CB[CodeBuild Projects]
+        ARTS[Build Artifacts]
+    end
+
+    subgraph Monitor["MonitoringStack"]
+        CW[CloudWatch Dashboards]
+        ALARMS[Alarms]
+    end
+
+    subgraph Front["FrontendStack"]
+        S3FE[(S3 Static Site)]
+        CF[CloudFront]
+    end
+
+    Foundation --> Network
+    Foundation --> Core
+    Foundation --> CICD
+    Network --> Models
+    Core --> Models
+    Core --> API
+    Models --> API
+    Foundation --> Front
+    Core --> Monitor
+    Models --> Monitor
+    API --> Monitor
+
+    style Foundation fill:#e1f5fe
+    style Core fill:#fff3e0
+    style Models fill:#e8f5e9
+    style API fill:#fce4ec

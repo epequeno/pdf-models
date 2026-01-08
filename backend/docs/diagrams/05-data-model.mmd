@@ -1,0 +1,22 @@
+erDiagram
+    JOBS {
+        string job_id PK "UUID"
+        string user_id "Cognito User ID"
+        string model "marker|dolphin|docling|deepseek-ocr"
+        string status "pending|processing|completed|failed"
+        string s3_input_key "identity-id/job-id.pdf"
+        string s3_result_key "identity-id/job-id-result.md"
+        string prompt "Optional user prompt"
+        string created_at "ISO8601 timestamp"
+        string completed_at "ISO8601 timestamp"
+        string error "Error message if failed"
+    }
+
+    S3_OBJECTS {
+        string key PK "identity-id/job-id.pdf"
+        blob content "PDF or Markdown file"
+        datetime expires "7 day lifecycle"
+    }
+
+    JOBS ||--o| S3_OBJECTS : "s3_input_key"
+    JOBS ||--o| S3_OBJECTS : "s3_result_key"

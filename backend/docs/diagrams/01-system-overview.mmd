@@ -1,0 +1,42 @@
+flowchart TB
+    subgraph API["API Layer"]
+        APIGW[API Gateway v2<br/>HTTP API]
+        AUTH[Cognito JWT<br/>Authorizer]
+
+        subgraph Lambdas["Rust Lambda Handlers"]
+            L1[submit-job]
+            L2[get-job]
+            L3[get-upload-url]
+        end
+    end
+
+    subgraph Storage["Storage Layer"]
+        S3[(S3 Bucket<br/>pdf-models-docs)]
+        DDB[(DynamoDB<br/>jobs table)]
+    end
+
+    subgraph Orchestration["Orchestration Layer"]
+        SF[Step Functions<br/>State Machine]
+    end
+
+    subgraph Compute["Compute Layer"]
+        subgraph CPU["CPU Models"]
+            MARKER[Marker<br/>4 vCPU / 16GB]
+            DOCLING[Docling<br/>4 vCPU / 16GB]
+        end
+        subgraph GPU["GPU Models (g4dn.xlarge)"]
+            DOLPHIN[Dolphin<br/>4 vCPU / 15GB + T4]
+            DEEPSEEK[DeepSeek-OCR<br/>4 vCPU / 15GB + T4]
+        end
+    end
+
+    APIGW --> AUTH
+    AUTH --> Lambdas
+    L1 --> DDB
+    L1 --> SF
+    L2 --> DDB
+    L3 --> S3
+
+    SF --> MARKER & DOCLING & DOLPHIN & DEEPSEEK
+    MARKER & DOCLING & DOLPHIN & DEEPSEEK --> S3
+    MARKER & DOCLING & DOLPHIN & DEEPSEEK --> DDB

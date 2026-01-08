@@ -1,0 +1,39 @@
+sequenceDiagram
+    autonumber
+    participant Client
+    participant APIGW as API Gateway
+    participant Lambda as submit-job Lambda
+    participant DDB as DynamoDB
+    participant SF as Step Functions
+    participant ECS as ECS Fargate
+    participant S3
+
+    Note over Client,S3: Job Submission Phase
+    Client->>APIGW: POST /v1/models/{model}/jobs<br/>{s3_input_key, start_processing: true}
+    APIGW->>APIGW: Validate JWT
+    APIGW->>Lambda: Forward request
+    Lambda->>DDB: Create job record<br/>status: "pending"
+    Lambda->>SF: StartExecution<br/>{job_id, s3_input_key, model}
+    Lambda-->>Client: {job_id, status: "pending"}
+
+    Note over Client,S3: Processing Phase
+    SF->>SF: LaunchFargateTask state
+    SF->>ECS: RunTask (sync)
+    activate ECS
+    ECS->>S3: Download PDF
+    ECS->>ECS: Run ML Model
+    ECS->>S3: Upload result.md
+    ECS->>DDB: Update status: "completed"
+    deactivate ECS
+    SF->>SF: Execution complete
+
+    Note over Client,S3: Polling Phase
+    loop Every 10 seconds
+        Client->>APIGW: GET /v1/models/{model}/jobs/{job_id}
+        APIGW->>Lambda: Forward request
+        Lambda->>DDB: Query job
+        Lambda-->>Client: {status, s3_result_key}
+    end
+
+    Note over Client,S3: Download Phase
+    Client->>S3: Download result<br/>(using Identity Pool credentials)
