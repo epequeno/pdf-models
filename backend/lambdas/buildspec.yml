@@ -4,42 +4,33 @@ phases:
   build:
     commands:
       - echo "Building Rust Lambda functions as workspace..."
-      - cd backend/lambdas
-
-      # Build all lambdas in one command - dependencies compile once
-      - cargo lambda build --release --arm64 --workspace
-
+      - cd backend/lambdas && cargo lambda build --release --arm64 --workspace
       - echo "Lambda builds complete"
 
   post_build:
     commands:
       - echo "Creating individual Lambda deployment packages..."
-      - cd backend/lambdas
+      - echo "Current directory is $(pwd)"
+      - ls -la backend/lambdas/target/lambda/
 
       # Workspace builds output to: target/lambda/{package-name}/bootstrap
       # Create submit-job.zip
-      - cd target/lambda/submit-job
-      - zip submit-job.zip bootstrap
-      - SUBMIT_JOB_VERSION=$(aws s3api put-object --bucket ${S3_BUCKET_NAME} --key lambda-artifacts/submit-job.zip --body submit-job.zip --query 'VersionId' --output text)
+      - cd backend/lambdas/target/lambda/submit-job && zip submit-job.zip bootstrap
+      - SUBMIT_JOB_VERSION=$(aws s3api put-object --bucket ${S3_BUCKET_NAME} --key lambda-artifacts/submit-job.zip --body backend/lambdas/target/lambda/submit-job/submit-job.zip --query 'VersionId' --output text)
       - echo "submit-job.zip uploaded with version ${SUBMIT_JOB_VERSION}"
       - aws ssm put-parameter --name /pdf-models/lambda/submit-job-version --value ${SUBMIT_JOB_VERSION} --type String --overwrite
-      - cd ..
 
       # Create get-job.zip
-      - cd get-job
-      - zip get-job.zip bootstrap
-      - GET_JOB_VERSION=$(aws s3api put-object --bucket ${S3_BUCKET_NAME} --key lambda-artifacts/get-job.zip --body get-job.zip --query 'VersionId' --output text)
+      - cd backend/lambdas/target/lambda/get-job && zip get-job.zip bootstrap
+      - GET_JOB_VERSION=$(aws s3api put-object --bucket ${S3_BUCKET_NAME} --key lambda-artifacts/get-job.zip --body backend/lambdas/target/lambda/get-job/get-job.zip --query 'VersionId' --output text)
       - echo "get-job.zip uploaded with version ${GET_JOB_VERSION}"
       - aws ssm put-parameter --name /pdf-models/lambda/get-job-version --value ${GET_JOB_VERSION} --type String --overwrite
-      - cd ..
 
       # Create get-upload-url.zip
-      - cd get-upload-url
-      - zip get-upload-url.zip bootstrap
-      - GET_UPLOAD_URL_VERSION=$(aws s3api put-object --bucket ${S3_BUCKET_NAME} --key lambda-artifacts/get-upload-url.zip --body get-upload-url.zip --query 'VersionId' --output text)
+      - cd backend/lambdas/target/lambda/get-upload-url && zip get-upload-url.zip bootstrap
+      - GET_UPLOAD_URL_VERSION=$(aws s3api put-object --bucket ${S3_BUCKET_NAME} --key lambda-artifacts/get-upload-url.zip --body backend/lambdas/target/lambda/get-upload-url/get-upload-url.zip --query 'VersionId' --output text)
       - echo "get-upload-url.zip uploaded with version ${GET_UPLOAD_URL_VERSION}"
       - aws ssm put-parameter --name /pdf-models/lambda/get-upload-url-version --value ${GET_UPLOAD_URL_VERSION} --type String --overwrite
-      - cd ..
 
       - echo "Lambda artifacts uploaded to S3"
 
