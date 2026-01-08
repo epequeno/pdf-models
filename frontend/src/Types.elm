@@ -117,6 +117,7 @@ type alias ModelMetadata =
     , producer : String
     , githubUrl : Maybe String
     , docsUrl : Maybe String
+    , huggingFaceUrl : Maybe String
     }
 
 
@@ -128,6 +129,7 @@ modelMetadata pdfModel =
             , producer = "VikParuchuri"
             , githubUrl = Just "https://github.com/VikParuchuri/marker"
             , docsUrl = Nothing
+            , huggingFaceUrl = Nothing
             }
 
         Dolphin ->
@@ -135,6 +137,7 @@ modelMetadata pdfModel =
             , producer = "ByteDance"
             , githubUrl = Just "https://github.com/bytedance/Dolphin"
             , docsUrl = Nothing
+            , huggingFaceUrl = Just "https://huggingface.co/ByteDance/Dolphin"
             }
 
         Docling ->
@@ -142,6 +145,7 @@ modelMetadata pdfModel =
             , producer = "IBM"
             , githubUrl = Just "https://github.com/DS4SD/docling"
             , docsUrl = Just "https://docling-project.github.io/docling/"
+            , huggingFaceUrl = Just "https://huggingface.co/ds4sd/docling-models"
             }
 
         DeepSeekOcr ->
@@ -149,6 +153,7 @@ modelMetadata pdfModel =
             , producer = "DeepSeek"
             , githubUrl = Just "https://github.com/deepseek-ai/DeepSeek-VL2"
             , docsUrl = Nothing
+            , huggingFaceUrl = Just "https://huggingface.co/deepseek-ai/deepseek-vl2"
             }
 
 
