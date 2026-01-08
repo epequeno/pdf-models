@@ -28,14 +28,22 @@ class APIClient:
             "Content-Type": "application/json",
         })
 
-    def submit_job(self, model: str, s3_input_key: str, start_processing: bool = True) -> Dict:
+    def submit_job(
+        self,
+        model: str,
+        s3_input_key: str,
+        start_processing: bool = True,
+        prompt: Optional[str] = None,
+    ) -> Dict:
         """
         Submit a new processing job with existing S3 key.
 
         Args:
-            model: Model name (e.g., "marker")
+            model: Model name (e.g., "marker", "dolphin", "deepseek-ocr")
             s3_input_key: S3 key of the input file
             start_processing: Whether to start processing immediately (default: True)
+            prompt: Optional custom prompt for VLM models (dolphin, deepseek-ocr).
+                   If not provided, the model uses its default prompt.
 
         Returns:
             Job details including job_id
@@ -48,6 +56,10 @@ class APIClient:
             "s3_input_key": s3_input_key,
             "start_processing": start_processing
         }
+
+        # Add prompt if provided (for VLM models)
+        if prompt is not None:
+            payload["prompt"] = prompt
 
         response = self.session.post(url, json=payload)
         response.raise_for_status()

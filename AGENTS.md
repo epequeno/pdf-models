@@ -146,7 +146,7 @@ The system uses an **Identity Pool workflow** where:
 - Prefer JSONata over JSONPath for better readability
 
 ### Lambda Functions in Rust
-- If Lambda is needed, use Rust (not Python)
+- Lambda functions are written in rust, NOT python
 - Avoid Python Lambda to prevent dependency conflicts with CDK
 - Keep Lambda handlers thin - just orchestration
 
@@ -154,7 +154,8 @@ The system uses an **Identity Pool workflow** where:
 
 ### ❌ Forgetting AWS_PROFILE
 **Symptom**: "Unable to locate credentials" or operations on wrong account
-**Solution**: Always use `AWS_PROFILE=arch` or the Makefile
+**Solution 1**: Always use `AWS_PROFILE=arch` or the Makefile
+**Solution 2**: Ask the user to refresh the AWS credentials
 
 ### ❌ Running bare CDK commands
 **Symptom**: "cdk: command not found" or wrong Python environment
@@ -256,7 +257,6 @@ Always deploy in this order to satisfy dependencies (or use `make cdk-deploy-all
 ## For New Agents Starting a Session
 
 1. Read this file first
-2. Check current implementation status in README.md
-3. Review architecture.md for system design
-4. Use Makefile for all AWS/CDK operations
-5. Remember: AWS_PROFILE=arch and uv are non-negotiable
+2. Review architecture.md for system design
+3. Use Makefile for all AWS/CDK operations
+4. Remember: AWS_PROFILE=arch and uv are non-negotiable

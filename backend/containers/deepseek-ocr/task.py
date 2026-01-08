@@ -134,7 +134,7 @@ def load_deepseek_ocr_model():
     return model, tokenizer
 
 
-def process_page_with_deepseek(model, tokenizer, image: Image.Image, page_num: int, temp_dir: Path) -> str:
+def process_page_with_deepseek(model, tokenizer, image: Image.Image, page_num: int, temp_dir: Path, custom_prompt: str = None) -> str:
     """Process a single page image with DeepSeek-OCR model.
 
     Args:
@@ -143,6 +143,7 @@ def process_page_with_deepseek(model, tokenizer, image: Image.Image, page_num: i
         image: PIL Image of the page
         page_num: Page number (1-indexed)
         temp_dir: Temporary directory for intermediate files
+        custom_prompt: Optional custom prompt from user. If None/empty, uses default.
 
     Returns:
         str: Markdown content for the page
@@ -157,8 +158,17 @@ def process_page_with_deepseek(model, tokenizer, image: Image.Image, page_num: i
     output_dir = temp_dir / f"output_{page_num}"
     output_dir.mkdir(exist_ok=True)
 
-    # DeepSeek-OCR prompt for markdown conversion
-    prompt = "<image>\nConvert the document to markdown."
+    # Use custom prompt if provided, otherwise use default
+    # DeepSeek-OCR requires <image> tag in prompt
+    if custom_prompt:
+        # If user's prompt doesn't include <image>, prepend it
+        if "<image>" not in custom_prompt:
+            prompt = f"<image>\n{custom_prompt}"
+        else:
+            prompt = custom_prompt
+        logger.info(f"Using custom prompt: {prompt}")
+    else:
+        prompt = "<image>\nConvert the document to markdown."
 
     # Run inference using the model's infer method
     # Using "Gundam" config (base_size=1024, image_size=640, crop_mode=True)
@@ -200,8 +210,13 @@ def main():
     input_key = get_required_env("S3_INPUT_KEY")
     table_name = get_required_env("DYNAMODB_TABLE")
 
+    # Get optional custom prompt (empty string means use default)
+    custom_prompt = os.environ.get("PROMPT", "").strip() or None
+
     logger.info(f"Starting DeepSeek-OCR job {job_id}")
     logger.info(f"Input: s3://{bucket_name}/{input_key}")
+    if custom_prompt:
+        logger.info(f"Custom prompt provided: {custom_prompt}")
 
     # Initialize AWS clients
     s3 = boto3.client("s3")
@@ -232,7 +247,7 @@ def main():
             # Process each page
             markdown_parts = []
             for i, image in enumerate(images, start=1):
-                page_content = process_page_with_deepseek(model, tokenizer, image, i, temp_path)
+                page_content = process_page_with_deepseek(model, tokenizer, image, i, temp_path, custom_prompt)
 
                 # Add page separator for multi-page documents
                 if i > 1:

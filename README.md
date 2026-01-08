@@ -3,8 +3,6 @@
 ## Overview
 A serverless platform for hosting open-source document processing models as API services. Users submit documents, get structured results back. No infrastructure management required.
 
-**Initial Focus**: PDF to Markdown conversion using [Marker](https://github.com/VikParuchuri/marker)
-
 ## Documentation
 - **[Architecture Documentation](backend/docs/architecture.md)** - Detailed technical design, patterns, and implementation guide
 - **[AI Agent Guide (AGENTS.md)](AGENTS.md)** - Critical requirements for AI agents (AWS_PROFILE, uv usage, common pitfalls)
@@ -32,18 +30,6 @@ A serverless platform for hosting open-source document processing models as API 
 - Stacks communicate via SSM Parameter Store (not CloudFormation exports)
 - Enables independent updates without coupling
 
-## Project Structure
-
-```
-backend/
-├── docs/          # Architecture and design documentation
-├── cdk/           # AWS CDK infrastructure (Python)
-├── containers/    # Model containers (built in AWS)
-└── lambdas/       # API handlers (Rust)
-
-frontend/          # Elm UI (low priority for MVP)
-```
-
 ## Getting Started
 
 **Prerequisites**: AWS CLI, CDK CLI, uv (Python), Rust toolchain
@@ -63,54 +49,12 @@ make aws-logs LOGGROUP=/aws/lambda/... # Tail logs
 4. API (Gateway + Lambda handlers)
 5. CI/CD (CodeBuild automation)
 
-**Important**: All AWS/CDK commands require `AWS_PROFILE=arch` prefix. The Makefile handles this automatically.
-
-See [Architecture Documentation](backend/docs/architecture.md) for detailed setup and implementation phases.
-
-## Current Status
-
-**Integration Tests Fixed - Container Performance Optimized** ✅
-
-- [x] Phase 1: Core Infrastructure - **DEPLOYED & WORKING**
-  - FoundationStack (ECR repositories)
-  - CoreInfrastructureStack (S3, DynamoDB, Cognito User Pool + Identity Pool)
-  - ✅ Identity Pool workflow implemented for direct S3 access
-- [x] Phase 1.5: CI/CD Infrastructure - **DEPLOYED & WORKING**
-  - CiCdStack (CodeCommit, CodeBuild)
-  - Custom Rust Lambda builder base image
-  - ✅ Fixed buildspec to handle S3 versioning correctly
-- [x] Phase 2: Marker Model - **DEPLOYED & OPTIMIZED** ✅
-  - MarkerStack (ECS, Fargate, Step Functions)
-  - ✅ Fixed networking: ECS tasks now use public subnets for ECR access
-  - ✅ Optimized container: Pre-downloads 1.34GB Marker model at build time
-- [x] Phase 3: API Layer - **HTTP API v2 FULLY WORKING** ✅
-  - ApiV2Stack (HTTP API Gateway, Cognito JWT authorizer)
-  - Rust Lambda functions with Identity Pool workflow
-  - API Endpoint: `https://eykwwhrt16.execute-api.us-east-1.amazonaws.com/`
-  - ✅ S3 access permissions resolved
-
-**Recent Fixes Applied**:
-- **Networking Issue**: Fixed ECS tasks unable to reach ECR by switching from private to public subnets
-- **Performance Issue**: Eliminated 1+ minute model download delay by pre-downloading models in container build
-- **Container Optimization**: Marker models (1.34GB) now baked into container image for instant startup
-
-**Performance Improvements**:
-- **Before**: 10+ minute job execution (1+ minute model download + processing)
-- **After**: ~30 seconds job execution (instant model loading + processing)
-
 ## Integration Testing
 
 **Run integration tests:**
 ```bash
 make test-integration-auto  # Sets up test user and runs all tests
 ```
-
-**Test coverage:**
-- ✅ Job submission with Identity Pool S3 upload
-- ✅ Job status retrieval and polling
-- ✅ Job listing for authenticated users
-- ✅ Authorization (404 for non-existent jobs)
-- ✅ End-to-end PDF processing (completes in ~30 seconds)
 
 **Test user credentials:**
 - Email: `integration-test@pdf-models.local`
@@ -149,8 +93,4 @@ curl -X POST \
 curl -H "Authorization: Bearer $ACCESS_TOKEN" \
   https://eykwwhrt16.execute-api.us-east-1.amazonaws.com/v1/models/marker/jobs/your-job-id
 ```
-
-# Potential additional models
-- https://huggingface.co/deepseek-ai/DeepSeek-OCR
-- https://huggingface.co/docling-project/docling-models
 

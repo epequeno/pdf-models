@@ -65,6 +65,9 @@ struct SubmitJobBody {
     /// If not provided, return upload_url for client to upload first
     #[serde(default)]
     start_processing: bool,
+    /// Optional custom prompt for VLM models (dolphin, deepseek-ocr)
+    /// If not provided, the model uses its default prompt
+    prompt: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -135,6 +138,7 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
         _ => SubmitJobBody {
             s3_input_key: None,
             start_processing: false,
+            prompt: None,
         },
     };
 
@@ -227,7 +231,8 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
         "created".to_string()
     };
 
-    dynamodb_client
+    // Build the DynamoDB put_item request
+    let mut put_item_request = dynamodb_client
         .put_item()
         .table_name(&table_name)
         .item("job_id", aws_sdk_dynamodb::types::AttributeValue::S(job_id.clone()))
@@ -235,18 +240,32 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
         .item("model", aws_sdk_dynamodb::types::AttributeValue::S(model.clone()))
         .item("status", aws_sdk_dynamodb::types::AttributeValue::S(initial_status.clone()))
         .item("s3_input_key", aws_sdk_dynamodb::types::AttributeValue::S(s3_input_key.clone()))
-        .item("created_at", aws_sdk_dynamodb::types::AttributeValue::S(created_at.clone()))
-        .send()
-        .await?;
+        .item("created_at", aws_sdk_dynamodb::types::AttributeValue::S(created_at.clone()));
+
+    // Add prompt field if provided (for VLM models like dolphin, deepseek-ocr)
+    if let Some(ref prompt) = body.prompt {
+        put_item_request = put_item_request.item(
+            "prompt",
+            aws_sdk_dynamodb::types::AttributeValue::S(prompt.clone()),
+        );
+    }
+
+    put_item_request.send().await?;
 
     info!("Created job record in DynamoDB: {}", job_id);
 
     // Start Step Functions execution if requested
     if body.start_processing {
-        let execution_input = json!({
+        // Build execution input, including prompt if provided
+        let mut execution_input = json!({
             "job_id": job_id,
             "s3_input_key": s3_input_key,
         });
+
+        // Add prompt to execution input if provided (for VLM models)
+        if let Some(ref prompt) = body.prompt {
+            execution_input["prompt"] = json!(prompt);
+        }
 
         sfn_client
             .start_execution()

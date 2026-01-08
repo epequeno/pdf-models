@@ -144,7 +144,7 @@ def load_dolphin_model():
     return model, processor, tokenizer, device
 
 
-def process_page_with_dolphin(model, processor, tokenizer, image: Image.Image, page_num: int, device: str) -> dict:
+def process_page_with_dolphin(model, processor, tokenizer, image: Image.Image, page_num: int, device: str, custom_prompt: str = None) -> dict:
     """Process a single page image with Dolphin model.
 
     Args:
@@ -154,6 +154,7 @@ def process_page_with_dolphin(model, processor, tokenizer, image: Image.Image, p
         image: PIL Image of the page
         page_num: Page number (1-indexed)
         device: Device to run inference on ('cuda' or 'cpu')
+        custom_prompt: Optional custom prompt from user. If None/empty, uses default.
 
     Returns:
         dict with page number, content, and dimensions
@@ -162,9 +163,13 @@ def process_page_with_dolphin(model, processor, tokenizer, image: Image.Image, p
 
     logger.info(f"Processing page {page_num}...")
 
+    # Use custom prompt if provided, otherwise use default
     # Dolphin requires specific prompt format with special tokens
-    prompt = "Read text in the image."
+    prompt = custom_prompt if custom_prompt else "Read text in the image."
     full_prompt = f"<s>{prompt} <Answer/>"
+
+    if custom_prompt:
+        logger.info(f"Using custom prompt: {prompt}")
 
     # Process the image separately
     inputs = processor(image, return_tensors="pt")
@@ -240,8 +245,13 @@ def main():
     input_key = get_required_env("S3_INPUT_KEY")
     table_name = get_required_env("DYNAMODB_TABLE")
 
+    # Get optional custom prompt (empty string means use default)
+    custom_prompt = os.environ.get("PROMPT", "").strip() or None
+
     logger.info(f"Starting Dolphin job {job_id}")
     logger.info(f"Input: s3://{bucket_name}/{input_key}")
+    if custom_prompt:
+        logger.info(f"Custom prompt provided: {custom_prompt}")
 
     # Initialize AWS clients
     s3 = boto3.client("s3")
@@ -272,7 +282,7 @@ def main():
             # Process each page
             pages_data = []
             for i, image in enumerate(images, start=1):
-                page_result = process_page_with_dolphin(model, processor, tokenizer, image, i, device)
+                page_result = process_page_with_dolphin(model, processor, tokenizer, image, i, device, custom_prompt)
                 pages_data.append(page_result)
                 logger.info(f"Page {i}/{len(images)} processed")
 

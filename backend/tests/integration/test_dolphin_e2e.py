@@ -159,6 +159,103 @@ class TestDolphinEndToEnd:
 
         print(f"\n✅ Dolphin end-to-end test passed!")
 
+    def test_submit_with_custom_prompt(
+        self,
+        config,
+        auth_tokens,
+        aws_credentials,
+        s3_client,
+        test_pdf_path,
+        unique_job_id,
+        cleanup_s3_keys,
+        cleanup_dynamodb_jobs,
+    ):
+        """
+        Test PDF processing with a custom prompt.
+
+        Dolphin is a VLM model that supports custom prompts to guide
+        how it processes the document.
+
+        Steps:
+        1. Upload PDF to S3
+        2. Submit job with custom prompt
+        3. Wait for job to complete
+        4. Validate results contain expected content
+        """
+        # Setup
+        model = "dolphin"
+        identity_id = aws_credentials["identity_id"]
+        s3_input_key = f"{identity_id}/{unique_job_id}.pdf"
+        s3_json_result_key = f"{identity_id}/{unique_job_id}-result.json"
+        s3_md_result_key = f"{identity_id}/{unique_job_id}-result.md"
+
+        # Custom prompt for extracting specific content
+        custom_prompt = "Extract all text from this document. Focus on identifying any headings, paragraphs, and lists."
+
+        # Register for cleanup
+        cleanup_s3_keys.append(s3_input_key)
+        cleanup_s3_keys.append(s3_json_result_key)
+        cleanup_s3_keys.append(s3_md_result_key)
+        cleanup_dynamodb_jobs.append(unique_job_id)
+
+        # Step 1: Upload PDF to S3
+        print(f"\n[1/4] Uploading PDF to s3://{config['s3_bucket']}/{s3_input_key}")
+        with open(test_pdf_path, "rb") as f:
+            s3_client.put_object(
+                Bucket=config["s3_bucket"],
+                Key=s3_input_key,
+                Body=f,
+                ContentType="application/pdf",
+            )
+        print(f"    ✓ PDF uploaded")
+
+        # Step 2: Submit job with custom prompt
+        print(f"\n[2/4] Submitting job with custom prompt")
+        print(f"    Prompt: {custom_prompt}")
+        api_client = APIClient(config["api_base_url"], auth_tokens["access_token"])
+
+        job_response = api_client.submit_job(
+            model,
+            s3_input_key,
+            start_processing=True,
+            prompt=custom_prompt,
+        )
+
+        assert "job_id" in job_response, "Response missing job_id"
+        assert job_response["status"] == "processing", f"Expected status 'processing', got '{job_response['status']}'"
+
+        job_id = job_response["job_id"]
+        print(f"    ✓ Job created: {job_id}")
+
+        # Step 3: Wait for job completion
+        print(f"\n[3/4] Waiting for job to complete (timeout: 30 minutes)")
+        completed_job = wait_for_job_completion(
+            api_client,
+            model,
+            job_id,
+            timeout_seconds=1800,
+            poll_interval=10,
+        )
+
+        assert completed_job["status"] == "completed", "Job did not complete successfully"
+        print(f"    ✓ Job completed successfully")
+
+        # Step 4: Download and validate results
+        print(f"\n[4/4] Downloading and validating results")
+
+        md_result_obj = s3_client.get_object(
+            Bucket=config["s3_bucket"],
+            Key=completed_job["s3_result_key"]
+        )
+        md_content = md_result_obj["Body"].read().decode("utf-8")
+
+        assert len(md_content) > 0, "Markdown result file is empty"
+        print(f"    ✓ Markdown result size: {len(md_content)} bytes")
+        print(f"    ✓ Result preview (first 200 chars):")
+        print(f"      {md_content[:200]}")
+
+        print(f"\n✅ Dolphin custom prompt test passed!")
+
     def test_list_jobs(
         self,
         config,

@@ -342,9 +342,11 @@ def handler(event, context):
     task_def_arn = response['Parameter']['Value']
 
     # Return the original event with the resolved task definition ARN
+    # Ensure prompt has a default empty string if not provided (for VLM models)
     return {{
         **event,
-        'task_definition_arn': task_def_arn
+        'task_definition_arn': task_def_arn,
+        'prompt': event.get('prompt', '')
     }}
             """),
             timeout=Duration.seconds(30),
@@ -490,6 +492,7 @@ def handler(event, context):
                                 {"Name": "S3_BUCKET", "Value": s3_bucket_name},
                                 {"Name": "DYNAMODB_TABLE", "Value": dynamodb_table_name},
                                 {"Name": "AWS_DEFAULT_REGION", "Value": self.region},
+                                {"Name": "PROMPT", "Value.$": "$.prompt"},
                             ],
                         }
                     ]
@@ -518,6 +521,7 @@ def handler(event, context):
                                 {"Name": "S3_INPUT_KEY", "Value.$": "$.s3_input_key"},
                                 {"Name": "S3_BUCKET", "Value": s3_bucket_name},
                                 {"Name": "DYNAMODB_TABLE", "Value": dynamodb_table_name},
+                                {"Name": "PROMPT", "Value.$": "$.prompt"},
                             ],
                         }
                     ]

@@ -23,6 +23,9 @@ class ModelConfig:
     output_formats: tuple[str, ...]  # ("markdown",) or ("json", "markdown")
     timeout_minutes: int = 120  # Task timeout
 
+    # Custom prompt support (for VLM models like Dolphin, DeepSeek-OCR)
+    supports_prompt: bool = False  # If True, model accepts custom user prompts
+
     # GPU/EC2 configuration (defaults to Fargate CPU)
     use_gpu: bool = False  # If True, use EC2 with GPU instead of Fargate
     gpu_count: int = 0  # Number of GPUs per task (typically 1 for GPU models)
@@ -50,6 +53,7 @@ MODELS: dict[str, ModelConfig] = {
         container_path="dolphin",
         output_formats=("json", "markdown"),
         timeout_minutes=30,  # Reduced from 120 - GPU is much faster
+        supports_prompt=True,  # VLM model accepts custom prompts
         use_gpu=True,
         gpu_count=1,
         instance_type="g4dn.xlarge",  # 1 T4 GPU, 4 vCPU, 16GB RAM
@@ -73,6 +77,7 @@ MODELS: dict[str, ModelConfig] = {
         container_path="deepseek-ocr",
         output_formats=("markdown",),
         timeout_minutes=30,
+        supports_prompt=True,  # VLM model accepts custom prompts
         use_gpu=True,
         gpu_count=1,
         instance_type="g4dn.xlarge",  # 1 T4 GPU, 4 vCPU, 16GB RAM
