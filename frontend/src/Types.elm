@@ -118,6 +118,7 @@ type alias ModelMetadata =
     , githubUrl : Maybe String
     , docsUrl : Maybe String
     , huggingFaceUrl : Maybe String
+    , arxivUrl : Maybe String
     }
 
 
@@ -130,6 +131,7 @@ modelMetadata pdfModel =
             , githubUrl = Just "https://github.com/VikParuchuri/marker"
             , docsUrl = Nothing
             , huggingFaceUrl = Nothing
+            , arxivUrl = Nothing
             }
 
         Dolphin ->
@@ -138,6 +140,7 @@ modelMetadata pdfModel =
             , githubUrl = Just "https://github.com/bytedance/Dolphin"
             , docsUrl = Nothing
             , huggingFaceUrl = Just "https://huggingface.co/ByteDance/Dolphin"
+            , arxivUrl = Just "https://arxiv.org/abs/2505.14059"
             }
 
         Docling ->
@@ -146,6 +149,7 @@ modelMetadata pdfModel =
             , githubUrl = Just "https://github.com/DS4SD/docling"
             , docsUrl = Just "https://docling-project.github.io/docling/"
             , huggingFaceUrl = Just "https://huggingface.co/ds4sd/docling-models"
+            , arxivUrl = Just "https://arxiv.org/abs/2408.09869"
             }
 
         DeepSeekOcr ->
@@ -154,6 +158,7 @@ modelMetadata pdfModel =
             , githubUrl = Just "https://github.com/deepseek-ai/DeepSeek-VL2"
             , docsUrl = Nothing
             , huggingFaceUrl = Just "https://huggingface.co/deepseek-ai/deepseek-vl2"
+            , arxivUrl = Just "https://arxiv.org/abs/2412.10302"
             }
 
 

@@ -268,6 +268,21 @@ viewModelInfo pdfModel isExpanded =
                                         ]
                                         [ text "Docs" ]
                                 )
+                        , metadata.arxivUrl
+                            |> Maybe.map
+                                (\url ->
+                                    a
+                                        [ href url
+                                        , Attr.target "_blank"
+                                        , css
+                                            [ color Styles.colors.accentPrimary
+                                            , Css.fontSize Styles.fontSize.small
+                                            , textDecoration none
+                                            , hover [ textDecoration underline ]
+                                            ]
+                                        ]
+                                        [ text "arXiv" ]
+                                )
                         ]
                     )
                 ]
