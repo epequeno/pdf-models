@@ -51,11 +51,11 @@ USER appuser
 # Pre-download Dolphin model with FP16 for GPU inference
 # This downloads ~8GB of model weights but makes runtime much faster
 RUN python3 -c "\
-from transformers import AutoModelForVision2Seq, AutoProcessor; \
+from transformers import VisionEncoderDecoderModel, AutoProcessor; \
 import torch; \
 print('Downloading ByteDance/Dolphin model for GPU...'); \
 processor = AutoProcessor.from_pretrained('ByteDance/Dolphin', trust_remote_code=True); \
-model = AutoModelForVision2Seq.from_pretrained('ByteDance/Dolphin', trust_remote_code=True, torch_dtype=torch.float16); \
+model = VisionEncoderDecoderModel.from_pretrained('ByteDance/Dolphin', trust_remote_code=True, torch_dtype=torch.float16); \
 print('Model pre-downloaded successfully')"
 
 # Force offline mode AFTER model is downloaded - prevents any runtime network requests

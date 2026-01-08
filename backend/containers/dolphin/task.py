@@ -96,9 +96,9 @@ def load_dolphin_model():
     """Load the Dolphin model and processor with GPU support if available.
 
     Returns:
-        tuple: (model, processor, device) where device is 'cuda' or 'cpu'
+        tuple: (model, processor, tokenizer, device)
     """
-    from transformers import AutoModelForVision2Seq, AutoProcessor
+    from transformers import VisionEncoderDecoderModel, AutoProcessor
     import torch
 
     # Detect device - use GPU if available
@@ -121,11 +121,15 @@ def load_dolphin_model():
         local_files_only=True
     )
 
+    # Get tokenizer from processor
+    tokenizer = processor.tokenizer
+
     # Use FP16 on GPU for faster inference, FP32 on CPU
     dtype = torch.float16 if device == "cuda" else torch.float32
     logger.info(f"Using dtype: {dtype}")
 
-    model = AutoModelForVision2Seq.from_pretrained(
+    # Use VisionEncoderDecoderModel - the correct class for Dolphin
+    model = VisionEncoderDecoderModel.from_pretrained(
         'ByteDance/Dolphin',
         trust_remote_code=True,
         torch_dtype=dtype,
@@ -134,17 +138,19 @@ def load_dolphin_model():
 
     # Move model to GPU if available
     model = model.to(device)
+    model.eval()
 
     logger.info("Dolphin model loaded successfully")
-    return model, processor, device
+    return model, processor, tokenizer, device
 
 
-def process_page_with_dolphin(model, processor, image: Image.Image, page_num: int, device: str) -> dict:
+def process_page_with_dolphin(model, processor, tokenizer, image: Image.Image, page_num: int, device: str) -> dict:
     """Process a single page image with Dolphin model.
 
     Args:
-        model: The Dolphin model
+        model: The Dolphin model (VisionEncoderDecoderModel)
         processor: The Dolphin processor
+        tokenizer: The tokenizer from processor
         image: PIL Image of the page
         page_num: Page number (1-indexed)
         device: Device to run inference on ('cuda' or 'cpu')
@@ -156,41 +162,48 @@ def process_page_with_dolphin(model, processor, image: Image.Image, page_num: in
 
     logger.info(f"Processing page {page_num}...")
 
-    # Dolphin uses a specific prompt format for document understanding
-    prompt = "Parse this document page and extract all text content with structure."
+    # Dolphin requires specific prompt format with special tokens
+    prompt = "Read text in the image."
+    full_prompt = f"<s>{prompt} <Answer/>"
 
-    # Process the image
-    inputs = processor(
-        text=prompt,
-        images=image,
-        return_tensors="pt"
-    )
+    # Process the image separately
+    inputs = processor(image, return_tensors="pt")
 
-    # Move inputs to device and match model dtype (float16 on GPU, float32 on CPU)
+    # Get pixel values and move to device with correct dtype
     dtype = torch.float16 if device == "cuda" else torch.float32
-    inputs = {
-        k: v.to(device, dtype=dtype) if v.dtype.is_floating_point else v.to(device)
-        for k, v in inputs.items()
-    }
+    pixel_values = inputs.pixel_values.to(device, dtype=dtype)
 
-    # Generate output
-    # Note: Dolphin uses mbart decoder with max 1024 positions
+    # Tokenize the prompt separately
+    prompt_ids = tokenizer(
+        full_prompt,
+        add_special_tokens=False,
+        return_tensors="pt"
+    ).input_ids.to(device)
+
+    decoder_attention_mask = torch.ones_like(prompt_ids).to(device)
+
+    # Generate output with correct parameters for Dolphin
     with torch.no_grad():
-        generated_ids = model.generate(
-            **inputs,
-            max_new_tokens=1024,
-            do_sample=False
+        outputs = model.generate(
+            pixel_values=pixel_values,
+            decoder_input_ids=prompt_ids,
+            decoder_attention_mask=decoder_attention_mask,
+            min_length=1,
+            max_length=4096,
+            pad_token_id=tokenizer.pad_token_id,
+            eos_token_id=tokenizer.eos_token_id,
+            use_cache=True,
+            bad_words_ids=[[tokenizer.unk_token_id]],
+            return_dict_in_generate=True,
+            do_sample=False,
+            num_beams=1,
         )
 
-    # Decode the output
-    generated_text = processor.batch_decode(
-        generated_ids,
-        skip_special_tokens=True
-    )[0]
+    # Decode the output, keeping special tokens to remove them properly
+    sequence = tokenizer.batch_decode(outputs.sequences, skip_special_tokens=False)[0]
 
-    # Remove the prompt from the output if present
-    if prompt in generated_text:
-        generated_text = generated_text.replace(prompt, "").strip()
+    # Remove prompt and special tokens from output
+    generated_text = sequence.replace(full_prompt, "").replace("<pad>", "").replace("</s>", "").strip()
 
     return {
         "page": page_num,
@@ -254,12 +267,12 @@ def main():
             logger.info(f"Converted {len(images)} pages to images")
 
             # Load Dolphin model (with GPU support if available)
-            model, processor, device = load_dolphin_model()
+            model, processor, tokenizer, device = load_dolphin_model()
 
             # Process each page
             pages_data = []
             for i, image in enumerate(images, start=1):
-                page_result = process_page_with_dolphin(model, processor, image, i, device)
+                page_result = process_page_with_dolphin(model, processor, tokenizer, image, i, device)
                 pages_data.append(page_result)
                 logger.info(f"Page {i}/{len(images)} processed")
 
