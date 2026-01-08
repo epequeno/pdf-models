@@ -4,7 +4,7 @@ import Components.Button as Button
 import Css exposing (..)
 import File
 import Html.Styled exposing (..)
-import Html.Styled.Attributes exposing (css, for, href, id, selected, type_, value)
+import Html.Styled.Attributes exposing (css, for, href, id, placeholder, selected, type_, value)
 import Html.Styled.Events exposing (on, onInput)
 import Json.Decode as Decode
 import Styles
@@ -43,6 +43,7 @@ view pdfModel model =
                     ]
                 ]
                 [ viewModelSelector pdfModel
+                , viewPromptInput pdfModel model.upload
                 , viewFileInput model.upload
                 , case model.upload.selectedFile of
                     Just file ->
@@ -150,6 +151,58 @@ viewModelOption currentPdfModel pdfModel =
         , selected (pdfModel == currentPdfModel)
         ]
         [ text (pdfModelToDisplayName pdfModel) ]
+
+
+viewPromptInput : PdfModel -> UploadState -> Html Msg
+viewPromptInput pdfModel uploadState =
+    if modelSupportsPrompt pdfModel then
+        div
+            [ css
+                [ marginBottom Styles.spacing.lg
+                ]
+            ]
+            [ label
+                [ css
+                    [ display block
+                    , Css.fontSize Styles.fontSize.body
+                    , color Styles.colors.textSecondary
+                    , marginBottom Styles.spacing.sm
+                    ]
+                ]
+                [ text "Custom Prompt (Optional)" ]
+            , textarea
+                [ onInput PromptChanged
+                , value uploadState.prompt
+                , placeholder "Enter custom instructions for the model..."
+                , css
+                    [ Css.width (pct 100)
+                    , padding2 Styles.spacing.sm Styles.spacing.md
+                    , backgroundColor Styles.colors.surface
+                    , border3 (px 1) solid Styles.colors.border
+                    , color Styles.colors.textPrimary
+                    , fontFamilies Styles.fontStack
+                    , Css.fontSize Styles.fontSize.body
+                    , Css.minHeight (px 80)
+                    , resize vertical
+                    , focus
+                        [ borderColor Styles.colors.focus
+                        , outline none
+                        ]
+                    ]
+                ]
+                []
+            , p
+                [ css
+                    [ Css.fontSize Styles.fontSize.small
+                    , color Styles.colors.textSecondary
+                    , marginTop (px 4)
+                    ]
+                ]
+                [ text "Provide custom instructions to guide how the model processes this document." ]
+            ]
+
+    else
+        text ""
 
 
 viewFileInput : UploadState -> Html Msg

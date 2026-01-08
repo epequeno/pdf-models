@@ -580,6 +580,16 @@ update msg model =
             in
             ( { model | upload = newUpload }, Cmd.none )
 
+        PromptChanged newPrompt ->
+            let
+                oldUpload =
+                    model.upload
+
+                newUpload =
+                    { oldUpload | prompt = newPrompt }
+            in
+            ( { model | upload = newUpload }, Cmd.none )
+
         UploadResponseReceived jsonString ->
             case Decode.decodeString S3.uploadResponseDecoder jsonString of
                 Ok response ->
@@ -599,9 +609,19 @@ update msg model =
                                                     , uploadProgress = Nothing
                                                     , submitting = True
                                                 }
+
+                                            pdfModel =
+                                                getModelFromRoute model.route
+
+                                            maybePrompt =
+                                                if modelSupportsPrompt pdfModel && not (String.isEmpty (String.trim model.upload.prompt)) then
+                                                    Just model.upload.prompt
+
+                                                else
+                                                    Nothing
                                         in
                                         ( { model | upload = newUpload }
-                                        , Api.submitJob tokens.accessToken (getModelFromRoute model.route) s3Key JobSubmitted
+                                        , Api.submitJob tokens.accessToken pdfModel s3Key maybePrompt JobSubmitted
                                         )
 
                                     _ ->
@@ -666,9 +686,19 @@ update msg model =
 
                         newUpload =
                             { oldUpload | submitting = True }
+
+                        pdfModel =
+                            getModelFromRoute model.route
+
+                        maybePrompt =
+                            if modelSupportsPrompt pdfModel && not (String.isEmpty (String.trim model.upload.prompt)) then
+                                Just model.upload.prompt
+
+                            else
+                                Nothing
                     in
                     ( { model | upload = newUpload }
-                    , Api.submitJob tokens.accessToken (getModelFromRoute model.route) s3Key JobSubmitted
+                    , Api.submitJob tokens.accessToken pdfModel s3Key maybePrompt JobSubmitted
                     )
 
                 _ ->
@@ -688,6 +718,7 @@ update msg model =
                                 , s3Key = Nothing
                                 , uploadProgress = Nothing
                                 , error = Nothing
+                                , prompt = ""
                             }
                     in
                     ( { model | upload = newUpload }
@@ -921,7 +952,15 @@ update msg model =
                                                 Api.getJob accessToken retryPdfModel jobId JobWithDownloadFetched
 
                                             Just (RetrySubmitJob retryPdfModel s3Key) ->
-                                                Api.submitJob accessToken retryPdfModel s3Key JobSubmitted
+                                                let
+                                                    maybePrompt =
+                                                        if modelSupportsPrompt retryPdfModel && not (String.isEmpty (String.trim model.upload.prompt)) then
+                                                            Just model.upload.prompt
+
+                                                        else
+                                                            Nothing
+                                                in
+                                                Api.submitJob accessToken retryPdfModel s3Key maybePrompt JobSubmitted
 
                                             Nothing ->
                                                 Cmd.none

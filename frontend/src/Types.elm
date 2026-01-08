@@ -80,6 +80,22 @@ pdfModelToDisplayName pdfModel =
             "DeepSeek OCR"
 
 
+modelSupportsPrompt : PdfModel -> Bool
+modelSupportsPrompt pdfModel =
+    case pdfModel of
+        Dolphin ->
+            True
+
+        DeepSeekOcr ->
+            True
+
+        Marker ->
+            False
+
+        Docling ->
+            False
+
+
 
 -- ROUTING
 
@@ -172,6 +188,7 @@ type alias UploadState =
     , s3Key : Maybe String
     , submitting : Bool
     , error : Maybe String
+    , prompt : String
     }
 
 
@@ -265,6 +282,7 @@ type Msg
     | UploadProgress Float
     | UploadResponseReceived String
     | UploadCompleted (Result Http.Error String)
+    | PromptChanged String
     | SubmitJobClicked
     | JobSubmitted (Result Http.Error Job)
       -- Jobs
@@ -310,6 +328,7 @@ initModel key route =
         , s3Key = Nothing
         , submitting = False
         , error = Nothing
+        , prompt = ""
         }
     , jobs =
         { jobs = []

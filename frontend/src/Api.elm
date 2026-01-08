@@ -25,19 +25,34 @@ apiBaseUrl =
 -- SUBMIT JOB
 
 
-submitJob : String -> PdfModel -> String -> (Result Http.Error Job -> msg) -> Cmd msg
-submitJob accessToken pdfModel s3Key toMsg =
+submitJob : String -> PdfModel -> String -> Maybe String -> (Result Http.Error Job -> msg) -> Cmd msg
+submitJob accessToken pdfModel s3Key maybePrompt toMsg =
+    let
+        baseFields =
+            [ ( "s3_input_key", Encode.string s3Key )
+            , ( "start_processing", Encode.bool True )
+            ]
+
+        promptField =
+            case maybePrompt of
+                Just prompt ->
+                    if String.isEmpty (String.trim prompt) then
+                        []
+
+                    else
+                        [ ( "prompt", Encode.string (String.trim prompt) ) ]
+
+                Nothing ->
+                    []
+
+        bodyFields =
+            baseFields ++ promptField
+    in
     Http.request
         { method = "POST"
         , headers = [ Http.header "Authorization" ("Bearer " ++ accessToken) ]
         , url = apiBaseUrl ++ "/v1/models/" ++ pdfModelToString pdfModel ++ "/jobs"
-        , body =
-            Http.jsonBody
-                (Encode.object
-                    [ ( "s3_input_key", Encode.string s3Key )
-                    , ( "start_processing", Encode.bool True )
-                    ]
-                )
+        , body = Http.jsonBody (Encode.object bodyFields)
         , expect = Http.expectJson toMsg jobDecoder
         , timeout = Nothing
         , tracker = Nothing
