@@ -112,6 +112,46 @@ defaultPromptForModel pdfModel =
             Nothing
 
 
+type alias ModelMetadata =
+    { description : String
+    , producer : String
+    , githubUrl : Maybe String
+    , docsUrl : Maybe String
+    }
+
+
+modelMetadata : PdfModel -> ModelMetadata
+modelMetadata pdfModel =
+    case pdfModel of
+        Marker ->
+            { description = "High-quality PDF to Markdown conversion using deep learning"
+            , producer = "VikParuchuri"
+            , githubUrl = Just "https://github.com/VikParuchuri/marker"
+            , docsUrl = Nothing
+            }
+
+        Dolphin ->
+            { description = "Document layout analysis with vision-language model"
+            , producer = "ByteDance"
+            , githubUrl = Just "https://github.com/bytedance/Dolphin"
+            , docsUrl = Nothing
+            }
+
+        Docling ->
+            { description = "AI-powered document understanding and conversion"
+            , producer = "IBM"
+            , githubUrl = Just "https://github.com/DS4SD/docling"
+            , docsUrl = Just "https://ds4sd.github.io/docling/"
+            }
+
+        DeepSeekOcr ->
+            { description = "Vision-language model for document OCR and understanding"
+            , producer = "DeepSeek"
+            , githubUrl = Just "https://github.com/deepseek-ai/DeepSeek-VL2"
+            , docsUrl = Nothing
+            }
+
+
 
 -- ROUTING
 
@@ -205,6 +245,7 @@ type alias UploadState =
     , submitting : Bool
     , error : Maybe String
     , prompt : String
+    , modelInfoExpanded : Bool
     }
 
 
@@ -300,6 +341,7 @@ type Msg
     | UploadResponseReceived String
     | UploadCompleted (Result Http.Error String)
     | PromptChanged String
+    | ToggleModelInfo
     | SubmitJobClicked
     | JobSubmitted (Result Http.Error Job)
       -- Jobs
@@ -346,6 +388,7 @@ initModel key route =
         , submitting = False
         , error = Nothing
         , prompt = ""
+        , modelInfoExpanded = False
         }
     , jobs =
         { jobs = []

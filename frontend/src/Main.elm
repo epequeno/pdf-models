@@ -628,6 +628,16 @@ update msg model =
             in
             ( { model | upload = newUpload }, Cmd.none )
 
+        ToggleModelInfo ->
+            let
+                oldUpload =
+                    model.upload
+
+                newUpload =
+                    { oldUpload | modelInfoExpanded = not oldUpload.modelInfoExpanded }
+            in
+            ( { model | upload = newUpload }, Cmd.none )
+
         UploadResponseReceived jsonString ->
             case Decode.decodeString S3.uploadResponseDecoder jsonString of
                 Ok response ->

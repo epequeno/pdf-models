@@ -4,8 +4,8 @@ import Components.Button as Button
 import Css exposing (..)
 import File
 import Html.Styled exposing (..)
-import Html.Styled.Attributes exposing (css, for, href, id, placeholder, selected, type_, value)
-import Html.Styled.Events exposing (on, onInput)
+import Html.Styled.Attributes as Attr exposing (css, for, href, id, placeholder, selected, type_, value)
+import Html.Styled.Events exposing (on, onClick, onInput)
 import Json.Decode as Decode
 import Styles
 import Types exposing (..)
@@ -43,6 +43,7 @@ view pdfModel model =
                     ]
                 ]
                 [ viewModelSelector pdfModel
+                , viewModelInfo pdfModel model.upload.modelInfoExpanded
                 , viewPromptInput pdfModel model.upload
                 , viewFileInput model.upload
                 , case model.upload.selectedFile of
@@ -151,6 +152,114 @@ viewModelOption currentPdfModel pdfModel =
         , selected (pdfModel == currentPdfModel)
         ]
         [ text (pdfModelToDisplayName pdfModel) ]
+
+
+viewModelInfo : PdfModel -> Bool -> Html Msg
+viewModelInfo pdfModel isExpanded =
+    let
+        metadata =
+            modelMetadata pdfModel
+
+        arrow =
+            if isExpanded then
+                "▼ "
+
+            else
+                "▶ "
+    in
+    div
+        [ css
+            [ marginBottom Styles.spacing.lg
+            ]
+        ]
+        [ -- Clickable header
+          div
+            [ onClick ToggleModelInfo
+            , css
+                [ cursor pointer
+                , color Styles.colors.textSecondary
+                , Css.fontSize Styles.fontSize.small
+                , hover [ color Styles.colors.textPrimary ]
+                ]
+            ]
+            [ text (arrow ++ "About this model") ]
+
+        -- Expandable content
+        , if isExpanded then
+            div
+                [ css
+                    [ marginTop Styles.spacing.sm
+                    , padding Styles.spacing.md
+                    , backgroundColor Styles.colors.hover
+                    , border3 (px 1) solid Styles.colors.border
+                    , property "border-radius" "4px"
+                    ]
+                ]
+                [ -- Model name and producer
+                  div
+                    [ css
+                        [ fontWeight Styles.fontWeight.semibold
+                        , color Styles.colors.textPrimary
+                        , marginBottom (px 4)
+                        ]
+                    ]
+                    [ text (pdfModelToDisplayName pdfModel ++ " by " ++ metadata.producer) ]
+
+                -- Description
+                , div
+                    [ css
+                        [ Css.fontSize Styles.fontSize.small
+                        , color Styles.colors.textSecondary
+                        , marginBottom Styles.spacing.sm
+                        ]
+                    ]
+                    [ text metadata.description ]
+
+                -- Links
+                , div
+                    [ css
+                        [ displayFlex
+                        , property "gap" "16px"
+                        ]
+                    ]
+                    (List.filterMap identity
+                        [ metadata.githubUrl
+                            |> Maybe.map
+                                (\url ->
+                                    a
+                                        [ href url
+                                        , Attr.target "_blank"
+                                        , css
+                                            [ color Styles.colors.accentPrimary
+                                            , Css.fontSize Styles.fontSize.small
+                                            , textDecoration none
+                                            , hover [ textDecoration underline ]
+                                            ]
+                                        ]
+                                        [ text "GitHub" ]
+                                )
+                        , metadata.docsUrl
+                            |> Maybe.map
+                                (\url ->
+                                    a
+                                        [ href url
+                                        , Attr.target "_blank"
+                                        , css
+                                            [ color Styles.colors.accentPrimary
+                                            , Css.fontSize Styles.fontSize.small
+                                            , textDecoration none
+                                            , hover [ textDecoration underline ]
+                                            ]
+                                        ]
+                                        [ text "Docs" ]
+                                )
+                        ]
+                    )
+                ]
+
+          else
+            text ""
+        ]
 
 
 viewPromptInput : PdfModel -> UploadState -> Html Msg

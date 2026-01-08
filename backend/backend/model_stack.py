@@ -229,7 +229,7 @@ class ModelStack(Stack):
                 "echo ECS_ENABLE_GPU_SUPPORT=true >> /etc/ecs/ecs.config",
             )
 
-            # Create Capacity Provider
+            # Create Capacity Provider with managed scaling for auto scale-in
             capacity_provider = ecs.AsgCapacityProvider(
                 self,
                 f"{model_name.title()}CapacityProvider",
