@@ -140,7 +140,7 @@ viewForm model =
             ]
             [ text "Already have an account? "
             , a
-                [ href "/login"
+                [ href (routeToPath Login)
                 , css
                     [ color Styles.colors.accentPrimary
                     , textDecoration none
@@ -246,7 +246,7 @@ viewSuccess =
             ]
             [ text "Your email has been verified. You can now sign in with your credentials." ]
         , a
-            [ href "/login"
+            [ href (routeToPath Login)
             , css
                 [ display inlineBlock
                 , padding2 Styles.spacing.sm Styles.spacing.md

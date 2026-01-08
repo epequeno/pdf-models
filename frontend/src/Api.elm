@@ -5,7 +5,9 @@ module Api exposing
     )
 
 import Http
+import Iso8601
 import Json.Decode as Decode exposing (Decoder)
+import Json.Decode.Pipeline exposing (optional, required)
 import Json.Encode as Encode
 import Time
 import Types exposing (..)
@@ -23,12 +25,12 @@ apiBaseUrl =
 -- SUBMIT JOB
 
 
-submitJob : String -> String -> (Result Http.Error Job -> msg) -> Cmd msg
-submitJob accessToken s3Key toMsg =
+submitJob : String -> PdfModel -> String -> (Result Http.Error Job -> msg) -> Cmd msg
+submitJob accessToken pdfModel s3Key toMsg =
     Http.request
         { method = "POST"
         , headers = [ Http.header "Authorization" ("Bearer " ++ accessToken) ]
-        , url = apiBaseUrl ++ "/v1/models/marker/jobs"
+        , url = apiBaseUrl ++ "/v1/models/" ++ pdfModelToString pdfModel ++ "/jobs"
         , body =
             Http.jsonBody
                 (Encode.object
@@ -46,12 +48,12 @@ submitJob accessToken s3Key toMsg =
 -- GET SINGLE JOB (with download URL)
 
 
-getJob : String -> String -> (Result Http.Error Job -> msg) -> Cmd msg
-getJob accessToken jobId toMsg =
+getJob : String -> PdfModel -> String -> (Result Http.Error Job -> msg) -> Cmd msg
+getJob accessToken pdfModel jobId toMsg =
     Http.request
         { method = "GET"
         , headers = [ Http.header "Authorization" ("Bearer " ++ accessToken) ]
-        , url = apiBaseUrl ++ "/v1/models/marker/jobs/" ++ jobId
+        , url = apiBaseUrl ++ "/v1/models/" ++ pdfModelToString pdfModel ++ "/jobs/" ++ jobId
         , body = Http.emptyBody
         , expect = Http.expectJson toMsg jobWithDownloadDecoder
         , timeout = Nothing
@@ -62,12 +64,12 @@ getJob accessToken jobId toMsg =
 -- GET JOBS
 
 
-getJobs : String -> (Result Http.Error (List Job) -> msg) -> Cmd msg
-getJobs accessToken toMsg =
+getJobs : String -> PdfModel -> (Result Http.Error (List Job) -> msg) -> Cmd msg
+getJobs accessToken pdfModel toMsg =
     Http.request
         { method = "GET"
         , headers = [ Http.header "Authorization" ("Bearer " ++ accessToken) ]
-        , url = apiBaseUrl ++ "/v1/models/marker/jobs"
+        , url = apiBaseUrl ++ "/v1/models/" ++ pdfModelToString pdfModel ++ "/jobs"
         , body = Http.emptyBody
         , expect = Http.expectJson toMsg jobsListDecoder
         , timeout = Nothing
@@ -81,28 +83,30 @@ getJobs accessToken toMsg =
 
 jobWithDownloadDecoder : Decoder Job
 jobWithDownloadDecoder =
-    Decode.map8 Job
-        (Decode.field "job_id" Decode.string)
-        (Decode.field "created_at" iso8601Decoder)
-        (Decode.field "status" jobStatusDecoder)
-        (Decode.field "s3_input_key" Decode.string)
-        (Decode.maybe (Decode.field "s3_result_key" Decode.string))
-        (Decode.maybe (Decode.field "completed_at" iso8601Decoder))
-        (Decode.maybe (Decode.field "error" Decode.string))
-        (Decode.maybe (Decode.field "download_url" Decode.string))
+    Decode.succeed Job
+        |> required "job_id" Decode.string
+        |> required "model" pdfModelDecoder
+        |> required "created_at" iso8601Decoder
+        |> required "status" jobStatusDecoder
+        |> required "s3_input_key" Decode.string
+        |> optional "s3_result_key" (Decode.maybe Decode.string) Nothing
+        |> optional "completed_at" (Decode.maybe iso8601Decoder) Nothing
+        |> optional "error" (Decode.maybe Decode.string) Nothing
+        |> optional "download_url" (Decode.maybe Decode.string) Nothing
 
 
 jobDecoder : Decoder Job
 jobDecoder =
-    Decode.map8 Job
-        (Decode.field "job_id" Decode.string)
-        (Decode.field "created_at" iso8601Decoder)
-        (Decode.field "status" jobStatusDecoder)
-        (Decode.field "s3_input_key" Decode.string)
-        (Decode.maybe (Decode.field "s3_result_key" Decode.string))
-        (Decode.maybe (Decode.field "completed_at" iso8601Decoder))
-        (Decode.maybe (Decode.field "error" Decode.string))
-        (Decode.succeed Nothing)  -- downloadUrl not provided in list view
+    Decode.succeed Job
+        |> required "job_id" Decode.string
+        |> required "model" pdfModelDecoder
+        |> required "created_at" iso8601Decoder
+        |> required "status" jobStatusDecoder
+        |> required "s3_input_key" Decode.string
+        |> optional "s3_result_key" (Decode.maybe Decode.string) Nothing
+        |> optional "completed_at" (Decode.maybe iso8601Decoder) Nothing
+        |> optional "error" (Decode.maybe Decode.string) Nothing
+        |> optional "download_url" (Decode.maybe Decode.string) Nothing
 
 
 jobsListDecoder : Decoder (List Job)
@@ -136,88 +140,20 @@ jobStatusDecoder =
             )
 
 
-iso8601Decoder : Decoder Time.Posix
-iso8601Decoder =
+pdfModelDecoder : Decoder PdfModel
+pdfModelDecoder =
     Decode.string
         |> Decode.andThen
             (\str ->
-                -- Parse ISO 8601 timestamp
-                -- For now, we'll use a simple approach that works with common formats
-                -- In production, you'd want a proper ISO 8601 parsing library
-                case parseIso8601 str of
-                    Just posix ->
-                        Decode.succeed posix
-                    
+                case stringToPdfModel str of
+                    Just pdfModel ->
+                        Decode.succeed pdfModel
+
                     Nothing ->
-                        -- Fallback to current time if parsing fails
-                        Decode.succeed (Time.millisToPosix (round (1000 * 1735948800))) -- Approximate current time
+                        Decode.fail ("Unknown model: " ++ str)
             )
 
 
-parseIso8601 : String -> Maybe Time.Posix
-parseIso8601 str =
-    -- Simple ISO 8601 parser for common formats like "2024-01-04T15:30:00Z"
-    -- This is a basic implementation - in production use a proper library
-    let
-        -- Remove 'Z' suffix if present
-        cleanStr = String.replace "Z" "" str
-        
-        -- Split on 'T' to separate date and time
-        parts = String.split "T" cleanStr
-    in
-    case parts of
-        [datePart, timePart] ->
-            case (parseDate datePart, parseTime timePart) of
-                (Just (year, month, day), Just (hour, minute, second)) ->
-                    -- Convert to milliseconds since epoch (very rough approximation)
-                    -- This is not accurate for all dates but will work for recent timestamps
-                    let
-                        -- Rough calculation - not accounting for leap years, etc.
-                        daysSinceEpoch = (year - 1970) * 365 + (month - 1) * 30 + (day - 1)
-                        millisSinceEpoch = 
-                            daysSinceEpoch * 24 * 60 * 60 * 1000 +
-                            hour * 60 * 60 * 1000 +
-                            minute * 60 * 1000 +
-                            second * 1000
-                    in
-                    Just (Time.millisToPosix millisSinceEpoch)
-                
-                _ ->
-                    Nothing
-        
-        _ ->
-            Nothing
-
-
-parseDate : String -> Maybe (Int, Int, Int)
-parseDate str =
-    case String.split "-" str of
-        [yearStr, monthStr, dayStr] ->
-            case (String.toInt yearStr, String.toInt monthStr, String.toInt dayStr) of
-                (Just year, Just month, Just day) ->
-                    Just (year, month, day)
-                _ ->
-                    Nothing
-        _ ->
-            Nothing
-
-
-parseTime : String -> Maybe (Int, Int, Int)
-parseTime str =
-    case String.split ":" str of
-        [hourStr, minuteStr, secondStr] ->
-            let
-                -- Handle seconds that might have decimal places
-                secondInt = String.split "." secondStr
-                    |> List.head
-                    |> Maybe.withDefault "0"
-                    |> String.toInt
-                    |> Maybe.withDefault 0
-            in
-            case (String.toInt hourStr, String.toInt minuteStr) of
-                (Just hour, Just minute) ->
-                    Just (hour, minute, secondInt)
-                _ ->
-                    Nothing
-        _ ->
-            Nothing
+iso8601Decoder : Decoder Time.Posix
+iso8601Decoder =
+    Iso8601.decoder

@@ -11,12 +11,13 @@ import File
 import Http
 import Json.Decode as Decode
 import S3
+import Set
 import Styles
 import Task
 import Time
 import Types exposing (..)
 import Url
-import Url.Parser as Parser exposing (Parser)
+import Url.Parser as Parser exposing ((</>), Parser)
 import Views.Jobs
 import Views.Login
 import Views.SignUp
@@ -59,12 +60,23 @@ init _ url key =
 routeParser : Parser (Route -> a) a
 routeParser =
     Parser.oneOf
-        [ Parser.map Upload Parser.top
+        [ Parser.map (Upload defaultPdfModel) Parser.top
         , Parser.map Login (Parser.s "login")
         , Parser.map SignUp (Parser.s "signup")
-        , Parser.map Upload (Parser.s "upload")
+        , Parser.map parseModelRoute (Parser.s "upload" </> Parser.string)
+        , Parser.map (Upload defaultPdfModel) (Parser.s "upload")
         , Parser.map Jobs (Parser.s "jobs")
         ]
+
+
+parseModelRoute : String -> Route
+parseModelRoute modelStr =
+    case stringToPdfModel modelStr of
+        Just pdfModel ->
+            Upload pdfModel
+
+        Nothing ->
+            NotFound
 
 
 parseUrl : Url.Url -> Route
@@ -139,6 +151,7 @@ update msg model =
                                         _ ->
                                             ""
                                     )
+                                    defaultPdfModel
                                     JobsFetched
 
                             else
@@ -203,7 +216,7 @@ update msg model =
                                                                 }
                                                         in
                                                         ( { model | auth = Authenticated tokens }
-                                                        , Nav.pushUrl model.key "/upload"
+                                                        , Nav.pushUrl model.key (routeToPath (Upload defaultPdfModel))
                                                         )
 
                                                     Nothing ->
@@ -307,7 +320,7 @@ update msg model =
             ( { model | auth = NotAuthenticated }
             , Cmd.batch
                 [ Auth.clearSession
-                , Nav.pushUrl model.key "/login"
+                , Nav.pushUrl model.key (routeToPath Login)
                 ]
             )
 
@@ -500,6 +513,9 @@ update msg model =
                     in
                     ( { model | signUpForm = newForm }, Cmd.none )
 
+        ModelSelected newPdfModel ->
+            ( model, Nav.pushUrl model.key (routeToPath (Upload newPdfModel)) )
+
         FileSelected file ->
             -- Automatically upload to S3 when file is selected
             case model.auth of
@@ -519,6 +535,7 @@ update msg model =
                         request =
                             { file = file
                             , accessToken = tokens.accessToken
+                            , pdfModel = getModelFromRoute model.route
                             }
                     in
                     ( { model | upload = newUpload }, S3.uploadFile request )
@@ -545,6 +562,7 @@ update msg model =
                         request =
                             { file = file
                             , accessToken = tokens.accessToken
+                            , pdfModel = getModelFromRoute model.route
                             }
                     in
                     ( model, S3.uploadFile request )
@@ -583,7 +601,7 @@ update msg model =
                                                 }
                                         in
                                         ( { model | upload = newUpload }
-                                        , Api.submitJob tokens.accessToken s3Key JobSubmitted
+                                        , Api.submitJob tokens.accessToken (getModelFromRoute model.route) s3Key JobSubmitted
                                         )
 
                                     _ ->
@@ -650,7 +668,7 @@ update msg model =
                             { oldUpload | submitting = True }
                     in
                     ( { model | upload = newUpload }
-                    , Api.submitJob tokens.accessToken s3Key JobSubmitted
+                    , Api.submitJob tokens.accessToken (getModelFromRoute model.route) s3Key JobSubmitted
                     )
 
                 _ ->
@@ -673,7 +691,7 @@ update msg model =
                             }
                     in
                     ( { model | upload = newUpload }
-                    , Nav.pushUrl model.key "/jobs"
+                    , Nav.pushUrl model.key (routeToPath Jobs)
                     )
 
                 Err error ->
@@ -700,7 +718,7 @@ update msg model =
                             { oldJobs | loading = True }
                     in
                     ( { model | jobs = newJobs }
-                    , Api.getJobs tokens.accessToken JobsFetched
+                    , Api.getJobs tokens.accessToken defaultPdfModel JobsFetched
                     )
 
                 _ ->
@@ -713,28 +731,75 @@ update msg model =
                         oldJobs =
                             model.jobs
 
+                        -- Check if any job transitioned from Processing to Complete/Failed
+                        processingCompleted =
+                            List.any
+                                (\newJob ->
+                                    case List.filter (\old -> old.id == newJob.id) oldJobs.jobs of
+                                        [ oldJob ] ->
+                                            oldJob.status == Processing && newJob.status /= Processing
+
+                                        _ ->
+                                            False
+                                )
+                                jobs
+
+                        -- Reset polling state if job completed
+                        newPollingState =
+                            if processingCompleted then
+                                Types.initPollingState
+
+                            else
+                                model.pollingState
+
+                        -- Auto-expand most recent job on first load
+                        newExpandedIds =
+                            if List.isEmpty oldJobs.jobs then
+                                case List.head jobs of
+                                    Just mostRecent ->
+                                        Set.singleton mostRecent.id
+
+                                    Nothing ->
+                                        Set.empty
+
+                            else
+                                oldJobs.expandedJobIds
+
                         newJobs =
                             { oldJobs
                                 | jobs = jobs
                                 , loading = False
                                 , error = Nothing
                                 , lastRefresh = Nothing
+                                , expandedJobIds = newExpandedIds
                             }
                     in
-                    ( { model | jobs = newJobs }, Cmd.none )
+                    ( { model | jobs = newJobs, pollingState = newPollingState }, Cmd.none )
 
                 Err error ->
-                    let
-                        oldJobs =
-                            model.jobs
+                    if is401Error error then
+                        -- Token expired, trigger refresh
+                        case model.auth of
+                            Authenticated tokens ->
+                                ( { model | pendingRetry = Just RetryFetchJobs }
+                                , Auth.refreshToken tokens.refreshToken
+                                )
 
-                        newJobs =
-                            { oldJobs
-                                | loading = False
-                                , error = Just (httpErrorToString error)
-                            }
-                    in
-                    ( { model | jobs = newJobs }, Cmd.none )
+                            _ ->
+                                ( model, Nav.pushUrl model.key (routeToPath Login) )
+
+                    else
+                        let
+                            oldJobs =
+                                model.jobs
+
+                            newJobs =
+                                { oldJobs
+                                    | loading = False
+                                    , error = Just (httpErrorToString error)
+                                }
+                        in
+                        ( { model | jobs = newJobs }, Cmd.none )
 
         RefreshClicked ->
             update FetchJobs model
@@ -743,7 +808,11 @@ update msg model =
             -- Fetch the job with download URL, then trigger download
             case model.auth of
                 Authenticated tokens ->
-                    ( model, Api.getJob tokens.accessToken jobId JobWithDownloadFetched )
+                    let
+                        jobPdfModel =
+                            findJobPdfModel jobId model.jobs.jobs
+                    in
+                    ( model, Api.getJob tokens.accessToken jobPdfModel jobId JobWithDownloadFetched )
 
                 _ ->
                     ( model, Cmd.none )
@@ -753,21 +822,145 @@ update msg model =
                 Ok job ->
                     case job.downloadUrl of
                         Just url ->
-                            -- Trigger download by navigating to the presigned URL
-                            ( model, Nav.load url )
+                            -- Clear any previous error and trigger download
+                            let
+                                oldJobs =
+                                    model.jobs
+
+                                newJobs =
+                                    { oldJobs | downloadError = Nothing }
+                            in
+                            ( { model | jobs = newJobs }, Nav.load url )
 
                         Nothing ->
                             -- No download URL available
-                            ( model, Cmd.none )
+                            let
+                                oldJobs =
+                                    model.jobs
+
+                                newJobs =
+                                    { oldJobs
+                                        | downloadError =
+                                            Just
+                                                { jobId = job.id
+                                                , message = "Download not available. The result may still be processing."
+                                                }
+                                    }
+                            in
+                            ( { model | jobs = newJobs }, Cmd.none )
+
+                Err error ->
+                    let
+                        oldJobs =
+                            model.jobs
+
+                        newJobs =
+                            { oldJobs
+                                | downloadError =
+                                    Just
+                                        { jobId = ""
+                                        , message = "Failed to fetch download: " ++ httpErrorToString error
+                                        }
+                            }
+                    in
+                    ( { model | jobs = newJobs }, Cmd.none )
+
+        ClearDownloadError ->
+            let
+                oldJobs =
+                    model.jobs
+
+                newJobs =
+                    { oldJobs | downloadError = Nothing }
+            in
+            ( { model | jobs = newJobs }, Cmd.none )
+
+        ToggleJobExpanded jobId ->
+            let
+                oldJobs =
+                    model.jobs
+
+                newExpandedIds =
+                    if Set.member jobId oldJobs.expandedJobIds then
+                        Set.remove jobId oldJobs.expandedJobIds
+
+                    else
+                        Set.insert jobId oldJobs.expandedJobIds
+
+                newJobs =
+                    { oldJobs | expandedJobIds = newExpandedIds }
+            in
+            ( { model | jobs = newJobs }, Cmd.none )
+
+        TokenRefreshReceived jsonString ->
+            case Decode.decodeString Auth.tokenRefreshResponseDecoder jsonString of
+                Ok response ->
+                    if response.success then
+                        case ( response.accessToken, response.idToken, response.expiresAt ) of
+                            ( Just accessToken, Just idToken, Just expiresAt ) ->
+                                let
+                                    newAuth =
+                                        case model.auth of
+                                            Authenticated tokens ->
+                                                Authenticated
+                                                    { tokens
+                                                        | accessToken = accessToken
+                                                        , idToken = idToken
+                                                        , expiresAt = expiresAt
+                                                    }
+
+                                            _ ->
+                                                model.auth
+
+                                    retryCmd =
+                                        case model.pendingRetry of
+                                            Just RetryFetchJobs ->
+                                                Api.getJobs accessToken defaultPdfModel JobsFetched
+
+                                            Just (RetryFetchJob retryPdfModel jobId) ->
+                                                Api.getJob accessToken retryPdfModel jobId JobWithDownloadFetched
+
+                                            Just (RetrySubmitJob retryPdfModel s3Key) ->
+                                                Api.submitJob accessToken retryPdfModel s3Key JobSubmitted
+
+                                            Nothing ->
+                                                Cmd.none
+                                in
+                                ( { model
+                                    | auth = newAuth
+                                    , pendingRetry = Nothing
+                                  }
+                                , retryCmd
+                                )
+
+                            _ ->
+                                -- Incomplete response, redirect to login
+                                ( { model | auth = NotAuthenticated, pendingRetry = Nothing }
+                                , Cmd.batch [ Auth.clearSession, Nav.pushUrl model.key (routeToPath Login) ]
+                                )
+
+                    else
+                        -- Refresh failed, redirect to login
+                        ( { model | auth = NotAuthenticated, pendingRetry = Nothing }
+                        , Cmd.batch [ Auth.clearSession, Nav.pushUrl model.key (routeToPath Login) ]
+                        )
 
                 Err _ ->
-                    -- Handle error - could show a message to user
-                    ( model, Cmd.none )
+                    ( { model | auth = NotAuthenticated, pendingRetry = Nothing }
+                    , Cmd.batch [ Auth.clearSession, Nav.pushUrl model.key (routeToPath Login) ]
+                    )
 
         PollTick time ->
             -- Poll for job updates if any jobs are processing and update current time
             let
-                updatedModel = { model | currentTime = time }
+                oldPolling =
+                    model.pollingState
+
+                newPolling =
+                    { oldPolling | consecutivePolls = oldPolling.consecutivePolls + 1 }
+
+                updatedModel =
+                    { model | currentTime = time, pollingState = newPolling }
             in
             update FetchJobs updatedModel
 
@@ -847,7 +1040,12 @@ subscriptions model =
 
                 jobs ->
                     if List.any (\j -> j.status == Processing) jobs then
-                        Time.every (10 * 1000) PollTick
+                        if model.pollingState.consecutivePolls < model.pollingState.maxPolls then
+                            Time.every (calculatePollingInterval model.pollingState) PollTick
+
+                        else
+                            Sub.none
+                            -- Stop polling after max attempts
 
                     else
                         Sub.none
@@ -858,8 +1056,19 @@ subscriptions model =
                 Time.every (30 * 1000) CurrentTimeReceived
             else
                 Sub.none
+
+        tokenRefreshSub =
+            Auth.receiveTokenRefreshResponse
+                (\value ->
+                    case Decode.decodeValue Decode.string value of
+                        Ok jsonString ->
+                            TokenRefreshReceived jsonString
+
+                        Err _ ->
+                            TokenRefreshReceived "{}"
+                )
     in
-    Sub.batch [ restoredSessionSub, authSub, signUpSub, confirmSignUpSub, uploadProgressSub, uploadResponseSub, pollSub, timeUpdateSub ]
+    Sub.batch [ restoredSessionSub, authSub, signUpSub, confirmSignUpSub, uploadProgressSub, uploadResponseSub, pollSub, timeUpdateSub, tokenRefreshSub ]
 
 
 
@@ -888,9 +1097,9 @@ viewContent model =
         SignUp ->
             Views.SignUp.view model
 
-        Upload ->
+        Upload pdfModel ->
             if Types.isAuthenticated model then
-                viewUploadPlaceholder model
+                viewUploadPlaceholder pdfModel model
 
             else
                 viewLoginPlaceholder model
@@ -911,9 +1120,9 @@ viewLoginPlaceholder model =
     Views.Login.view model
 
 
-viewUploadPlaceholder : Model -> Html Msg
-viewUploadPlaceholder model =
-    Views.Upload.view model
+viewUploadPlaceholder : PdfModel -> Model -> Html Msg
+viewUploadPlaceholder pdfModel model =
+    Views.Upload.view pdfModel model
 
 
 viewJobsPlaceholder : Model -> Html Msg
@@ -923,6 +1132,48 @@ viewJobsPlaceholder model =
 
 
 -- HELPERS
+
+
+getModelFromRoute : Route -> PdfModel
+getModelFromRoute route =
+    case route of
+        Upload pdfModel ->
+            pdfModel
+
+        _ ->
+            defaultPdfModel
+
+
+findJobPdfModel : String -> List Job -> PdfModel
+findJobPdfModel jobId jobs =
+    jobs
+        |> List.filter (\job -> job.id == jobId)
+        |> List.head
+        |> Maybe.map .pdfModel
+        |> Maybe.withDefault defaultPdfModel
+
+
+is401Error : Http.Error -> Bool
+is401Error error =
+    case error of
+        Http.BadStatus 401 ->
+            True
+
+        _ ->
+            False
+
+
+calculatePollingInterval : PollingState -> Float
+calculatePollingInterval state =
+    let
+        -- Exponential backoff: base * 1.5^n, capped at max
+        multiplier =
+            1.5 ^ toFloat state.consecutivePolls
+
+        calculated =
+            state.baseIntervalMs * multiplier
+    in
+    Basics.min calculated state.maxIntervalMs
 
 
 generateJobId : () -> String

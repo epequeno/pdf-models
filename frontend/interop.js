@@ -136,6 +136,7 @@ window.AwsInterop = {
                     // Get pre-signed upload URL from API
                     const presignedData = await getPresignedUploadUrl(
                         request.accessToken,
+                        request.model,
                         file.name,
                         file.type || 'application/pdf'
                     );
@@ -165,13 +166,51 @@ window.AwsInterop = {
                 }
             });
         }
+
+        // Handle token refresh requests from Elm
+        if (ports.refreshTokenPort) {
+            ports.refreshTokenPort.subscribe(async function(refreshTokenValue) {
+                try {
+                    console.log('Refreshing token...');
+                    const result = await refreshAuthToken(refreshTokenValue);
+                    const newExpiresAt = Date.now() + (result.expiresIn * 1000);
+
+                    // Update localStorage with new tokens
+                    const stored = JSON.parse(localStorage.getItem('pdfmodels_auth') || '{}');
+                    const updatedTokens = {
+                        ...stored,
+                        accessToken: result.accessToken,
+                        idToken: result.idToken,
+                        expiresAt: newExpiresAt
+                    };
+                    localStorage.setItem('pdfmodels_auth', JSON.stringify(updatedTokens));
+
+                    if (ports.receiveTokenRefreshResponse) {
+                        ports.receiveTokenRefreshResponse.send(JSON.stringify({
+                            success: true,
+                            accessToken: result.accessToken,
+                            idToken: result.idToken,
+                            expiresAt: newExpiresAt
+                        }));
+                    }
+                } catch (error) {
+                    console.error('Token refresh error:', error);
+                    if (ports.receiveTokenRefreshResponse) {
+                        ports.receiveTokenRefreshResponse.send(JSON.stringify({
+                            success: false,
+                            error: error.message || 'Token refresh failed'
+                        }));
+                    }
+                }
+            });
+        }
     }
 };
 
 // Get pre-signed upload URL from API
-async function getPresignedUploadUrl(accessToken, filename, contentType) {
+async function getPresignedUploadUrl(accessToken, model, filename, contentType) {
     const response = await fetch(
-        `${AWS_CONFIG.apiBaseUrl}/v1/models/marker/upload-url`,
+        `${AWS_CONFIG.apiBaseUrl}/v1/models/${model}/upload-url`,
         {
             method: 'POST',
             headers: {

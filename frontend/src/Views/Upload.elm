@@ -4,15 +4,15 @@ import Components.Button as Button
 import Css exposing (..)
 import File
 import Html.Styled exposing (..)
-import Html.Styled.Attributes exposing (css, for, href, id, type_)
-import Html.Styled.Events exposing (on)
+import Html.Styled.Attributes exposing (css, for, href, id, selected, type_, value)
+import Html.Styled.Events exposing (on, onInput)
 import Json.Decode as Decode
 import Styles
 import Types exposing (..)
 
 
-view : Model -> Html Msg
-view model =
+view : PdfModel -> Model -> Html Msg
+view pdfModel model =
     div
         [ css
             [ Styles.containerStyle
@@ -42,7 +42,8 @@ view model =
                     , backgroundColor Styles.colors.surface
                     ]
                 ]
-                [ viewFileInput model.upload
+                [ viewModelSelector pdfModel
+                , viewFileInput model.upload
                 , case model.upload.selectedFile of
                     Just file ->
                         viewSelectedFile file model.upload
@@ -87,7 +88,7 @@ viewHeader model =
             [ text "PDF Models" ]
         , div [ css [ displayFlex, property "gap" "12px" ] ]
             [ a
-                [ href "/jobs"
+                [ href (routeToPath Jobs)
                 , css
                     [ padding2 Styles.spacing.sm Styles.spacing.md
                     , border3 (px 1) solid Styles.colors.border
@@ -102,6 +103,53 @@ viewHeader model =
             , Button.button Button.Secondary "Logout" SignOutClicked
             ]
         ]
+
+
+viewModelSelector : PdfModel -> Html Msg
+viewModelSelector currentPdfModel =
+    div
+        [ css
+            [ marginBottom Styles.spacing.lg
+            ]
+        ]
+        [ label
+            [ css
+                [ display block
+                , Css.fontSize Styles.fontSize.body
+                , color Styles.colors.textSecondary
+                , marginBottom Styles.spacing.sm
+                ]
+            ]
+            [ text "Model" ]
+        , select
+            [ onInput (stringToPdfModel >> Maybe.withDefault defaultPdfModel >> ModelSelected)
+            , value (pdfModelToString currentPdfModel)
+            , css
+                [ Css.width (pct 100)
+                , padding2 Styles.spacing.sm Styles.spacing.md
+                , backgroundColor Styles.colors.surface
+                , border3 (px 1) solid Styles.colors.border
+                , color Styles.colors.textPrimary
+                , fontFamilies Styles.fontStack
+                , Css.fontSize Styles.fontSize.body
+                , cursor pointer
+                , focus
+                    [ borderColor Styles.colors.focus
+                    , outline none
+                    ]
+                ]
+            ]
+            (List.map (viewModelOption currentPdfModel) allPdfModels)
+        ]
+
+
+viewModelOption : PdfModel -> PdfModel -> Html Msg
+viewModelOption currentPdfModel pdfModel =
+    option
+        [ value (pdfModelToString pdfModel)
+        , selected (pdfModel == currentPdfModel)
+        ]
+        [ text (pdfModelToDisplayName pdfModel) ]
 
 
 viewFileInput : UploadState -> Html Msg

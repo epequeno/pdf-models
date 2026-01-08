@@ -96,7 +96,7 @@ view model =
                     ]
                     [ text "Don't have an account? "
                     , a
-                        [ href "/signup"
+                        [ href (routeToPath SignUp)
                         , css
                             [ color Styles.colors.accentPrimary
                             , textDecoration none

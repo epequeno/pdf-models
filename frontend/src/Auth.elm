@@ -2,6 +2,7 @@ port module Auth exposing
     ( AuthResponse
     , ConfirmSignUpResponse
     , SignUpResponse
+    , TokenRefreshResponse
     , authResponseDecoder
     , clearSession
     , confirmSignUp
@@ -10,10 +11,13 @@ port module Auth exposing
     , receiveConfirmSignUpResponse
     , receiveRestoredSession
     , receiveSignUpResponse
+    , receiveTokenRefreshResponse
+    , refreshToken
     , restoreSession
     , signIn
     , signUp
     , signUpResponseDecoder
+    , tokenRefreshResponseDecoder
     )
 
 import Json.Decode as Decode exposing (Decoder)
@@ -49,6 +53,12 @@ port receiveRestoredSession : (Encode.Value -> msg) -> Sub msg
 
 
 port clearSessionPort : () -> Cmd msg
+
+
+port refreshTokenPort : String -> Cmd msg
+
+
+port receiveTokenRefreshResponse : (Encode.Value -> msg) -> Sub msg
 
 
 
@@ -95,6 +105,11 @@ clearSession =
     clearSessionPort ()
 
 
+refreshToken : String -> Cmd msg
+refreshToken refreshTokenValue =
+    refreshTokenPort refreshTokenValue
+
+
 
 -- TYPES
 
@@ -118,6 +133,15 @@ type alias SignUpResponse =
 
 type alias ConfirmSignUpResponse =
     { success : Bool
+    , error : Maybe String
+    }
+
+
+type alias TokenRefreshResponse =
+    { success : Bool
+    , accessToken : Maybe String
+    , idToken : Maybe String
+    , expiresAt : Maybe Int
     , error : Maybe String
     }
 
@@ -150,3 +174,13 @@ confirmSignUpResponseDecoder =
     Decode.map2 ConfirmSignUpResponse
         (Decode.field "success" Decode.bool)
         (Decode.maybe (Decode.field "error" Decode.string))
+
+
+tokenRefreshResponseDecoder : Decoder TokenRefreshResponse
+tokenRefreshResponseDecoder =
+    Decode.succeed TokenRefreshResponse
+        |> required "success" Decode.bool
+        |> optional "accessToken" (Decode.maybe Decode.string) Nothing
+        |> optional "idToken" (Decode.maybe Decode.string) Nothing
+        |> optional "expiresAt" (Decode.maybe Decode.int) Nothing
+        |> optional "error" (Decode.maybe Decode.string) Nothing

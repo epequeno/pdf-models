@@ -7,6 +7,8 @@ import Components.Timeline as Timeline
 import Css exposing (..)
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (css, href)
+import Html.Styled.Events exposing (onClick)
+import Set exposing (Set)
 import Styles
 import Time
 import Types exposing (..)
@@ -51,7 +53,7 @@ viewHeader =
             [ text "PDF Models" ]
         , div [ css [ displayFlex, property "gap" "12px" ] ]
             [ a
-                [ href "/upload"
+                [ href (routeToPath (Upload defaultPdfModel))
                 , css
                     [ padding2 Styles.spacing.sm Styles.spacing.md
                     , border3 (px 1) solid Styles.colors.border
@@ -89,6 +91,28 @@ viewJobsSection model =
                 [ text "Your Jobs" ]
             , Button.button Button.Secondary "Refresh" RefreshClicked
             ]
+        , case model.jobs.downloadError of
+            Just downloadErr ->
+                div
+                    [ css
+                        [ backgroundColor (hex "2d1f1f")
+                        , border3 (px 1) solid Styles.colors.accentError
+                        , padding Styles.spacing.md
+                        , marginBottom Styles.spacing.md
+                        , displayFlex
+                        , justifyContent spaceBetween
+                        , alignItems center
+                        , property "border-radius" "4px"
+                        ]
+                    ]
+                    [ div
+                        [ css [ color Styles.colors.accentError ] ]
+                        [ text downloadErr.message ]
+                    , Button.button Button.Secondary "Dismiss" ClearDownloadError
+                    ]
+
+            Nothing ->
+                text ""
         , case model.jobs.error of
             Just err ->
                 div
@@ -119,51 +143,81 @@ viewJobsSection model =
                         [ css
                             [ displayFlex
                             , flexDirection column
-                            , property "gap" "16px"
+                            , property "gap" "12px"
                             ]
                         ]
-                        (List.map (viewJobCard model.currentTime) model.jobs.jobs)
+                        (List.map (viewJobCard model.currentTime model.jobs.expandedJobIds) model.jobs.jobs)
         ]
 
 
-viewJobCard : Time.Posix -> Job -> Html Msg
-viewJobCard currentTime job =
+viewJobCard : Time.Posix -> Set String -> Job -> Html Msg
+viewJobCard currentTime expandedJobIds job =
+    let
+        isExpanded =
+            Set.member job.id expandedJobIds
+    in
     div
         [ css
             [ border3 (px 1) solid Styles.colors.border
             , backgroundColor Styles.colors.surface
-            , padding Styles.spacing.lg
             , property "border-radius" "4px"
+            , overflow Css.hidden
             ]
         ]
-        [ -- Header with job ID and status
+        [ -- Clickable header
           div
             [ css
                 [ displayFlex
                 , justifyContent spaceBetween
                 , alignItems center
-                , marginBottom Styles.spacing.md
-                , paddingBottom Styles.spacing.md
-                , borderBottom3 (px 1) solid Styles.colors.border
+                , padding Styles.spacing.md
+                , cursor pointer
+                , hover [ backgroundColor Styles.colors.hover ]
                 ]
+            , onClick (ToggleJobExpanded job.id)
             ]
-            [ div []
-                [ div
+            [ div
+                [ css
+                    [ displayFlex
+                    , alignItems center
+                    , property "gap" "12px"
+                    ]
+                ]
+                [ -- Expand/collapse indicator
+                  span
+                    [ css
+                        [ color Styles.colors.textSecondary
+                        , Css.fontSize Styles.fontSize.small
+                        , display inlineBlock
+                        , Css.width (px 16)
+                        ]
+                    ]
+                    [ text
+                        (if isExpanded then
+                            "▼"
+
+                         else
+                            "▶"
+                        )
+                    ]
+                , span
                     [ css
                         [ fontWeight Styles.fontWeight.semibold
                         , color Styles.colors.textPrimary
-                        , marginBottom (px 4)
                         ]
                     ]
                     [ text ("Job " ++ truncateJobId job.id) ]
-                , div
+                , span
                     [ css
                         [ fontSize Styles.fontSize.small
-                        , color Styles.colors.textSecondary
-                        , fontFamily monospace
+                        , color Styles.colors.accentPrimary
+                        , backgroundColor Styles.colors.hover
+                        , padding2 (px 2) (px 8)
+                        , property "border-radius" "4px"
                         ]
                     ]
-                    [ text job.s3InputKey ]
+                    [ text (pdfModelToDisplayName job.pdfModel) ]
+                , StatusBadge.statusBadge job.status
                 ]
             , div
                 [ css
@@ -172,7 +226,13 @@ viewJobCard currentTime job =
                     , property "gap" "12px"
                     ]
                 ]
-                [ StatusBadge.statusBadge job.status
+                [ span
+                    [ css
+                        [ fontSize Styles.fontSize.small
+                        , color Styles.colors.textSecondary
+                        ]
+                    ]
+                    [ text (formatRelativeTime currentTime job.submittedAt) ]
                 , case job.status of
                     Complete ->
                         case job.s3OutputKey of
@@ -186,42 +246,94 @@ viewJobCard currentTime job =
                         text ""
                 ]
             ]
-        , -- Timeline
-          Timeline.timeline currentTime job
-        , -- Error message if present
-          case job.error of
-            Just errorMsg ->
-                div
+        , -- Expanded content
+          if isExpanded then
+            div
+                [ css
+                    [ padding Styles.spacing.lg
+                    , paddingTop (px 0)
+                    , borderTop3 (px 1) solid Styles.colors.border
+                    ]
+                ]
+                [ div
                     [ css
-                        [ marginTop Styles.spacing.md
-                        , padding Styles.spacing.md
-                        , backgroundColor (hex "2d1f1f")
-                        , border3 (px 1) solid Styles.colors.accentError
-                        , property "border-radius" "4px"
+                        [ fontSize Styles.fontSize.small
+                        , color Styles.colors.textSecondary
+                        , fontFamily monospace
+                        , marginBottom Styles.spacing.md
+                        , marginTop Styles.spacing.md
                         ]
                     ]
-                    [ div
-                        [ css
-                            [ fontWeight Styles.fontWeight.semibold
-                            , color Styles.colors.accentError
-                            , marginBottom (px 4)
+                    [ text job.s3InputKey ]
+                , Timeline.timeline currentTime job
+                , case job.error of
+                    Just errorMsg ->
+                        div
+                            [ css
+                                [ marginTop Styles.spacing.md
+                                , padding Styles.spacing.md
+                                , backgroundColor (hex "2d1f1f")
+                                , border3 (px 1) solid Styles.colors.accentError
+                                , property "border-radius" "4px"
+                                ]
                             ]
-                        ]
-                        [ text "Error Details" ]
-                    , div
-                        [ css
-                            [ fontSize Styles.fontSize.small
-                            , color Styles.colors.accentError
-                            , fontFamily monospace
-                            , whiteSpace preWrap
+                            [ div
+                                [ css
+                                    [ fontWeight Styles.fontWeight.semibold
+                                    , color Styles.colors.accentError
+                                    , marginBottom (px 4)
+                                    ]
+                                ]
+                                [ text "Error Details" ]
+                            , div
+                                [ css
+                                    [ fontSize Styles.fontSize.small
+                                    , color Styles.colors.accentError
+                                    , fontFamily monospace
+                                    , whiteSpace preWrap
+                                    ]
+                                ]
+                                [ text errorMsg ]
                             ]
-                        ]
-                        [ text errorMsg ]
-                    ]
 
-            Nothing ->
-                text ""
+                    Nothing ->
+                        text ""
+                ]
+
+          else
+            text ""
         ]
+
+
+formatRelativeTime : Time.Posix -> Time.Posix -> String
+formatRelativeTime now submitted =
+    let
+        diffMs =
+            Time.posixToMillis now - Time.posixToMillis submitted
+
+        diffSeconds =
+            diffMs // 1000
+
+        diffMinutes =
+            diffSeconds // 60
+
+        diffHours =
+            diffMinutes // 60
+
+        diffDays =
+            diffHours // 24
+    in
+    if diffDays > 0 then
+        String.fromInt diffDays ++ "d ago"
+
+    else if diffHours > 0 then
+        String.fromInt diffHours ++ "h ago"
+
+    else if diffMinutes > 0 then
+        String.fromInt diffMinutes ++ "m ago"
+
+    else
+        "just now"
 
 
 truncateJobId : String -> String

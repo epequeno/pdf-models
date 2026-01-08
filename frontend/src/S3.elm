@@ -10,6 +10,7 @@ port module S3 exposing
 import File exposing (File)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
+import Types exposing (PdfModel, pdfModelToString)
 
 
 -- PORTS
@@ -31,6 +32,7 @@ port receiveUploadResponse : (Encode.Value -> msg) -> Sub msg
 type alias UploadRequest =
     { file : File
     , accessToken : String
+    , pdfModel : PdfModel
     }
 
 
@@ -39,6 +41,7 @@ uploadFile request =
     uploadFilePort
         (Encode.object
             [ ( "accessToken", Encode.string request.accessToken )
+            , ( "model", Encode.string (pdfModelToString request.pdfModel) )
             ]
         )
 

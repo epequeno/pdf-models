@@ -4,8 +4,81 @@ import Browser
 import Browser.Navigation as Nav
 import File exposing (File)
 import Http
+import Set exposing (Set)
 import Time
 import Url
+
+
+-- PDF MODELS
+
+
+type PdfModel
+    = Marker
+    | Dolphin
+    | Docling
+    | DeepSeekOcr
+
+
+allPdfModels : List PdfModel
+allPdfModels =
+    [ Marker, Dolphin, Docling, DeepSeekOcr ]
+
+
+defaultPdfModel : PdfModel
+defaultPdfModel =
+    Marker
+
+
+pdfModelToString : PdfModel -> String
+pdfModelToString pdfModel =
+    case pdfModel of
+        Marker ->
+            "marker"
+
+        Dolphin ->
+            "dolphin"
+
+        Docling ->
+            "docling"
+
+        DeepSeekOcr ->
+            "deepseek-ocr"
+
+
+stringToPdfModel : String -> Maybe PdfModel
+stringToPdfModel str =
+    case str of
+        "marker" ->
+            Just Marker
+
+        "dolphin" ->
+            Just Dolphin
+
+        "docling" ->
+            Just Docling
+
+        "deepseek-ocr" ->
+            Just DeepSeekOcr
+
+        _ ->
+            Nothing
+
+
+pdfModelToDisplayName : PdfModel -> String
+pdfModelToDisplayName pdfModel =
+    case pdfModel of
+        Marker ->
+            "Marker (PDF to Markdown)"
+
+        Dolphin ->
+            "Dolphin (Document Layout)"
+
+        Docling ->
+            "Docling (Document Understanding)"
+
+        DeepSeekOcr ->
+            "DeepSeek OCR"
+
 
 
 -- ROUTING
@@ -14,9 +87,28 @@ import Url
 type Route
     = Login
     | SignUp
-    | Upload
+    | Upload PdfModel
     | Jobs
     | NotFound
+
+
+routeToPath : Route -> String
+routeToPath route =
+    case route of
+        Login ->
+            "/login"
+
+        SignUp ->
+            "/signup"
+
+        Upload pdfModel ->
+            "/upload/" ++ pdfModelToString pdfModel
+
+        Jobs ->
+            "/jobs"
+
+        NotFound ->
+            "/"
 
 
 type alias Flags =
@@ -36,6 +128,8 @@ type alias Model =
     , upload : UploadState
     , jobs : JobsState
     , currentTime : Time.Posix
+    , pendingRetry : Maybe ApiRetryContext
+    , pollingState : PollingState
     }
 
 
@@ -86,11 +180,43 @@ type alias JobsState =
     , loading : Bool
     , error : Maybe String
     , lastRefresh : Maybe Time.Posix
+    , downloadError : Maybe DownloadError
+    , expandedJobIds : Set String
+    }
+
+
+type alias DownloadError =
+    { jobId : String
+    , message : String
+    }
+
+
+type ApiRetryContext
+    = RetryFetchJobs
+    | RetryFetchJob PdfModel String -- model, jobId
+    | RetrySubmitJob PdfModel String -- model, s3Key
+
+
+type alias PollingState =
+    { consecutivePolls : Int
+    , maxPolls : Int
+    , baseIntervalMs : Float
+    , maxIntervalMs : Float
+    }
+
+
+initPollingState : PollingState
+initPollingState =
+    { consecutivePolls = 0
+    , maxPolls = 60
+    , baseIntervalMs = 5000
+    , maxIntervalMs = 60000
     }
 
 
 type alias Job =
     { id : String
+    , pdfModel : PdfModel
     , submittedAt : Time.Posix
     , status : JobStatus
     , s3InputKey : String
@@ -133,6 +259,7 @@ type Msg
     | ConfirmSignUpClicked
     | ConfirmSignUpResponseReceived String
       -- Upload
+    | ModelSelected PdfModel
     | FileSelected File
     | UploadToS3
     | UploadProgress Float
@@ -148,6 +275,9 @@ type Msg
     | JobWithDownloadFetched (Result Http.Error Job)
     | PollTick Time.Posix
     | CurrentTimeReceived Time.Posix
+    | ClearDownloadError
+    | ToggleJobExpanded String
+    | TokenRefreshReceived String
 
 
 
@@ -186,8 +316,12 @@ initModel key route =
         , loading = False
         , error = Nothing
         , lastRefresh = Nothing
+        , downloadError = Nothing
+        , expandedJobIds = Set.empty
         }
     , currentTime = Time.millisToPosix 0
+    , pendingRetry = Nothing
+    , pollingState = initPollingState
     }
 
 
