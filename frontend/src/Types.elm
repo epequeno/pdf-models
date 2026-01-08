@@ -141,7 +141,7 @@ modelMetadata pdfModel =
             { description = "AI-powered document understanding and conversion"
             , producer = "IBM"
             , githubUrl = Just "https://github.com/DS4SD/docling"
-            , docsUrl = Just "https://ds4sd.github.io/docling/"
+            , docsUrl = Just "https://docling-project.github.io/docling/"
             }
 
         DeepSeekOcr ->
