@@ -265,6 +265,39 @@ viewJobCard currentTime expandedJobIds job =
                         ]
                     ]
                     [ text job.s3InputKey ]
+                , case job.prompt of
+                    Just promptText ->
+                        div
+                            [ css
+                                [ marginBottom Styles.spacing.md
+                                , padding Styles.spacing.md
+                                , backgroundColor Styles.colors.hover
+                                , border3 (px 1) solid Styles.colors.border
+                                , property "border-radius" "4px"
+                                ]
+                            ]
+                            [ div
+                                [ css
+                                    [ fontWeight Styles.fontWeight.semibold
+                                    , color Styles.colors.textSecondary
+                                    , marginBottom (px 4)
+                                    , fontSize Styles.fontSize.small
+                                    ]
+                                ]
+                                [ text "Custom Prompt" ]
+                            , div
+                                [ css
+                                    [ fontSize Styles.fontSize.small
+                                    , color Styles.colors.textPrimary
+                                    , fontFamily monospace
+                                    , whiteSpace preWrap
+                                    ]
+                                ]
+                                [ text promptText ]
+                            ]
+
+                    Nothing ->
+                        text ""
                 , Timeline.timeline currentTime job
                 , case job.error of
                     Just errorMsg ->

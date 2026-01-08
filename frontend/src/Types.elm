@@ -96,6 +96,22 @@ modelSupportsPrompt pdfModel =
             False
 
 
+defaultPromptForModel : PdfModel -> Maybe String
+defaultPromptForModel pdfModel =
+    case pdfModel of
+        Dolphin ->
+            Just "Read text in the image."
+
+        DeepSeekOcr ->
+            Just "<image>\nConvert the document to markdown."
+
+        Marker ->
+            Nothing
+
+        Docling ->
+            Nothing
+
+
 
 -- ROUTING
 
@@ -241,6 +257,7 @@ type alias Job =
     , completedAt : Maybe Time.Posix
     , error : Maybe String
     , downloadUrl : Maybe String
+    , prompt : Maybe String
     }
 
 

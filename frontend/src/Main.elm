@@ -159,8 +159,29 @@ update msg model =
 
                         _ ->
                             Cmd.none
+
+                -- Set default prompt when navigating to upload page
+                newUpload =
+                    case newRoute of
+                        Upload pdfModel ->
+                            let
+                                oldUpload =
+                                    model.upload
+
+                                newPrompt =
+                                    case defaultPromptForModel pdfModel of
+                                        Just defaultPrompt ->
+                                            defaultPrompt
+
+                                        Nothing ->
+                                            ""
+                            in
+                            { oldUpload | prompt = newPrompt }
+
+                        _ ->
+                            model.upload
             in
-            ( { model | route = newRoute }, cmd )
+            ( { model | route = newRoute, upload = newUpload }, cmd )
 
         LinkClicked urlRequest ->
             case urlRequest of
@@ -514,7 +535,24 @@ update msg model =
                     ( { model | signUpForm = newForm }, Cmd.none )
 
         ModelSelected newPdfModel ->
-            ( model, Nav.pushUrl model.key (routeToPath (Upload newPdfModel)) )
+            let
+                oldUpload =
+                    model.upload
+
+                newPrompt =
+                    case defaultPromptForModel newPdfModel of
+                        Just defaultPrompt ->
+                            defaultPrompt
+
+                        Nothing ->
+                            ""
+
+                newUpload =
+                    { oldUpload | prompt = newPrompt }
+            in
+            ( { model | upload = newUpload }
+            , Nav.pushUrl model.key (routeToPath (Upload newPdfModel))
+            )
 
         FileSelected file ->
             -- Automatically upload to S3 when file is selected

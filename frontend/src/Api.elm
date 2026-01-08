@@ -108,6 +108,7 @@ jobWithDownloadDecoder =
         |> optional "completed_at" (Decode.maybe iso8601Decoder) Nothing
         |> optional "error" (Decode.maybe Decode.string) Nothing
         |> optional "download_url" (Decode.maybe Decode.string) Nothing
+        |> optional "prompt" (Decode.maybe Decode.string) Nothing
 
 
 jobDecoder : Decoder Job
@@ -122,6 +123,7 @@ jobDecoder =
         |> optional "completed_at" (Decode.maybe iso8601Decoder) Nothing
         |> optional "error" (Decode.maybe Decode.string) Nothing
         |> optional "download_url" (Decode.maybe Decode.string) Nothing
+        |> optional "prompt" (Decode.maybe Decode.string) Nothing
 
 
 jobsListDecoder : Decoder (List Job)

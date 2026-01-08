@@ -79,6 +79,8 @@ struct JobResponse {
     completed_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    prompt: Option<String>,
 }
 
 impl Response {
@@ -208,6 +210,7 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
                     created_at: item.get("created_at").and_then(|v| v.as_s().ok()).map_or("", |v| v).to_string(),
                     completed_at: item.get("completed_at").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
                     error: item.get("error").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
+                    prompt: item.get("prompt").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
                 };
 
                 Ok(Response::new(200, json!(job)))
@@ -247,6 +250,7 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
                     created_at: item.get("created_at")?.as_s().ok()?.to_string(),
                     completed_at: item.get("completed_at").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
                     error: item.get("error").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
+                    prompt: item.get("prompt").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
                 })
             })
             .collect();
