@@ -75,13 +75,14 @@ class MarkerStack(Stack):
         isolated_subnet_ids = ["subnet-04a204ceff9880907", "subnet-0c304190e2352482f"]
         ecs_security_group_id = "sg-0a8df0846d1a6fc96"
 
-        # Create ECS cluster without VPC specification (uses default VPC)
+        # Create ECS cluster with Fargate Spot capacity provider for cost savings
         # The actual networking will be specified in the Step Functions task definition
         cluster = ecs.Cluster(
             self,
             "MarkerCluster",
             cluster_name=f"{CONFIG.PROJECT_NAME}-marker-cluster",
             container_insights_v2=ecs.ContainerInsights.ENHANCED,
+            enable_fargate_capacity_providers=True,
         )
 
         # Create task execution role (used by ECS to pull image, write logs)
@@ -330,13 +331,20 @@ def handler(event, context):
         )
 
         # Step 2: Use the resolved ARN in a custom ECS RunTask state
+        # Uses Fargate Spot for ~70% cost savings on interruptible workloads
         run_task_state = {
             "Type": "Task",
             "Resource": "arn:aws:states:::ecs:runTask.sync",
             "Parameters": {
                 "Cluster": cluster.cluster_arn,
                 "TaskDefinition.$": "$.task_definition_arn",
-                "LaunchType": "FARGATE",
+                "CapacityProviderStrategy": [
+                    {
+                        "CapacityProvider": "FARGATE_SPOT",
+                        "Weight": 1,
+                        "Base": 0
+                    }
+                ],
                 "PlatformVersion": "LATEST",
                 "NetworkConfiguration": {
                     "AwsvpcConfiguration": {

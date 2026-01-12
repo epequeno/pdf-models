@@ -166,6 +166,7 @@ class CiCdStack(Stack):
                 build_spec=codebuild.BuildSpec.from_source_filename(
                     f"backend/containers/{model_config.container_path}/buildspec.yml"
                 ),
+                timeout=Duration.minutes(45),  # Prevent runaway builds from accumulating costs
             )
 
             # Grant ECR permissions to CodeBuild

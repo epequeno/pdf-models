@@ -7,12 +7,14 @@ phases:
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO_URI
       - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:-latest}
       - echo "Building image with tag $IMAGE_TAG"
+      - echo "Pulling existing image for cache..."
+      - docker pull $ECR_REPO_URI:latest || true
 
   build:
     commands:
-      - echo Building Rust Lambda builder base image...
+      - echo Building Rust Lambda builder base image with BuildKit caching...
       - cd backend/containers/rust-lambda-builder
-      - docker build -t $ECR_REPO_URI:$IMAGE_TAG .
+      - DOCKER_BUILDKIT=1 docker build --cache-from $ECR_REPO_URI:latest -t $ECR_REPO_URI:$IMAGE_TAG .
       - docker tag $ECR_REPO_URI:$IMAGE_TAG $ECR_REPO_URI:latest
 
   post_build:

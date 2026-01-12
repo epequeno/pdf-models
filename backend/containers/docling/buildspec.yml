@@ -12,13 +12,15 @@ phases:
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:-latest}
       - echo "Image tag will be:$IMAGE_TAG"
+      - echo "Pulling existing image for cache..."
+      - docker pull $ECR_REPOSITORY_URI:latest || true
 
   build:
     commands:
       - echo "Build started on $(date)"
-      - echo "Building the Docker image..."
+      - echo "Building the Docker image with BuildKit caching..."
       - cd backend/containers/docling
-      - docker build -t $ECR_REPOSITORY_URI:latest .
+      - DOCKER_BUILDKIT=1 docker build --cache-from $ECR_REPOSITORY_URI:latest -t $ECR_REPOSITORY_URI:latest .
       - docker tag $ECR_REPOSITORY_URI:latest $ECR_REPOSITORY_URI:$IMAGE_TAG
       - echo "Build completed"
 

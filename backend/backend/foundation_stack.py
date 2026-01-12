@@ -49,11 +49,11 @@ class FoundationStack(Stack):
                 empty_on_delete=True,
                 # Security: Scan images on push for vulnerabilities
                 image_scan_on_push=True,
-                # Lifecycle: Keep only last 5 images to control costs
+                # Lifecycle: Keep only last 3 images to control costs
                 lifecycle_rules=[
                     ecr.LifecycleRule(
-                        description="Keep last 5 images only",
-                        max_image_count=5,
+                        description="Keep last 3 images only",
+                        max_image_count=3,
                         rule_priority=1,
                     )
                 ],
