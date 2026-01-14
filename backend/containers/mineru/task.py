@@ -103,55 +103,67 @@ def process_pdf_with_mineru(input_path: str, output_dir: str) -> dict:
     Returns:
         dict with 'json' (structured document) and 'markdown' (text) content
     """
-    # MinerU 2.x imports - package renamed from magic_pdf to mineru
-    from mineru.data.data_reader_writer import FileBasedDataWriter
-    from mineru.backend.pipeline.pipeline_analyze import doc_analyze as pipeline_doc_analyze
-    from mineru.backend.pipeline.pipeline_middle_json_mkcontent import union_make as pipeline_union_make
-    from mineru.backend.pipeline.model_json_to_middle_json import result_to_middle_json as pipeline_result_to_middle_json
-    from mineru.cli.common import read_fn
+    # MinerU 2.x imports
+    from mineru.cli.common import do_parse
 
     logger.info("Initializing MinerU processing...")
-
-    # Create output directories
-    image_dir = os.path.join(output_dir, "images")
-    os.makedirs(image_dir, exist_ok=True)
 
     # Read PDF bytes
     logger.info(f"Reading PDF: {input_path}")
     with open(input_path, "rb") as f:
         pdf_bytes = f.read()
 
-    # Set up image writer for extracted images
-    image_writer = FileBasedDataWriter(image_dir)
+    # Get PDF filename without extension for output naming
+    pdf_name = os.path.splitext(os.path.basename(input_path))[0]
 
-    # Analyze document with pipeline backend (CPU mode)
-    logger.info("Analyzing document with MinerU pipeline backend...")
-    model_list, page_count = pipeline_doc_analyze(pdf_bytes, ocr=True)
+    # Process with MinerU using the high-level API
+    # do_parse writes output files to disk
+    logger.info("Processing document with MinerU...")
+    do_parse(
+        output_dir=output_dir,
+        pdf_file_names=[pdf_name],
+        pdf_bytes_list=[pdf_bytes],
+        lang_list=['en'],
+        backend='pipeline',  # CPU mode, no GPU required
+        parse_method='auto',
+        f_dump_middle_json=True,
+        f_dump_content_list=True,
+    )
 
-    # Convert model results to middle JSON format
-    logger.info("Converting model results to middle format...")
-    middle_json = pipeline_result_to_middle_json(model_list)
+    # Read the generated output files
+    # MinerU outputs to: output_dir/pdf_name/auto/
+    result_dir = os.path.join(output_dir, pdf_name, 'auto')
 
-    # Generate content from middle JSON
-    logger.info("Generating content from analysis...")
-    content_result = pipeline_union_make(middle_json, image_writer, image_dir)
+    # Read markdown output
+    md_path = os.path.join(result_dir, f'{pdf_name}.md')
+    if os.path.exists(md_path):
+        with open(md_path, 'r', encoding='utf-8') as f:
+            markdown_content = f.read()
+    else:
+        logger.warning(f"Markdown file not found at {md_path}")
+        markdown_content = ""
 
-    # Extract markdown and content list from result
-    markdown_content = content_result.get("markdown", "")
-    content_list = content_result.get("content_list", [])
+    # Read middle JSON for structured content
+    middle_json_path = os.path.join(result_dir, f'{pdf_name}_middle.json')
+    if os.path.exists(middle_json_path):
+        with open(middle_json_path, 'r', encoding='utf-8') as f:
+            middle_json = json.load(f)
+    else:
+        logger.warning(f"Middle JSON not found at {middle_json_path}")
+        middle_json = {}
 
     # Build structured JSON output
     json_content = {
-        "content": content_list,
+        "content": middle_json.get("content_list", []),
+        "pdf_info": middle_json.get("pdf_info", {}),
         "_metadata": {
             "model": "mineru",
             "backend": "pipeline",
             "processed_at": datetime.now(timezone.utc).isoformat(),
-            "page_count": page_count,
         }
     }
 
-    logger.info(f"Processing complete: {page_count} pages, {len(markdown_content)} chars markdown")
+    logger.info(f"Processing complete: {len(markdown_content)} chars markdown")
 
     return {
         "json": json_content,
