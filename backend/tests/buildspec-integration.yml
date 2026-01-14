@@ -21,8 +21,8 @@ phases:
 
   build:
     commands:
-      - cd backend
       - |
+        cd backend
         if [ -n "$MODEL" ]; then
           uv run pytest tests/integration/test_${MODEL}_e2e.py -v -s --tb=short --junitxml=test-results/integration-results.xml
         else
