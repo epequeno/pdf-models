@@ -60,10 +60,12 @@ ENV MINERU_TOOLS_CONFIG_JSON=/app/magic-pdf.json
 # - OCR models (paddleocr_torch)
 # - Formula recognition models
 # - Table detection models
+# Note: Don't use local_dir - let HF Hub use its proper cache structure with hashes
 RUN pip install --no-cache-dir huggingface_hub && \
     echo "Pre-downloading MinerU models from HuggingFace..." && \
-    python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='opendatalab/PDF-Extract-Kit-1.0', local_dir='/app/hf_cache/hub/models--opendatalab--PDF-Extract-Kit-1.0')" && \
-    echo "Models pre-downloaded successfully"
+    python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='opendatalab/PDF-Extract-Kit-1.0')" && \
+    echo "Models pre-downloaded successfully" && \
+    ls -la $HF_HOME/hub/
 
 # Set offline mode after download to prevent runtime downloads
 ENV HF_HUB_OFFLINE=1
