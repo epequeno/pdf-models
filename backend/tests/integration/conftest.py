@@ -18,11 +18,10 @@ def _get_ssm_parameter(parameter_name: str, region: str = "us-east-1") -> Option
     Returns None if the parameter doesn't exist or if there's an error.
     """
     try:
-        # Use AWS_PROFILE environment variable if set (for integration tests)
+        # Use AWS_PROFILE environment variable if set (for local integration tests)
         profile_name = os.getenv("AWS_PROFILE")
         if profile_name:
-            import boto3.session
-            session = boto3.session.Session(profile_name=profile_name)
+            session = boto3.Session(profile_name=profile_name)
             ssm = session.client("ssm", region_name=region)
         else:
             ssm = boto3.client("ssm", region_name=region)
