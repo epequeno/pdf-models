@@ -54,14 +54,14 @@ RUN mkdir -p /app/mineru_models && \
 # Set config file location
 ENV MINERU_TOOLS_CONFIG_JSON=/app/magic-pdf.json
 
-# Pre-download models at build time using mineru CLI
-# This downloads layout, formula, and table models (~2-5GB total)
-# Running a minimal PDF ensures all models are cached
+# Pre-download models at build time using mineru's official download command
+# This downloads all required models (~2-5GB total) including:
+# - Layout detection models (doclayout_yolo)
+# - OCR models (paddleocr_torch)
+# - Formula recognition models
+# - Table detection models
 RUN echo "Pre-downloading MinerU models..." && \
-    echo '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R>>endobj\nxref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000052 00000 n \n0000000101 00000 n \ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n178\n%%EOF' > /tmp/test.pdf && \
-    mkdir -p /tmp/output && \
-    mineru -p /tmp/test.pdf -o /tmp/output -b pipeline || echo "Model download completed (errors during minimal PDF processing are expected)" && \
-    rm -rf /tmp/test.pdf /tmp/output && \
+    mineru-models-download && \
     echo "Models pre-downloaded successfully"
 
 # Set offline mode after download to prevent runtime downloads
