@@ -123,7 +123,7 @@ def process_pdf_with_mineru(input_path: str, output_dir: str) -> dict:
         output_dir=output_dir,
         pdf_file_names=[pdf_name],
         pdf_bytes_list=[pdf_bytes],
-        lang_list=['en'],
+        p_lang_list=['en'],
         backend='pipeline',  # CPU mode, no GPU required
         parse_method='auto',
         f_dump_middle_json=True,
