@@ -23,6 +23,11 @@ phases:
     commands:
       - |
         cd backend
+        echo "=== DEBUG: Listing tests/integration/ ==="
+        ls -la tests/integration/
+        echo "=== DEBUG: Looking for test_mineru_e2e.py ==="
+        ls -la tests/integration/test_mineru_e2e.py || echo "File not found!"
+        echo "=== END DEBUG ==="
         if [ -n "$MODEL" ]; then
           uv run pytest tests/integration/test_${MODEL}_e2e.py -v -s --tb=short --junitxml=test-results/integration-results.xml
         else
