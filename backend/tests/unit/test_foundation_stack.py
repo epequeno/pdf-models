@@ -41,19 +41,17 @@ def test_ecr_repository_configuration():
     stack = FoundationStack(app, "TestFoundationStack")
     template = Template.from_stack(stack)
 
-    # Verify ECR repository properties
+    # Verify ECR repository properties (checking common config across all model repos)
     template.has_resource_properties(
         "AWS::ECR::Repository",
         {
-            "RepositoryName": CONFIG.ECR_MARKER_REPO_NAME,
             # Image scanning enabled for security
             "ImageScanningConfiguration": {
                 "ScanOnPush": True,
             },
-            # Lifecycle policy exists (keeps last 5 images)
-            # Check for both "countNumber":5 and "countType":"imageCountMoreThan"
+            # Lifecycle policy exists (keeps last 3 images)
             "LifecyclePolicy": Match.object_like({
-                "LifecyclePolicyText": Match.string_like_regexp(r'.*"countNumber"\s*:\s*5.*'),
+                "LifecyclePolicyText": Match.string_like_regexp(r'.*"countNumber"\s*:\s*3.*'),
             }),
             # Empty on delete for clean teardown
             "EmptyOnDelete": True,

@@ -1,0 +1,37 @@
+version: 0.2
+
+# CodeBuild specification for building and pushing MinerU container to ECR
+# This runs in CodeBuild, triggered manually via AWS CLI or console
+
+phases:
+  pre_build:
+    commands:
+      - echo "Logging in to Amazon ECR..."
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $(echo $ECR_REPOSITORY_URI | cut -d'/' -f1)
+      - echo "ECR Repository URI:$ECR_REPOSITORY_URI"
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:-latest}
+      - echo "Image tag will be:$IMAGE_TAG"
+      - echo "Pulling existing image for cache..."
+      - docker pull $ECR_REPOSITORY_URI:latest || true
+
+  build:
+    commands:
+      - echo "Build started on $(date)"
+      - echo "Building the Docker image with BuildKit caching..."
+      - cd backend/containers/mineru
+      - DOCKER_BUILDKIT=1 docker build --cache-from $ECR_REPOSITORY_URI:latest -t $ECR_REPOSITORY_URI:latest .
+      - docker tag $ECR_REPOSITORY_URI:latest $ECR_REPOSITORY_URI:$IMAGE_TAG
+      - echo "Build completed"
+
+  post_build:
+    commands:
+      - echo "Build completed on $(date)"
+      - echo "Pushing the Docker images..."
+      - docker push $ECR_REPOSITORY_URI:latest
+      - docker push $ECR_REPOSITORY_URI:$IMAGE_TAG
+      - echo "Successfully pushed $ECR_REPOSITORY_URI:latest"
+      - echo "Successfully pushed $ECR_REPOSITORY_URI:$IMAGE_TAG"
+      - echo "Updating SSM parameter with image tag..."
+      - aws ssm put-parameter --name "/pdf-models/cicd/mineru-image-tag" --value "$IMAGE_TAG" --type String --overwrite
+      - echo "SSM parameter /pdf-models/cicd/mineru-image-tag updated to $IMAGE_TAG"

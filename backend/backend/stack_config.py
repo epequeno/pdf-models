@@ -86,6 +86,14 @@ MODELS: dict[str, ModelConfig] = {
         max_capacity=2,
         ebs_volume_size_gb=100,  # 9.29GB image + Docker overhead + headroom
     ),
+    "mineru": ModelConfig(
+        name="mineru",
+        cpu=4096,  # 4 vCPU
+        memory_mib=16384,  # 16GB (MinerU recommends 8GB min, 16GB for headroom)
+        container_path="mineru",
+        output_formats=("markdown", "json"),
+        timeout_minutes=30,  # CPU pipeline is reasonably fast
+    ),
 }
 
 
