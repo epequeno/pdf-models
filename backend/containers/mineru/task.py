@@ -103,9 +103,12 @@ def process_pdf_with_mineru(input_path: str, output_dir: str) -> dict:
     Returns:
         dict with 'json' (structured document) and 'markdown' (text) content
     """
-    from magic_pdf.data.data_reader_writer import FileBasedDataWriter, FileBasedDataReader
-    from magic_pdf.data.dataset import PymuDocDataset
-    from magic_pdf.model.doc_analyze_by_custom_model import doc_analyze
+    # MinerU 2.x imports - package renamed from magic_pdf to mineru
+    from mineru.data.data_reader_writer import FileBasedDataWriter
+    from mineru.backend.pipeline.pipeline_analyze import doc_analyze as pipeline_doc_analyze
+    from mineru.backend.pipeline.pipeline_middle_json_mkcontent import union_make as pipeline_union_make
+    from mineru.backend.pipeline.model_json_to_middle_json import result_to_middle_json as pipeline_result_to_middle_json
+    from mineru.cli.common import read_fn
 
     logger.info("Initializing MinerU processing...")
 
@@ -113,33 +116,29 @@ def process_pdf_with_mineru(input_path: str, output_dir: str) -> dict:
     image_dir = os.path.join(output_dir, "images")
     os.makedirs(image_dir, exist_ok=True)
 
-    # Set up readers and writers
-    image_writer = FileBasedDataWriter(image_dir)
-    reader = FileBasedDataReader("")
-
     # Read PDF bytes
     logger.info(f"Reading PDF: {input_path}")
-    pdf_bytes = reader.read(input_path)
+    with open(input_path, "rb") as f:
+        pdf_bytes = f.read()
 
-    # Create dataset from PDF
-    logger.info("Creating dataset and classifying document...")
-    ds = PymuDocDataset(pdf_bytes)
+    # Set up image writer for extracted images
+    image_writer = FileBasedDataWriter(image_dir)
 
-    # Analyze document with model (uses pipeline backend configured in magic-pdf.json)
-    logger.info("Analyzing document with MinerU model...")
-    infer_result = ds.apply(doc_analyze, ocr=True)
+    # Analyze document with pipeline backend (CPU mode)
+    logger.info("Analyzing document with MinerU pipeline backend...")
+    model_list, page_count = pipeline_doc_analyze(pdf_bytes, ocr=True)
 
-    # Parse the document
-    logger.info("Parsing document content...")
-    pipe_result = infer_result.pipe_ocr_mode(image_writer)
+    # Convert model results to middle JSON format
+    logger.info("Converting model results to middle format...")
+    middle_json = pipeline_result_to_middle_json(model_list)
 
-    # Get markdown content
-    logger.info("Generating Markdown output...")
-    markdown_content = pipe_result.get_markdown(image_dir)
+    # Generate content from middle JSON
+    logger.info("Generating content from analysis...")
+    content_result = pipeline_union_make(middle_json, image_writer, image_dir)
 
-    # Get structured content (content list)
-    logger.info("Generating JSON output...")
-    content_list = pipe_result.get_content_list(image_dir)
+    # Extract markdown and content list from result
+    markdown_content = content_result.get("markdown", "")
+    content_list = content_result.get("content_list", [])
 
     # Build structured JSON output
     json_content = {
@@ -148,9 +147,11 @@ def process_pdf_with_mineru(input_path: str, output_dir: str) -> dict:
             "model": "mineru",
             "backend": "pipeline",
             "processed_at": datetime.now(timezone.utc).isoformat(),
-            "page_count": len(ds) if hasattr(ds, '__len__') else None,
+            "page_count": page_count,
         }
     }
+
+    logger.info(f"Processing complete: {page_count} pages, {len(markdown_content)} chars markdown")
 
     return {
         "json": json_content,
