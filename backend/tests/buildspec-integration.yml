@@ -21,19 +21,8 @@ phases:
 
   build:
     commands:
+      # Note: pre_build already did 'cd backend', so we're already in the backend dir
       - |
-        echo "=== DEBUG: Current directory before cd ==="
-        pwd
-        ls -la
-        echo "=== DEBUG: After cd backend ==="
-        cd backend
-        pwd
-        ls -la
-        echo "=== DEBUG: Listing tests/ ==="
-        ls -la tests/ || echo "tests/ not found"
-        echo "=== DEBUG: Listing tests/integration/ ==="
-        ls -la tests/integration/ || echo "tests/integration/ not found"
-        echo "=== END DEBUG ==="
         if [ -n "$MODEL" ]; then
           uv run pytest tests/integration/test_${MODEL}_e2e.py -v -s --tb=short --junitxml=test-results/integration-results.xml
         else
