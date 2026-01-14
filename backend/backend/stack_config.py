@@ -26,6 +26,9 @@ class ModelConfig:
     # Custom prompt support (for VLM models like Dolphin, DeepSeek-OCR)
     supports_prompt: bool = False  # If True, model accepts custom user prompts
 
+    # Fargate ephemeral storage (for large container images with pre-downloaded models)
+    ephemeral_storage_gib: int = 21  # Fargate ephemeral storage (21-200 GiB, default 20)
+
     # GPU/EC2 configuration (defaults to Fargate CPU)
     use_gpu: bool = False  # If True, use EC2 with GPU instead of Fargate
     gpu_count: int = 0  # Number of GPUs per task (typically 1 for GPU models)
@@ -93,6 +96,7 @@ MODELS: dict[str, ModelConfig] = {
         container_path="mineru",
         output_formats=("markdown", "json"),
         timeout_minutes=30,  # CPU pipeline is reasonably fast
+        ephemeral_storage_gib=50,  # ~5GB models + image layers
     ),
 }
 

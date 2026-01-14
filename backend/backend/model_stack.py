@@ -280,6 +280,7 @@ class ModelStack(Stack):
                 family=f"{CONFIG.PROJECT_NAME}-{model_name}",
                 cpu=model_config.cpu,
                 memory_limit_mib=model_config.memory_mib,
+                ephemeral_storage_gib=model_config.ephemeral_storage_gib,
                 execution_role=execution_role,
                 task_role=task_role,
             )
