@@ -54,14 +54,15 @@ RUN mkdir -p /app/mineru_models && \
 # Set config file location
 ENV MINERU_TOOLS_CONFIG_JSON=/app/magic-pdf.json
 
-# Pre-download models at build time using mineru's official download command
+# Pre-download models at build time using huggingface_hub SDK
 # This downloads all required models (~2-5GB total) including:
 # - Layout detection models (doclayout_yolo)
 # - OCR models (paddleocr_torch)
 # - Formula recognition models
 # - Table detection models
-RUN echo "Pre-downloading MinerU models..." && \
-    mineru-models-download && \
+RUN pip install --no-cache-dir huggingface_hub && \
+    echo "Pre-downloading MinerU models from HuggingFace..." && \
+    python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='opendatalab/PDF-Extract-Kit-1.0', local_dir='/app/hf_cache/hub/models--opendatalab--PDF-Extract-Kit-1.0')" && \
     echo "Models pre-downloaded successfully"
 
 # Set offline mode after download to prevent runtime downloads
