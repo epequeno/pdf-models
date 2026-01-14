@@ -23,6 +23,10 @@ phases:
     commands:
       # Note: pre_build already did 'cd backend', so we're already in the backend dir
       - |
+        echo "Current directory: $(pwd)"
+        echo "Testing SSM access..."
+        aws ssm get-parameter --name "/pdf-models/core/cognito-user-pool-client-id" --query 'Parameter.Value' --output text || echo "SSM lookup failed"
+        echo "Running tests..."
         if [ -n "$MODEL" ]; then
           uv run pytest tests/integration/test_${MODEL}_e2e.py -v -s --tb=short --junitxml=test-results/integration-results.xml
         else
