@@ -255,6 +255,41 @@ container-build:
 		echo "Error: MODEL parameter required. Usage: make container-build MODEL=marker"; \
 		exit 1; \
 	fi
+	@# Check for uncommitted changes in the container directory
+	@if [ -n "$$(git status --porcelain backend/containers/$(MODEL)/)" ]; then \
+		echo ""; \
+		echo "⚠️  WARNING: Uncommitted changes in backend/containers/$(MODEL)/"; \
+		echo "   CodeBuild pulls from CodeCommit - your local changes won't be included!"; \
+		echo ""; \
+		git status --short backend/containers/$(MODEL)/; \
+		echo ""; \
+		read -p "   Commit and push changes now? [y/N] " confirm; \
+		if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
+			git add backend/containers/$(MODEL)/ && \
+			git commit -m "Update $(MODEL) container" && \
+			git push; \
+		else \
+			echo "Aborting build. Commit and push your changes first."; \
+			exit 1; \
+		fi; \
+	fi
+	@# Check for unpushed commits
+	@UNPUSHED=$$(git log origin/$$(git rev-parse --abbrev-ref HEAD)..HEAD --oneline 2>/dev/null); \
+	if [ -n "$$UNPUSHED" ]; then \
+		echo ""; \
+		echo "⚠️  WARNING: Unpushed commits detected:"; \
+		echo "$$UNPUSHED"; \
+		echo ""; \
+		echo "   CodeBuild pulls from CodeCommit - unpushed commits won't be included!"; \
+		echo ""; \
+		read -p "   Push now? [y/N] " confirm; \
+		if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
+			git push; \
+		else \
+			echo "Aborting build. Push your changes first."; \
+			exit 1; \
+		fi; \
+	fi
 	@echo "Triggering CodeBuild for $(MODEL) container with AWS_PROFILE=$(AWS_PROFILE)..."
 	@echo "Note: This triggers the CodeBuild project, it does not build locally."
 	$(AWS) codebuild start-build \
