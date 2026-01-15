@@ -1,7 +1,9 @@
 module Main exposing (main)
 
 import Browser
+import Browser.Events
 import Browser.Navigation as Nav
+import Components.ModelPalette exposing (modelPalette)
 import Css.Global
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (..)
@@ -20,6 +22,7 @@ import Url
 import Url.Parser as Parser exposing ((</>), Parser)
 import Views.Jobs
 import Views.Login
+import Views.Models
 import Views.SignUp
 import Views.Upload
 
@@ -66,6 +69,7 @@ routeParser =
         , Parser.map parseModelRoute (Parser.s "upload" </> Parser.string)
         , Parser.map (Upload defaultPdfModel) (Parser.s "upload")
         , Parser.map Jobs (Parser.s "jobs")
+        , Parser.map Models (Parser.s "models")
         ]
 
 
@@ -550,7 +554,7 @@ update msg model =
                 newUpload =
                     { oldUpload | prompt = newPrompt }
             in
-            ( { model | upload = newUpload }
+            ( { model | upload = newUpload, modelPaletteOpen = False, hoveredModel = Nothing }
             , Nav.pushUrl model.key (routeToPath (Upload newPdfModel))
             )
 
@@ -628,15 +632,153 @@ update msg model =
             in
             ( { model | upload = newUpload }, Cmd.none )
 
-        ToggleModelInfo ->
-            let
-                oldUpload =
-                    model.upload
+        -- Model Selection & Discovery
+        OpenModelPalette ->
+            ( { model | modelPaletteOpen = True, modelSearchQuery = "" }, Cmd.none )
 
-                newUpload =
-                    { oldUpload | modelInfoExpanded = not oldUpload.modelInfoExpanded }
+        CloseModelPalette ->
+            ( { model | modelPaletteOpen = False, modelSearchQuery = "" }, Cmd.none )
+
+        ModelSearchChanged query ->
+            ( { model | modelSearchQuery = query }, Cmd.none )
+
+        ModelHovered maybePdfModel ->
+            ( { model | hoveredModel = maybePdfModel }, Cmd.none )
+
+        ToggleModelCardExpanded pdfModel ->
+            let
+                newExpanded =
+                    if model.expandedModelCard == Just pdfModel then
+                        Nothing
+
+                    else
+                        Just pdfModel
             in
-            ( { model | upload = newUpload }, Cmd.none )
+            ( { model | expandedModelCard = newExpanded }, Cmd.none )
+
+        ToggleCategoryFilter category ->
+            let
+                oldFilters =
+                    model.modelFilters
+
+                newCategories =
+                    if List.member category oldFilters.categories then
+                        List.filter (\c -> c /= category) oldFilters.categories
+
+                    else
+                        category :: oldFilters.categories
+
+                newFilters =
+                    { oldFilters | categories = newCategories }
+            in
+            ( { model | modelFilters = newFilters }, Cmd.none )
+
+        ToggleCapabilityFilter capability ->
+            let
+                oldFilters =
+                    model.modelFilters
+
+                newCapabilities =
+                    if List.member capability oldFilters.capabilities then
+                        List.filter (\c -> c /= capability) oldFilters.capabilities
+
+                    else
+                        capability :: oldFilters.capabilities
+
+                newFilters =
+                    { oldFilters | capabilities = newCapabilities }
+            in
+            ( { model | modelFilters = newFilters }, Cmd.none )
+
+        ClearModelFilters ->
+            ( { model | modelFilters = { categories = [], capabilities = [] } }, Cmd.none )
+
+        ToggleModelComparison pdfModel ->
+            let
+                newComparison =
+                    if List.member pdfModel model.comparisonModels then
+                        List.filter (\m -> m /= pdfModel) model.comparisonModels
+
+                    else if List.length model.comparisonModels < 3 then
+                        pdfModel :: model.comparisonModels
+
+                    else
+                        model.comparisonModels
+            in
+            ( { model | comparisonModels = newComparison }, Cmd.none )
+
+        ClearComparison ->
+            ( { model | comparisonModels = [] }, Cmd.none )
+
+        KeyboardShortcut key ->
+            if key == "openPalette" && not model.modelPaletteOpen then
+                -- Open palette and select the first model
+                let
+                    firstModel =
+                        List.head allPdfModels
+                in
+                ( { model | modelPaletteOpen = True, modelSearchQuery = "", hoveredModel = firstModel }, Cmd.none )
+
+            else if key == "Escape" && model.modelPaletteOpen then
+                ( { model | modelPaletteOpen = False, hoveredModel = Nothing }, Cmd.none )
+
+            else if key == "ArrowDown" && model.modelPaletteOpen then
+                let
+                    filteredModels =
+                        filterModels model.modelFilters model.modelSearchQuery allPdfModels
+
+                    nextModel =
+                        case model.hoveredModel of
+                            Nothing ->
+                                List.head filteredModels
+
+                            Just current ->
+                                getNextInList current filteredModels
+                in
+                ( { model | hoveredModel = nextModel }, Cmd.none )
+
+            else if key == "ArrowUp" && model.modelPaletteOpen then
+                let
+                    filteredModels =
+                        filterModels model.modelFilters model.modelSearchQuery allPdfModels
+
+                    prevModel =
+                        case model.hoveredModel of
+                            Nothing ->
+                                List.head (List.reverse filteredModels)
+
+                            Just current ->
+                                getPrevInList current filteredModels
+                in
+                ( { model | hoveredModel = prevModel }, Cmd.none )
+
+            else if key == "Enter" && model.modelPaletteOpen then
+                case model.hoveredModel of
+                    Just selectedModel ->
+                        let
+                            oldUpload =
+                                model.upload
+
+                            newPrompt =
+                                case defaultPromptForModel selectedModel of
+                                    Just defaultPrompt ->
+                                        defaultPrompt
+
+                                    Nothing ->
+                                        ""
+
+                            newUpload =
+                                { oldUpload | prompt = newPrompt }
+                        in
+                        ( { model | upload = newUpload, modelPaletteOpen = False, hoveredModel = Nothing }
+                        , Nav.pushUrl model.key (routeToPath (Upload selectedModel))
+                        )
+
+                    Nothing ->
+                        ( model, Cmd.none )
+
+            else
+                ( model, Cmd.none )
 
         UploadResponseReceived jsonString ->
             case Decode.decodeString S3.uploadResponseDecoder jsonString of
@@ -1154,8 +1296,42 @@ subscriptions model =
                         Err _ ->
                             TokenRefreshReceived "{}"
                 )
+
+        keyboardSub =
+            Browser.Events.onKeyDown keyboardDecoder
     in
-    Sub.batch [ restoredSessionSub, authSub, signUpSub, confirmSignUpSub, uploadProgressSub, uploadResponseSub, pollSub, timeUpdateSub, tokenRefreshSub ]
+    Sub.batch [ restoredSessionSub, authSub, signUpSub, confirmSignUpSub, uploadProgressSub, uploadResponseSub, pollSub, timeUpdateSub, tokenRefreshSub, keyboardSub ]
+
+
+keyboardDecoder : Decode.Decoder Msg
+keyboardDecoder =
+    Decode.map4 toKeyboardMsg
+        (Decode.field "key" Decode.string)
+        (Decode.field "metaKey" Decode.bool)
+        (Decode.field "ctrlKey" Decode.bool)
+        (Decode.field "altKey" Decode.bool)
+
+
+toKeyboardMsg : String -> Bool -> Bool -> Bool -> Msg
+toKeyboardMsg key metaKey ctrlKey altKey =
+    -- ⌘K or Ctrl+K to open palette
+    if (key == "k" || key == "K") && (metaKey || ctrlKey) then
+        KeyboardShortcut "openPalette"
+
+    else if key == "Escape" then
+        KeyboardShortcut "Escape"
+
+    else if key == "ArrowUp" then
+        KeyboardShortcut "ArrowUp"
+
+    else if key == "ArrowDown" then
+        KeyboardShortcut "ArrowDown"
+
+    else if key == "Enter" then
+        KeyboardShortcut "Enter"
+
+    else
+        KeyboardShortcut ""
 
 
 
@@ -1170,9 +1346,25 @@ view model =
             div []
                 [ Css.Global.global Styles.globalStyles
                 , viewContent model
+                , viewModelPalette model
                 ]
         ]
     }
+
+
+viewModelPalette : Model -> Html Msg
+viewModelPalette model =
+    let
+        currentModel =
+            getModelFromRoute model.route
+    in
+    modelPalette
+        { isOpen = model.modelPaletteOpen
+        , searchQuery = model.modelSearchQuery
+        , selectedModel = currentModel
+        , hoveredModel = model.hoveredModel
+        , filters = model.modelFilters
+        }
 
 
 viewContent : Model -> Html Msg
@@ -1194,6 +1386,13 @@ viewContent model =
         Jobs ->
             if Types.isAuthenticated model then
                 viewJobsPlaceholder model
+
+            else
+                viewLoginPlaceholder model
+
+        Models ->
+            if Types.isAuthenticated model then
+                Views.Models.view model
 
             else
                 viewLoginPlaceholder model
@@ -1287,3 +1486,25 @@ httpErrorToString error =
 
         Http.BadBody message ->
             "Invalid response: " ++ message
+
+
+getNextInList : a -> List a -> Maybe a
+getNextInList current list =
+    case list of
+        [] ->
+            Nothing
+
+        [ single ] ->
+            Just single
+
+        first :: second :: rest ->
+            if first == current then
+                Just second
+
+            else
+                getNextInList current (second :: rest)
+
+
+getPrevInList : a -> List a -> Maybe a
+getPrevInList current list =
+    getNextInList current (List.reverse list)

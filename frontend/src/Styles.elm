@@ -408,3 +408,189 @@ flexBetween =
 gap : Css.Px -> Style
 gap size =
     property "gap" (String.fromFloat size.numericValue ++ "px")
+
+
+
+-- GRID UTILITIES
+
+
+gridColumns : Int -> Style
+gridColumns cols =
+    property "grid-template-columns" ("repeat(" ++ String.fromInt cols ++ ", minmax(0, 1fr))")
+
+
+modelCardGrid : Style
+modelCardGrid =
+    batch
+        [ property "display" "grid"
+        , property "grid-template-columns" "repeat(auto-fill, minmax(280px, 1fr))"
+        , gap spacing.lg
+        ]
+
+
+modelCardGridCompact : Style
+modelCardGridCompact =
+    batch
+        [ property "display" "grid"
+        , property "grid-template-columns" "repeat(2, 1fr)"
+        , gap spacing.md
+        ]
+
+
+
+-- MODEL CARD STYLES
+
+
+modelCardStyle : Style
+modelCardStyle =
+    batch
+        [ backgroundColor colors.surface
+        , border3 (px 1) solid colors.border
+        , borderRadius radius.lg
+        , padding spacing.lg
+        , cursor pointer
+        , transitions.base
+        , hover
+            [ backgroundColor colors.surfaceRaised
+            , borderColor colors.borderStrong
+            , transform (translateY (px -2))
+            , shadows.md
+            ]
+        ]
+
+
+modelCardSelectedStyle : Style
+modelCardSelectedStyle =
+    batch
+        [ modelCardStyle
+        , borderColor colors.accent
+        , shadows.glow
+        , hover
+            [ borderColor colors.accent
+            , shadows.glowStrong
+            ]
+        ]
+
+
+modelCardExpandedStyle : Style
+modelCardExpandedStyle =
+    batch
+        [ modelCardStyle
+        , property "grid-column" "1 / -1"
+        ]
+
+
+
+-- CATEGORY COLORS
+
+
+categoryColor : String -> Color
+categoryColor category =
+    case category of
+        "OCR & Conversion" ->
+            colors.accent
+
+        "Layout Analysis" ->
+            colors.info
+
+        "Document Understanding" ->
+            colors.success
+
+        _ ->
+            colors.textSecondary
+
+
+categoryBgColor : String -> Color
+categoryBgColor category =
+    case category of
+        "OCR & Conversion" ->
+            colors.accentMuted
+
+        "Layout Analysis" ->
+            colors.infoMuted
+
+        "Document Understanding" ->
+            colors.successMuted
+
+        _ ->
+            colors.surface
+
+
+
+-- PILL/BADGE STYLES
+
+
+pillStyle : Style
+pillStyle =
+    batch
+        [ displayFlex
+        , alignItems center
+        , padding2 spacing.xs spacing.sm
+        , borderRadius radius.full
+        , Css.fontSize fontSize.caption
+        , fontWeight fontWeights.medium
+        ]
+
+
+categoryPillStyle : String -> Style
+categoryPillStyle category =
+    batch
+        [ pillStyle
+        , backgroundColor (categoryBgColor category)
+        , color (categoryColor category)
+        ]
+
+
+
+-- MODAL/OVERLAY STYLES
+
+
+modalOverlay : Style
+modalOverlay =
+    batch
+        [ position fixed
+        , top zero
+        , left zero
+        , right zero
+        , bottom zero
+        , backgroundColor (rgba 0 0 0 0.7)
+        , displayFlex
+        , alignItems center
+        , justifyContent center
+        , property "z-index" "1000"
+        , property "backdrop-filter" "blur(4px)"
+        ]
+
+
+modalContent : Style
+modalContent =
+    batch
+        [ backgroundColor colors.surfaceRaised
+        , border3 (px 1) solid colors.border
+        , borderRadius radius.xl
+        , shadows.lg
+        , maxWidth (px 560)
+        , Css.width (pct 90)
+        , maxHeight (vh 70)
+        , overflow hidden
+        , displayFlex
+        , flexDirection column
+        ]
+
+
+
+-- SCROLLBAR STYLES
+
+
+customScrollbar : Style
+customScrollbar =
+    batch
+        [ property "scrollbar-width" "thin"
+        , property "scrollbar-color" (colorToString colors.borderStrong ++ " transparent")
+        ]
+
+
+colorToString : Color -> String
+colorToString color =
+    -- Convert Color to string for CSS properties
+    color.value

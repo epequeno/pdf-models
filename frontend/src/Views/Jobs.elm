@@ -65,6 +65,19 @@ viewHeader =
                 ]
             ]
             [ a
+                [ href (routeToPath Models)
+                , css
+                    [ color Styles.colors.textSecondary
+                    , textDecoration none
+                    , Css.fontSize Styles.fontSize.body
+                    , Styles.transitions.base
+                    , hover
+                        [ color Styles.colors.textPrimary
+                        ]
+                    ]
+                ]
+                [ text "Models" ]
+            , a
                 [ href (routeToPath (Upload defaultPdfModel))
                 , css
                     [ Styles.flexRow

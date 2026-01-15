@@ -248,6 +248,120 @@ Always deploy in this order to satisfy dependencies (or use `make cdk-deploy-all
 7. `MonitoringStack` - CloudWatch dashboards and alarms
 8. `FrontendStack` - S3 static site, CloudFront distribution
 
+## Frontend Testing with agent-browser
+
+Use [agent-browser](https://github.com/vercel-labs/agent-browser) to test the frontend UI without manual browser interaction.
+
+### Setup
+
+agent-browser should already be installed globally. If not:
+```bash
+npm install -g agent-browser
+agent-browser install  # Download Chromium
+```
+
+### Dev Mode (Recommended for UI Testing)
+
+Add `?dev` to the URL to enable dev mode, which auto-authenticates with mock tokens:
+
+```bash
+cd frontend && ./build.sh
+cd dst && uv run python -m http.server 8080 &
+agent-browser open "http://localhost:8080/?dev"
+```
+
+**Dev mode features:**
+- Auto-login on page load (no credentials needed)
+- Access to all authenticated pages (Upload, Models, Jobs/Dashboard)
+- Sign-in form accepts any credentials
+- Mock tokens never expire
+
+**Note:** API calls will fail in dev mode (no backend), but all UI pages and navigation work.
+
+### Testing Workflow
+
+1. **Start the frontend server**:
+```bash
+cd frontend && ./build.sh  # Build the Elm app
+cd dst && uv run python -m http.server 8080 &
+```
+
+2. **Open the browser with dev mode**:
+```bash
+agent-browser open "http://localhost:8080/?dev"
+```
+
+3. **Take snapshots to see interactive elements**:
+```bash
+agent-browser snapshot -i  # Shows elements with refs like @e1, @e2
+```
+
+4. **Interact with elements**:
+```bash
+agent-browser fill @e1 "test@example.com"  # Fill text inputs
+agent-browser click @e3                     # Click buttons
+agent-browser press "Meta+k"                # Keyboard shortcuts (Cmd+K)
+agent-browser press "Escape"                # Close modals
+agent-browser press "ArrowDown"             # Navigate lists
+```
+
+5. **Take screenshots for visual verification**:
+```bash
+agent-browser screenshot /tmp/test-screenshot.png
+```
+
+6. **Close when done**:
+```bash
+agent-browser close
+```
+
+### Example: Testing the Model Palette
+
+```bash
+# Start server and open browser
+agent-browser open http://localhost:8080/
+
+# Open the model palette with Cmd+K
+agent-browser press "Meta+k"
+
+# Take screenshot to verify it opened
+agent-browser screenshot /tmp/palette-test.png
+
+# Test search functionality
+agent-browser snapshot -i  # Find search input ref
+agent-browser fill @e5 "docling"
+
+# Test keyboard navigation
+agent-browser press "ArrowDown"
+agent-browser press "Enter"  # Select model
+
+# Close palette with Escape
+agent-browser press "Escape"
+
+# Close browser
+agent-browser close
+```
+
+### Useful Commands
+
+| Task | Command |
+|------|---------|
+| Open URL | `agent-browser open <url>` |
+| List elements | `agent-browser snapshot -i` |
+| Click element | `agent-browser click @e1` |
+| Fill input | `agent-browser fill @e1 "text"` |
+| Press key | `agent-browser press "Enter"` |
+| Key combo | `agent-browser press "Meta+k"` |
+| Screenshot | `agent-browser screenshot <path>` |
+| Get page title | `agent-browser get title` |
+| Close browser | `agent-browser close` |
+
+### Notes
+
+- The frontend requires authentication for most pages. Without a backend, you can only test the login page and global features like the command palette (Cmd+K).
+- Use `snapshot -i` after each interaction to get updated element refs.
+- Screenshots are useful for visual verification of styling and layout.
+
 ## Getting Help
 
 - **Architecture details**: See [backend/docs/architecture.md](backend/docs/architecture.md)
@@ -260,3 +374,4 @@ Always deploy in this order to satisfy dependencies (or use `make cdk-deploy-all
 2. Review architecture.md for system design
 3. Use Makefile for all AWS/CDK operations
 4. Remember: AWS_PROFILE=arch and uv are non-negotiable
+5. Use agent-browser for frontend UI testing

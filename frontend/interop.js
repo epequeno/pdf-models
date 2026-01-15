@@ -9,14 +9,46 @@ const AWS_CONFIG = {
     apiBaseUrl: 'https://api.epequeno.app'
 };
 
+// Dev mode detection - enabled on localhost with ?dev parameter
+function isDevMode() {
+    const isLocalhost = window.location.hostname === 'localhost' ||
+                        window.location.hostname === '127.0.0.1';
+    const hasDevParam = new URLSearchParams(window.location.search).has('dev');
+    return isLocalhost && hasDevParam;
+}
+
+// Mock tokens for dev mode (never expire - set to year 2099)
+const DEV_MOCK_TOKENS = {
+    accessToken: 'dev-mock-access-token',
+    idToken: 'dev-mock-id-token',
+    refreshToken: 'dev-mock-refresh-token',
+    expiresAt: 4102444800000  // Year 2099
+};
+
 window.AwsInterop = {
     setup: function(ports) {
-        console.log('AWS Interop ready');
+        if (isDevMode()) {
+            console.log('AWS Interop ready (DEV MODE - using mock auth)');
+        } else {
+            console.log('AWS Interop ready');
+        }
 
         // Handle session restoration requests
         if (ports.restoreSessionPort) {
             ports.restoreSessionPort.subscribe(async function() {
                 try {
+                    // In dev mode, always return mock tokens
+                    if (isDevMode()) {
+                        console.log('Dev mode: returning mock auth tokens');
+                        if (ports.receiveRestoredSession) {
+                            ports.receiveRestoredSession.send(JSON.stringify({
+                                success: true,
+                                ...DEV_MOCK_TOKENS
+                            }));
+                        }
+                        return;
+                    }
+
                     const result = await restoreAuthSession();
                     if (ports.receiveRestoredSession) {
                         ports.receiveRestoredSession.send(JSON.stringify(result));
@@ -48,6 +80,18 @@ window.AwsInterop = {
         // Handle sign in requests from Elm
         ports.signInPort.subscribe(async function(credentials) {
             try {
+                // In dev mode, accept any credentials and return mock tokens
+                if (isDevMode()) {
+                    console.log('Dev mode: mock sign in for', credentials.email);
+                    if (ports.receiveAuthResponse) {
+                        ports.receiveAuthResponse.send(JSON.stringify({
+                            success: true,
+                            ...DEV_MOCK_TOKENS
+                        }));
+                    }
+                    return;
+                }
+
                 console.log('Attempting sign in...');
                 const result = await authenticateWithCognito(
                     credentials.email,

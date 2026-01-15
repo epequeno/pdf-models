@@ -1,6 +1,7 @@
 module Views.Upload exposing (view)
 
 import Components.Button as Button
+import Components.ModelGrid exposing (modelGrid, modelGridConfig)
 import Css exposing (..)
 import Css.Animations as Animations
 import File
@@ -51,7 +52,66 @@ view pdfModel model =
                     [ text "Upload a PDF document for processing" ]
                 ]
 
-            -- Main card
+            -- Model selection section
+            , div
+                [ css [ marginBottom Styles.spacing.xxl ] ]
+                [ div
+                    [ css
+                        [ Styles.flexBetween
+                        , marginBottom Styles.spacing.md
+                        ]
+                    ]
+                    [ label
+                        [ css
+                            [ Styles.textCaption
+                            ]
+                        ]
+                        [ text "SELECT MODEL" ]
+                    , button
+                        [ onClick OpenModelPalette
+                        , css
+                            [ backgroundColor Styles.colors.surface
+                            , border3 (px 1) solid Styles.colors.border
+                            , borderRadius Styles.radius.md
+                            , padding2 Styles.spacing.xs Styles.spacing.sm
+                            , color Styles.colors.textTertiary
+                            , cursor pointer
+                            , Css.fontSize Styles.fontSize.caption
+                            , fontFamilies Styles.fontStack
+                            , Styles.transitions.fast
+                            , hover
+                                [ borderColor Styles.colors.borderStrong
+                                , color Styles.colors.textSecondary
+                                ]
+                            ]
+                        ]
+                        [ text "⌘K" ]
+                    ]
+                , modelGrid
+                    (modelGridConfig
+                        { selectedModel = pdfModel
+                        , hoveredModel = model.hoveredModel
+                        , onSelect = ModelSelected
+                        , onHover = ModelHovered
+                        }
+                    )
+                , a
+                    [ href (routeToPath Models)
+                    , css
+                        [ display block
+                        , textAlign center
+                        , marginTop Styles.spacing.lg
+                        , Css.fontSize Styles.fontSize.small
+                        , color Styles.colors.textTertiary
+                        , textDecoration none
+                        , Styles.transitions.fast
+                        , hover [ color Styles.colors.accent ]
+                        ]
+                    ]
+                    [ text "Explore all models →" ]
+                ]
+
+            -- Main card for file upload
             , div
                 [ css
                     [ backgroundColor Styles.colors.surface
@@ -60,9 +120,7 @@ view pdfModel model =
                     , padding Styles.spacing.xxl
                     ]
                 ]
-                [ viewModelSelector pdfModel
-                , viewModelInfo pdfModel model.upload.modelInfoExpanded
-                , viewPromptInput pdfModel model.upload
+                [ viewPromptInput pdfModel model.upload
                 , viewFileDropZone model.upload pdfModel
                 , case model.upload.error of
                     Just err ->
@@ -116,6 +174,23 @@ viewHeader =
                 ]
             ]
             [ a
+                [ href (routeToPath Models)
+                , css
+                    [ padding2 Styles.spacing.sm Styles.spacing.base
+                    , border3 (px 1) solid Styles.colors.border
+                    , borderRadius Styles.radius.md
+                    , color Styles.colors.textSecondary
+                    , textDecoration none
+                    , Css.fontSize Styles.fontSize.body
+                    , Styles.transitions.base
+                    , hover
+                        [ backgroundColor Styles.colors.overlay
+                        , borderColor Styles.colors.borderStrong
+                        ]
+                    ]
+                ]
+                [ text "Models" ]
+            , a
                 [ href (routeToPath Jobs)
                 , css
                     [ padding2 Styles.spacing.sm Styles.spacing.base
@@ -135,192 +210,6 @@ viewHeader =
             , Button.button Button.Ghost "Sign Out" SignOutClicked
             ]
         ]
-
-
-viewModelSelector : PdfModel -> Html Msg
-viewModelSelector currentPdfModel =
-    div
-        [ css
-            [ marginBottom Styles.spacing.xl
-            ]
-        ]
-        [ label
-            [ css
-                [ display block
-                , Styles.textCaption
-                , marginBottom Styles.spacing.sm
-                ]
-            ]
-            [ text "PROCESSING MODEL" ]
-        , select
-            [ onInput (stringToPdfModel >> Maybe.withDefault defaultPdfModel >> ModelSelected)
-            , value (pdfModelToString currentPdfModel)
-            , css
-                [ Css.width (pct 100)
-                , padding2 Styles.spacing.md Styles.spacing.base
-                , backgroundColor Styles.colors.surfaceRaised
-                , border3 (px 1) solid Styles.colors.border
-                , borderRadius Styles.radius.md
-                , color Styles.colors.textPrimary
-                , fontFamilies Styles.fontStack
-                , Css.fontSize Styles.fontSize.body
-                , cursor pointer
-                , Styles.transitions.base
-                , hover
-                    [ borderColor Styles.colors.borderStrong
-                    ]
-                , focus
-                    [ borderColor Styles.colors.borderFocus
-                    , Styles.focusRing
-                    ]
-                ]
-            ]
-            (List.map (viewModelOption currentPdfModel) allPdfModels)
-        ]
-
-
-viewModelOption : PdfModel -> PdfModel -> Html Msg
-viewModelOption currentPdfModel pdfModel =
-    option
-        [ value (pdfModelToString pdfModel)
-        , selected (pdfModel == currentPdfModel)
-        , css
-            [ backgroundColor Styles.colors.surfaceRaised
-            , color Styles.colors.textPrimary
-            ]
-        ]
-        [ text (pdfModelToDisplayName pdfModel) ]
-
-
-viewModelInfo : PdfModel -> Bool -> Html Msg
-viewModelInfo pdfModel isExpanded =
-    let
-        metadata =
-            modelMetadata pdfModel
-    in
-    div
-        [ css
-            [ marginBottom Styles.spacing.xl
-            ]
-        ]
-        [ -- Clickable header
-          div
-            [ onClick ToggleModelInfo
-            , css
-                [ cursor pointer
-                , Styles.flexRow
-                , Styles.gap Styles.spacing.sm
-                , color Styles.colors.textTertiary
-                , Css.fontSize Styles.fontSize.small
-                , Styles.transitions.base
-                , hover [ color Styles.colors.textSecondary ]
-                ]
-            ]
-            [ span
-                [ css
-                    [ Styles.transitions.base
-                    , transform
-                        (if isExpanded then
-                            rotate (deg 90)
-
-                         else
-                            rotate (deg 0)
-                        )
-                    ]
-                ]
-                [ text "▶" ]
-            , text "About this model"
-            ]
-
-        -- Expandable content
-        , if isExpanded then
-            div
-                [ css
-                    [ marginTop Styles.spacing.md
-                    , padding Styles.spacing.lg
-                    , backgroundColor Styles.colors.surfaceRaised
-                    , border3 (px 1) solid Styles.colors.border
-                    , borderRadius Styles.radius.lg
-                    ]
-                ]
-                [ -- Model name and producer
-                  div
-                    [ css
-                        [ Styles.flexRow
-                        , Styles.gap Styles.spacing.sm
-                        , marginBottom Styles.spacing.sm
-                        ]
-                    ]
-                    [ span
-                        [ css
-                            [ fontWeight Styles.fontWeights.medium
-                            , color Styles.colors.textPrimary
-                            ]
-                        ]
-                        [ text (pdfModelToDisplayName pdfModel) ]
-                    , span
-                        [ css [ color Styles.colors.textTertiary ]
-                        ]
-                        [ text "by" ]
-                    , span
-                        [ css [ color Styles.colors.accent ]
-                        ]
-                        [ text metadata.producer ]
-                    ]
-
-                -- Description
-                , div
-                    [ css
-                        [ Styles.textSmall
-                        , marginBottom Styles.spacing.lg
-                        , lineHeight Styles.lineHeights.relaxed
-                        ]
-                    ]
-                    [ text metadata.description ]
-
-                -- Links
-                , div
-                    [ css
-                        [ Styles.flexRow
-                        , Styles.gap Styles.spacing.lg
-                        , flexWrap wrap
-                        ]
-                    ]
-                    (List.filterMap identity
-                        [ metadata.githubUrl
-                            |> Maybe.map (viewLink "GitHub")
-                        , metadata.huggingFaceUrl
-                            |> Maybe.map (viewLink "Hugging Face")
-                        , metadata.docsUrl
-                            |> Maybe.map (viewLink "Docs")
-                        , metadata.arxivUrl
-                            |> Maybe.map (viewLink "arXiv")
-                        ]
-                    )
-                ]
-
-          else
-            text ""
-        ]
-
-
-viewLink : String -> String -> Html msg
-viewLink label url =
-    a
-        [ href url
-        , Attr.target "_blank"
-        , css
-            [ color Styles.colors.accent
-            , Css.fontSize Styles.fontSize.small
-            , textDecoration none
-            , Styles.transitions.base
-            , hover
-                [ color Styles.colors.accentHover
-                , textDecoration underline
-                ]
-            ]
-        ]
-        [ text label ]
 
 
 viewPromptInput : PdfModel -> UploadState -> Html Msg
