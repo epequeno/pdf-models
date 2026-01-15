@@ -98,6 +98,38 @@ MODELS: dict[str, ModelConfig] = {
         timeout_minutes=30,  # CPU pipeline is reasonably fast
         ephemeral_storage_gib=50,  # ~5GB models + image layers
     ),
+    "olmocr": ModelConfig(
+        name="olmocr",
+        cpu=4096,  # 4 vCPU on g4dn.xlarge
+        memory_mib=15360,  # 15GB (leave headroom from 16GB instance)
+        container_path="olmocr",
+        output_formats=("markdown",),
+        timeout_minutes=30,
+        supports_prompt=True,  # VLM model accepts custom prompts
+        use_gpu=True,
+        gpu_count=1,
+        instance_type="g4dn.xlarge",  # 1 T4 GPU, 4 vCPU, 16GB RAM
+        spot_enabled=True,
+        min_capacity=0,  # Scale to zero when idle
+        max_capacity=2,
+        ebs_volume_size_gb=100,  # 7B model + vLLM + headroom
+    ),
+    "docext": ModelConfig(
+        name="docext",
+        cpu=4096,  # 4 vCPU on g4dn.xlarge
+        memory_mib=15360,  # 15GB (leave headroom from 16GB instance)
+        container_path="docext",
+        output_formats=("markdown",),
+        timeout_minutes=30,
+        supports_prompt=True,  # VLM model accepts custom prompts
+        use_gpu=True,
+        gpu_count=1,
+        instance_type="g4dn.xlarge",  # 1 T4 GPU, 4 vCPU, 16GB RAM
+        spot_enabled=True,
+        min_capacity=0,  # Scale to zero when idle
+        max_capacity=2,
+        ebs_volume_size_gb=80,  # 3B model + transformers
+    ),
 }
 
 
