@@ -1,6 +1,10 @@
 module Api exposing
     ( getJob
     , getJobs
+    , jobDecoder
+    , jobStatusDecoder
+    , jobsListDecoder
+    , pdfModelDecoder
     , submitJob
     )
 

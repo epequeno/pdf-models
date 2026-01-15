@@ -1,5 +1,6 @@
 .PHONY: help test test-watch test-integration test-integration-setup test-integration-auto test-integration-debug \
         test-unit-cloud test-integration-cloud test-cloud-status \
+        test-frontend test-frontend-watch \
         cdk-synth cdk-diff cdk-deploy cdk-destroy cdk-deploy-all \
         aws-logs aws-s3-ls aws-stepfunctions-list aws-ecs-force-new-deployment \
         container-build base-image-build lambda-build lambda-build-status lambda-clean \
@@ -17,8 +18,10 @@ help:
 	@echo "pdf-models Makefile"
 	@echo ""
 	@echo "Testing Commands (Local):"
-	@echo "  make test                          - Run all unit tests"
-	@echo "  make test-watch                    - Run tests in watch mode"
+	@echo "  make test                          - Run all backend unit tests"
+	@echo "  make test-watch                    - Run backend tests in watch mode"
+	@echo "  make test-frontend                 - Run Elm frontend unit tests"
+	@echo "  make test-frontend-watch           - Run Elm frontend tests in watch mode"
 	@echo "  make test-integration              - Run integration tests (requires setup)"
 	@echo "  make test-integration-setup        - Create Cognito test user for integration tests (interactive)"
 	@echo "  make test-integration-auto         - Create test user and run integration tests (automated)"
@@ -74,6 +77,14 @@ test:
 test-watch:
 	@echo "Running tests in watch mode..."
 	cd backend && uv run pytest-watch tests/ -v
+
+test-frontend:
+	@echo "Running Elm frontend unit tests..."
+	cd frontend && elm-test
+
+test-frontend-watch:
+	@echo "Running Elm frontend tests in watch mode..."
+	cd frontend && elm-test --watch
 
 test-integration:
 	@echo "Running integration tests..."
