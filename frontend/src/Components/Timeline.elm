@@ -1,6 +1,7 @@
 module Components.Timeline exposing (timeline)
 
 import Css exposing (..)
+import Css.Animations as Animations
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (css)
 import Styles
@@ -31,36 +32,47 @@ timeline currentTime job =
     in
     div
         [ css
-            [ border3 (px 1) solid Styles.colors.border
-            , backgroundColor Styles.colors.surface
-            , padding Styles.spacing.md
-            , property "border-radius" "4px"
+            [ backgroundColor Styles.colors.surfaceRaised
+            , border3 (px 1) solid Styles.colors.border
+            , borderRadius Styles.radius.lg
+            , padding Styles.spacing.xl
             ]
         ]
-        [ h3
+        [ div
             [ css
-                [ fontSize Styles.fontSize.h2
-                , fontWeight Styles.fontWeight.semibold
-                , color Styles.colors.textPrimary
-                , marginBottom Styles.spacing.md
+                [ Styles.flexRow
+                , Styles.gap Styles.spacing.sm
+                , marginBottom Styles.spacing.lg
                 ]
             ]
-            [ text "Processing Timeline" ]
+            [ span
+                [ css
+                    [ Css.fontSize (px 16)
+                    , opacity (num 0.7)
+                    ]
+                ]
+                [ text "⏱" ]
+            , h3
+                [ css
+                    [ Styles.textH2
+                    , margin zero
+                    ]
+                ]
+                [ text "Processing Timeline" ]
+            ]
         , div
             [ css
                 [ displayFlex
                 , flexDirection column
-                , property "gap" "12px"
                 ]
             ]
-            (List.map (viewEvent currentTime) events)
+            (List.indexedMap (viewEvent currentTime (List.length events)) events)
         ]
 
 
 buildTimeline : Time.Posix -> Job -> List TimelineEvent
-buildTimeline currentTime job =
+buildTimeline _ job =
     let
-        -- Event 1: Job submitted
         submittedEvent =
             { label = "Job Submitted"
             , timestamp = Just job.submittedAt
@@ -68,7 +80,6 @@ buildTimeline currentTime job =
             , detail = Nothing
             }
 
-        -- Event 2: Processing started
         processingEvent =
             case job.status of
                 Pending ->
@@ -82,7 +93,7 @@ buildTimeline currentTime job =
                     { label = "Processing"
                     , timestamp = Nothing
                     , status = EventActive
-                    , detail = Just "Converting PDF to Markdown..."
+                    , detail = Just "Converting document..."
                     }
 
                 Complete ->
@@ -96,10 +107,9 @@ buildTimeline currentTime job =
                     { label = "Processing"
                     , timestamp = Nothing
                     , status = EventFailed
-                    , detail = job.error
+                    , detail = Nothing
                     }
 
-        -- Event 3: Job completed
         completedEvent =
             case job.status of
                 Complete ->
@@ -126,88 +136,143 @@ buildTimeline currentTime job =
     [ submittedEvent, processingEvent, completedEvent ]
 
 
-viewEvent : Time.Posix -> TimelineEvent -> Html Msg
-viewEvent currentTime event =
+viewEvent : Time.Posix -> Int -> Int -> TimelineEvent -> Html Msg
+viewEvent currentTime totalEvents index event =
+    let
+        isLast =
+            index == totalEvents - 1
+    in
     div
         [ css
             [ displayFlex
-            , property "gap" "12px"
-            , alignItems flexStart
+            , Styles.gap Styles.spacing.base
+            , alignItems stretch
             ]
         ]
-        [ -- Status indicator (colored circle)
+        [ -- Left side: indicator + connector line
           div
             [ css
-                [ width (px 16)
-                , height (px 16)
-                , property "border-radius" "50%"
-                , backgroundColor (eventColor event.status)
-                , flexShrink (num 0)
-                , marginTop (px 2)
-                , case event.status of
-                    EventActive ->
-                        batch
-                            [ property "animation" "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite"
-                            ]
-
-                    _ ->
-                        batch []
+                [ displayFlex
+                , flexDirection column
+                , alignItems center
+                , Css.width (px 24)
                 ]
             ]
-            []
-        , -- Event details
+            [ -- Status dot with ring
+              div
+                [ css
+                    ([ Css.width (px 12)
+                     , Css.height (px 12)
+                     , borderRadius (pct 50)
+                     , backgroundColor (eventDotColor event.status)
+                     , flexShrink (num 0)
+                     , position relative
+                     ]
+                        ++ (if event.status == EventActive then
+                                [ animationName pulseAnimation
+                                , animationDuration (ms 2000)
+                                , property "animation-iteration-count" "infinite"
+                                , property "animation-timing-function" "ease-in-out"
+                                , property "box-shadow" "0 0 8px rgba(34, 211, 238, 0.5)"
+                                ]
+
+                            else
+                                []
+                           )
+                    )
+                ]
+                []
+            , -- Connector line
+              if not isLast then
+                div
+                    [ css
+                        [ Css.width (px 2)
+                        , flex (num 1)
+                        , minHeight (px 40)
+                        , backgroundColor
+                            (if event.status == EventComplete then
+                                Styles.colors.borderStrong
+
+                             else
+                                Styles.colors.border
+                            )
+                        , marginTop Styles.spacing.sm
+                        , marginBottom Styles.spacing.sm
+                        ]
+                    ]
+                    []
+
+              else
+                text ""
+            ]
+        , -- Right side: content
           div
             [ css
                 [ flex (num 1)
+                , paddingBottom
+                    (if isLast then
+                        px 0
+
+                     else
+                        Styles.spacing.lg
+                    )
                 ]
             ]
             [ div
                 [ css
-                    [ fontWeight Styles.fontWeight.semibold
-                    , color
-                        (case event.status of
-                            EventFailed ->
-                                Styles.colors.accentError
-
-                            EventActive ->
-                                Styles.colors.accentPrimary
-
-                            EventComplete ->
-                                Styles.colors.accentSuccess
-
-                            EventPending ->
-                                Styles.colors.textSecondary
-                        )
-                    , marginBottom (px 4)
+                    [ Styles.flexRow
+                    , Styles.gap Styles.spacing.sm
+                    , marginBottom Styles.spacing.xs
                     ]
                 ]
-                [ text event.label ]
-            , case event.timestamp of
-                Just _ ->
-                    div
-                        [ css
-                            [ fontSize Styles.fontSize.small
-                            , color Styles.colors.textSecondary
-                            ]
+                [ span
+                    [ css
+                        [ fontWeight Styles.fontWeights.medium
+                        , color (eventTextColor event.status)
+                        , Css.fontSize Styles.fontSize.body
                         ]
-                        [ text (formatTimestamp currentTime event.timestamp) ]
+                    ]
+                    [ text event.label ]
+                , case event.timestamp of
+                    Just _ ->
+                        span
+                            [ css
+                                [ Css.fontSize Styles.fontSize.small
+                                , color Styles.colors.textTertiary
+                                ]
+                            ]
+                            [ text (formatTimestamp currentTime event.timestamp) ]
 
-                Nothing ->
-                    text ""
+                    Nothing ->
+                        text ""
+                ]
             , case event.detail of
                 Just detail ->
                     div
                         [ css
-                            [ fontSize Styles.fontSize.small
+                            [ Css.fontSize Styles.fontSize.small
                             , color
                                 (if event.status == EventFailed then
-                                    Styles.colors.accentError
+                                    Styles.colors.error
 
                                  else
                                     Styles.colors.textSecondary
                                 )
-                            , marginTop (px 4)
-                            , fontFamily monospace
+                            , fontFamilies Styles.codeFontStack
+                            , backgroundColor
+                                (if event.status == EventFailed then
+                                    Styles.colors.errorMuted
+
+                                 else if event.status == EventActive then
+                                    Styles.colors.accentMuted
+
+                                 else
+                                    rgba 0 0 0 0
+                                )
+                            , padding2 Styles.spacing.xs Styles.spacing.sm
+                            , borderRadius Styles.radius.sm
+                            , display inlineBlock
+                            , marginTop Styles.spacing.xs
                             ]
                         ]
                         [ text detail ]
@@ -218,20 +283,45 @@ viewEvent currentTime event =
         ]
 
 
-eventColor : EventStatus -> Color
-eventColor status =
+eventDotColor : EventStatus -> Color
+eventDotColor status =
     case status of
         EventComplete ->
-            Styles.colors.accentSuccess
+            Styles.colors.success
 
         EventActive ->
-            Styles.colors.accentPrimary
+            Styles.colors.accent
+
+        EventPending ->
+            Styles.colors.textTertiary
+
+        EventFailed ->
+            Styles.colors.error
+
+
+eventTextColor : EventStatus -> Color
+eventTextColor status =
+    case status of
+        EventComplete ->
+            Styles.colors.success
+
+        EventActive ->
+            Styles.colors.accent
 
         EventPending ->
             Styles.colors.textSecondary
 
         EventFailed ->
-            Styles.colors.accentError
+            Styles.colors.error
+
+
+pulseAnimation : Animations.Keyframes {}
+pulseAnimation =
+    Animations.keyframes
+        [ ( 0, [ Animations.opacity (num 1), Animations.transform [ scale 1 ] ] )
+        , ( 50, [ Animations.opacity (num 0.7), Animations.transform [ scale 1.3 ] ] )
+        , ( 100, [ Animations.opacity (num 1), Animations.transform [ scale 1 ] ] )
+        ]
 
 
 formatTimestamp : Time.Posix -> Maybe Time.Posix -> String
@@ -239,33 +329,42 @@ formatTimestamp currentTime maybeTime =
     case maybeTime of
         Just time ->
             let
-                currentMillis = Time.posixToMillis currentTime
-                timeMillis = Time.posixToMillis time
-                diffMillis = currentMillis - timeMillis
-                diffSeconds = diffMillis // 1000
-                diffMinutes = diffSeconds // 60
-                diffHours = diffMinutes // 60
-                diffDays = diffHours // 24
+                currentMillis =
+                    Time.posixToMillis currentTime
+
+                timeMillis =
+                    Time.posixToMillis time
+
+                diffMillis =
+                    currentMillis - timeMillis
+
+                diffSeconds =
+                    diffMillis // 1000
+
+                diffMinutes =
+                    diffSeconds // 60
+
+                diffHours =
+                    diffMinutes // 60
+
+                diffDays =
+                    diffHours // 24
             in
             if diffSeconds < 60 then
                 if diffSeconds < 10 then
-                    "Just now"
+                    "just now"
+
                 else
-                    String.fromInt diffSeconds ++ " seconds ago"
+                    String.fromInt diffSeconds ++ "s ago"
+
             else if diffMinutes < 60 then
-                if diffMinutes == 1 then
-                    "1 minute ago"
-                else
-                    String.fromInt diffMinutes ++ " minutes ago"
+                String.fromInt diffMinutes ++ "m ago"
+
             else if diffHours < 24 then
-                if diffHours == 1 then
-                    "1 hour ago"
-                else
-                    String.fromInt diffHours ++ " hours ago"
-            else if diffDays == 1 then
-                "1 day ago"
+                String.fromInt diffHours ++ "h ago"
+
             else
-                String.fromInt diffDays ++ " days ago"
+                String.fromInt diffDays ++ "d ago"
 
         Nothing ->
             ""

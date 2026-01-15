@@ -4,8 +4,8 @@
 
 PDF Models is a serverless models-as-a-service platform for hosting open-source document processing models. The platform provides API access to document processing capabilities, allowing developers to integrate ML models without managing infrastructure.
 
-**Initial Model**: Marker (PDF to Markdown conversion)
 **Use Case**: Processing public sector RFI/RFO/RFQ documents
+**Model Comparisons**: https://idp-leaderboard.org/
 
 ## Architecture Principles
 

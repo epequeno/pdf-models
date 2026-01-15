@@ -2,727 +2,373 @@
 
 ## Overview
 
-A minimal, terminal-style web application for PDF-to-Markdown conversion built with Elm and elm-css. The frontend provides a developer-focused interface for authenticating, uploading PDFs, submitting processing jobs, and retrieving results.
+A premium, executive-ready web application for PDF document processing built with Elm and elm-css. The frontend provides a polished, modern interface for authenticating, uploading PDFs, submitting processing jobs, and retrieving results.
 
-## Design Principles
+## Design System: "Nexus"
 
-**Minimal and Functional**
-- Focus on core workflows without unnecessary features
-- Every UI element serves a clear purpose
-- Fast to implement and maintain
+Inspired by Linear and Stripe's design language - sophisticated dark theme with electric cyan accents, professional typography, and attention to micro-interactions.
 
-**Technical/Terminal Aesthetic**
-- Monospace typography throughout
-- Dark theme with muted accent colors
-- Clean, rectangular UI elements with minimal decoration
-- Terminal-style status indicators and feedback
+### Design Principles
 
-**Transparency**
-- Show S3 keys and job IDs to users
-- Display raw status information
-- Minimal abstraction over backend API
+**Premium & Professional**
+- Stripe/Linear-level polish suitable for executive demos
+- Clean, sophisticated dark theme
+- Thoughtful spacing and visual hierarchy
+
+**Modern & Innovative**
+- Electric cyan accents convey cutting-edge AI technology
+- Smooth transitions and animations
+- Real-time status feedback for processing jobs
+
+**Developer-Friendly**
+- Dashboard-centric design showing job metrics
+- Clear status indicators and timelines
+- Technical information displayed elegantly
 
 ## Visual Design System
 
 ### Color Palette
 
 ```elm
--- Background and surfaces
-background: #1a1a1a      -- Primary background
-surface: #252525         -- Card/panel backgrounds
-border: #333333          -- Subtle borders and dividers
+-- Backgrounds (layered for depth)
+background: #0a0a0b      -- Primary background (near black)
+surface: #141415         -- Card/panel backgrounds
+surfaceRaised: #1c1c1e   -- Modals, dropdowns
+overlay: #252528         -- Hover states
 
--- Text
-textPrimary: #e0e0e0     -- Primary text
-textSecondary: #999999   -- Secondary/muted text
-textTertiary: #666666    -- Disabled/placeholder text
+-- Text hierarchy
+textPrimary: #f4f4f5     -- Primary text (high contrast)
+textSecondary: #a1a1aa   -- Secondary/muted text (zinc-400)
+textTertiary: #71717a    -- Hints, disabled text (zinc-500)
+textInverse: #09090b     -- Text on light/accent surfaces
 
--- Accent colors
-accentPrimary: #00d9ff   -- Links, primary actions, focus states
-accentSuccess: #50fa7b   -- Success states, completed jobs
-accentWarning: #f1fa8c   -- Processing/pending states
-accentError: #ff5555     -- Errors, failed jobs
+-- Accent - Electric Cyan
+accent: #22d3ee          -- Primary accent (cyan-400)
+accentHover: #06b6d4     -- Hover state (cyan-500)
+accentPressed: #0891b2   -- Pressed state (cyan-600)
+accentMuted: rgba(34, 211, 238, 0.1)   -- Subtle backgrounds
+accentSubtle: rgba(34, 211, 238, 0.2)  -- Badges, highlights
 
--- Interactive states
-hover: #2a2a2a           -- Button/row hover background
-active: #333333          -- Button active state
-focus: #00d9ff           -- Focus ring color
+-- Semantic colors
+success: #4ade80         -- Complete jobs, success states (green-400)
+successMuted: rgba(74, 222, 128, 0.15)
+warning: #fbbf24         -- Pending states (amber-400)
+warningMuted: rgba(251, 191, 36, 0.15)
+error: #f87171           -- Failed jobs, errors (red-400)
+errorMuted: rgba(248, 113, 113, 0.15)
+info: #60a5fa            -- Informational (blue-400)
+
+-- Borders
+border: #27272a          -- Default borders (zinc-800)
+borderStrong: #3f3f46    -- Emphasized borders (zinc-700)
+borderFocus: #22d3ee     -- Focus ring color
 ```
 
 ### Typography
 
-**Font Stack:**
+**Primary Font Stack (UI text):**
 ```
-"JetBrains Mono", "Fira Code", "SF Mono", "Consolas", "Liberation Mono", monospace
+Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif
+```
+
+**Code Font Stack (technical values only):**
+```
+"JetBrains Mono", "Fira Code", "SF Mono", Consolas, "Liberation Mono", monospace
 ```
 
 **Type Scale:**
-- Heading 1: 24px, weight 600
-- Heading 2: 18px, weight 600
-- Body: 14px, weight 400
-- Small: 12px, weight 400
-- Code: 13px, weight 400
+- Display: 32px / 600 weight (page titles)
+- H1: 24px / 600 weight (section headers)
+- H2: 18px / 500 weight (card titles)
+- Body: 14px / 400 weight (default text)
+- Small: 13px / 400 weight (secondary info)
+- Caption: 12px / 500 weight (labels, badges, uppercase)
+- Code: 13px / 400 weight (monospace technical values)
 
-**Line Height:** 1.5 for body text, 1.2 for headings
+**Line Heights:**
+- Tight: 1.25 (headings)
+- Normal: 1.5 (body text)
+- Relaxed: 1.625 (descriptions)
 
-### Spacing System
-
-Base unit: 8px
+### Spacing System (8px grid)
 
 ```
-xs:  4px   (0.5 units)
-sm:  8px   (1 unit)
-md:  16px  (2 units)
-lg:  24px  (3 units)
-xl:  32px  (4 units)
-xxl: 48px  (6 units)
+xs:   4px    (micro adjustments)
+sm:   8px    (tight spacing)
+md:   12px   (compact elements)
+base: 16px   (default padding)
+lg:   20px   (comfortable spacing)
+xl:   24px   (card padding)
+xxl:  32px   (section spacing)
+xxxl: 40px   (page margins)
+huge: 48px   (major sections)
+massive: 64px (hero spacing)
 ```
 
-### UI Components
+### Border Radius
 
-**Buttons**
-- Rectangular (no border-radius)
-- 1px solid border
-- Padding: 8px 16px
-- Hover: background lightens slightly
-- Primary: accent border + text
-- Secondary: border text only
+```
+none: 0px
+sm:   4px    (buttons, inputs)
+md:   6px    (cards, form elements)
+lg:   8px    (modals)
+xl:   12px   (feature cards)
+full: 9999px (pills, avatars)
+```
 
-**Inputs**
-- Rectangular text inputs
-- 1px border, accent color on focus
-- Padding: 8px 12px
-- Background: slightly lighter than page background
+### Shadows
 
-**Tables**
-- 1px borders between rows
-- Hover state on rows
-- Monospace throughout
-- Compact spacing
+```
+sm:   0 1px 2px rgba(0, 0, 0, 0.3)      -- Subtle depth
+md:   0 4px 6px rgba(0, 0, 0, 0.3)      -- Card elevation
+lg:   0 8px 16px rgba(0, 0, 0, 0.4)     -- Modal elevation
+glow: 0 0 20px rgba(34, 211, 238, 0.15) -- Accent glow
+```
 
-**Status Badges**
-- Inline text with color coding
-- Optional symbol prefix (●)
-- No background, just colored text
+### Transitions
+
+All interactive elements use smooth 150ms ease transitions.
+
+## UI Components
+
+### Buttons
+
+**Variants:**
+- **Primary**: Solid cyan background, dark text - for main CTAs
+- **Secondary**: Outlined with border, fills on hover - for secondary actions
+- **Ghost**: No border, subtle hover background - for tertiary actions
+- **Danger**: Red outlined - for destructive actions
+
+**Sizes:**
+- Small: 28px height, padding 4px 12px
+- Medium: 36px height, padding 8px 16px (default)
+- Large: 44px height, padding 12px 24px
+
+**States:**
+- Hover: Background/border color shift
+- Active: Slightly darker
+- Focus: Cyan focus ring (2px)
+- Disabled: 60% opacity, not-allowed cursor
+
+### Inputs
+
+- Rounded corners (6px radius)
+- Subtle border that strengthens on hover
+- Cyan focus ring with glow effect
+- Placeholder text in zinc-500
+- Label above input in caption style (uppercase, medium weight)
+
+### Status Badges
+
+- Pill-shaped (full radius)
+- Colored dot + text
+- Subtle colored background tint
+- Processing badge has animated pulsing dot
+
+**Status Colors:**
+- Pending: Amber/yellow
+- Processing: Cyan (animated pulse)
+- Complete: Green
+- Failed: Red
+
+### Cards
+
+- Surface background with subtle border
+- 6-8px border radius
+- 24px internal padding
+- Interactive cards have hover state (raised surface, stronger border)
+
+### Timeline Component
+
+- Vertical layout with connected dots
+- Colored indicators per status
+- Processing step has glowing animated dot
+- Timestamps shown inline
+- Detail text in muted code blocks
 
 ## Application Structure
 
-### Page Views
+### Dashboard (Jobs) View
 
-The application has three main views, managed by URL routing:
-
-#### 1. Authentication View (`/login`)
-
-**Purpose:** User login via Cognito
-
-**Layout:**
 ```
-┌─────────────────────────────────────┐
-│                                     │
-│         PDF Models                  │
-│                                     │
-│     ┌──────────────────────┐       │
-│     │ Email                │       │
-│     └──────────────────────┘       │
-│                                     │
-│     ┌──────────────────────┐       │
-│     │ Password             │       │
-│     └──────────────────────┘       │
-│                                     │
-│     [    Sign In    ]              │
-│                                     │
-│     Error message here             │
-│                                     │
-└─────────────────────────────────────┘
-```
-
-**State:**
-- Email input value
-- Password input value
-- Loading state
-- Error message (if auth fails)
-
-**Actions:**
-- Submit credentials → Cognito authentication
-- On success: store tokens, redirect to `/upload`
-- On failure: display error
-
-#### 2. Upload View (`/upload` or `/`)
-
-**Purpose:** Upload PDF to S3 and submit processing job
-
-**Layout:**
-```
-┌─────────────────────────────────────────────────┐
-│ PDF Models                      [Jobs] [Logout] │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  Upload PDF                                     │
-│                                                 │
-│  ┌─────────────────────────────────────┐       │
-│  │                                     │       │
-│  │  [Browse Files]                     │       │
-│  │                                     │       │
-│  │  selected-file.pdf                  │       │
-│  │  Uploading... 47%                   │       │
-│  │                                     │       │
-│  └─────────────────────────────────────┘       │
-│                                                 │
-│  S3 Key: us-east-1:abc.../job-123.pdf          │
-│                                                 │
-│  [  Submit Job  ]                              │
-│                                                 │
-└─────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│  Dashboard                           [+ New Job] [Sign Out]│
+│  Monitor your PDF processing jobs                          │
+├────────────────────────────────────────────────────────────┤
+│                                                            │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐     │
+│  │ TOTAL    │ │PROCESSING│ │COMPLETED │ │ FAILED   │     │
+│  │    12    │ │     2    │ │     8    │ │    2     │     │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘     │
+│                                                            │
+│  Recent Jobs                               [Refresh]       │
+│                                                            │
+│  ┌────────────────────────────────────────────────────┐   │
+│  │ ▶ Job abc123   Marker   ● Processing   2m ago      │   │
+│  └────────────────────────────────────────────────────┘   │
+│  ┌────────────────────────────────────────────────────┐   │
+│  │ ▼ Job def456   Marker   ● Complete     5m ago [↓]  │   │
+│  │   ─────────────────────────────────────────────    │   │
+│  │   user-id/job-def456.pdf                           │   │
+│  │                                                     │   │
+│  │   ⏱ Processing Timeline                           │   │
+│  │   ● Job Submitted         5m ago                   │   │
+│  │   │                                                │   │
+│  │   ● Processing            Converting document...    │   │
+│  │   │                                                │   │
+│  │   ● Completed             Ready for download       │   │
+│  └────────────────────────────────────────────────────┘   │
+└────────────────────────────────────────────────────────────┘
 ```
 
-**State:**
-- Selected file
-- Upload progress (0-100)
-- S3 key (after upload complete)
-- Submit status
-- Identity ID (from Identity Pool)
+### Upload View
 
-**Actions:**
-1. Select file from local system
-2. Get Identity Pool credentials
-3. Upload to S3: `s3://bucket/{identityId}/{jobId}.pdf`
-4. Display S3 key to user
-5. Submit job to API with S3 key
-6. Redirect to `/jobs` on success
-
-#### 3. Jobs List View (`/jobs`)
-
-**Purpose:** View all submitted jobs and their status
-
-**Layout:**
 ```
-┌───────────────────────────────────────────────────────────────┐
-│ PDF Models              [Upload] [Refresh] [Logout]           │
-├───────────────────────────────────────────────────────────────┤
-│                                                               │
-│  Your Jobs                                                    │
-│                                                               │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │ Job ID        │ Submitted    │ Status     │ Actions    │ │
-│  ├─────────────────────────────────────────────────────────┤ │
-│  │ job-abc123    │ 2 min ago    │ ● complete │ [Download] │ │
-│  │ job-def456    │ 5 min ago    │ ● process  │ —          │ │
-│  │ job-ghi789    │ 1 hour ago   │ ● failed   │ [Retry]    │ │
-│  └─────────────────────────────────────────────────────────┘ │
-│                                                               │
-│  Auto-refresh: 10s                                            │
-│                                                               │
-└───────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│  PDF Models                         [Dashboard] [Sign Out] │
+├────────────────────────────────────────────────────────────┤
+│                                                            │
+│                      New Job                               │
+│           Upload a PDF document for processing             │
+│                                                            │
+│  ┌────────────────────────────────────────────────────┐   │
+│  │                                                     │   │
+│  │  PROCESSING MODEL                                   │   │
+│  │  ┌─────────────────────────────────────────────┐   │   │
+│  │  │ Marker                               ▼      │   │   │
+│  │  └─────────────────────────────────────────────┘   │   │
+│  │                                                     │   │
+│  │  ▶ About this model                                │   │
+│  │                                                     │   │
+│  │  DOCUMENT                                          │   │
+│  │  ┌─────────────────────────────────────────────┐   │   │
+│  │  │                                             │   │   │
+│  │  │          📄                                 │   │   │
+│  │  │   Click to upload or drag and drop         │   │   │
+│  │  │          PDF files only                    │   │   │
+│  │  │                                             │   │   │
+│  │  └─────────────────────────────────────────────┘   │   │
+│  │                                                     │   │
+│  └────────────────────────────────────────────────────┘   │
+│                                                            │
+└────────────────────────────────────────────────────────────┘
 ```
 
-**State:**
-- List of jobs (fetched from API)
-- Polling interval (active when any job is processing)
-- Last refresh timestamp
+### Login View
 
-**Actions:**
-- Fetch jobs on mount
-- Poll every 10s when jobs are in "processing" state
-- Download button → fetch result from S3
-- Manual refresh button
-- Navigate to Upload view
-
-**Job Status Values:**
-```elm
-type JobStatus
-    = Pending      -- Submitted but not started
-    | Processing   -- Currently being processed
-    | Complete     -- Done, results available
-    | Failed       -- Processing failed
 ```
-
-### Routing
-
-Using `elm/browser` and `Browser.application`:
-
-```elm
-type Route
-    = Login
-    | Upload
-    | Jobs
-    | NotFound
-
--- URL structure:
--- /login
--- /upload (or /)
--- /jobs
+┌────────────────────────────────────────────────────────────┐
+│                                                            │
+│                         📄                                 │
+│                    PDF Models                              │
+│            Document processing platform                    │
+│                                                            │
+│         ┌────────────────────────────────────┐            │
+│         │           Sign In                   │            │
+│         │                                     │            │
+│         │  Email                              │            │
+│         │  ┌──────────────────────────────┐  │            │
+│         │  │ you@example.com              │  │            │
+│         │  └──────────────────────────────┘  │            │
+│         │                                     │            │
+│         │  Password                           │            │
+│         │  ┌──────────────────────────────┐  │            │
+│         │  │ ••••••••••••                 │  │            │
+│         │  └──────────────────────────────┘  │            │
+│         │                                     │            │
+│         │  ┌──────────────────────────────┐  │            │
+│         │  │         Sign In              │  │            │
+│         │  └──────────────────────────────┘  │            │
+│         │                                     │            │
+│         │  Don't have an account? Sign up    │            │
+│         └────────────────────────────────────┘            │
+│                                                            │
+└────────────────────────────────────────────────────────────┘
 ```
-
-## Component Architecture
-
-### Reusable Components
-
-#### Button
-```elm
--- Button.elm
-type ButtonStyle = Primary | Secondary
-
-button : ButtonStyle -> String -> msg -> Html msg
-```
-
-**Styles:**
-- Primary: accent border and text, hover background
-- Secondary: border only, accent text
-
-#### Input
-```elm
--- Input.elm
-type alias InputConfig msg =
-    { label : String
-    , value : String
-    , onInput : String -> msg
-    , inputType : String  -- "text", "password", "email"
-    , placeholder : String
-    }
-
-input : InputConfig msg -> Html msg
-```
-
-**Features:**
-- Label above input
-- Focus state with accent border
-- Error state (red border)
-
-#### Table
-```elm
--- Table.elm
-type alias Column data =
-    { header : String
-    , view : data -> Html msg
-    }
-
-table : List (Column data) -> List data -> Html msg
-```
-
-**Features:**
-- Generic table component
-- Hover states on rows
-- Consistent spacing and borders
-
-#### StatusBadge
-```elm
--- StatusBadge.elm
-type Status = Pending | Processing | Complete | Failed
-
-statusBadge : Status -> Html msg
-```
-
-**Rendering:**
-- Pending: yellow dot + "pending"
-- Processing: yellow dot + "processing"
-- Complete: green dot + "complete"
-- Failed: red dot + "failed"
-
-#### FileUploader
-```elm
--- FileUploader.elm
-type alias UploaderState =
-    { selectedFile : Maybe File
-    , progress : Maybe Float  -- 0.0 to 1.0
-    , s3Key : Maybe String
-    }
-
-fileUploader : UploaderState -> (File -> msg) -> Html msg
-```
-
-**Features:**
-- File input
-- Display selected filename
-- Progress bar during upload
-- Display S3 key after upload
-
-## Data Flow and State Management
-
-### Model Structure
-
-```elm
-type alias Model =
-    { route : Route
-    , auth : AuthState
-    , upload : UploadState
-    , jobs : JobsState
-    }
-
-type AuthState
-    = NotAuthenticated
-    | Authenticating
-    | Authenticated AuthTokens
-
-type alias AuthTokens =
-    { accessToken : String
-    , idToken : String
-    , identityId : String
-    }
-
-type alias UploadState =
-    { selectedFile : Maybe File
-    , uploadProgress : Maybe Float
-    , s3Key : Maybe String
-    , submitStatus : RemoteData
-    }
-
-type alias JobsState =
-    { jobs : List Job
-    , loading : Bool
-    , error : Maybe String
-    , lastRefresh : Maybe Time.Posix
-    }
-
-type alias Job =
-    { id : String
-    , submittedAt : Time.Posix
-    , status : JobStatus
-    , s3InputKey : String
-    , s3OutputKey : Maybe String
-    }
-```
-
-### Message Types
-
-```elm
-type Msg
-    -- Routing
-    = UrlChanged Url
-    | LinkClicked Browser.UrlRequest
-
-    -- Auth
-    | EmailChanged String
-    | PasswordChanged String
-    | SignInClicked
-    | SignInCompleted (Result Http.Error AuthTokens)
-    | SignOutClicked
-
-    -- Upload
-    | FileSelected File
-    | UploadToS3
-    | UploadProgress Float
-    | UploadCompleted (Result Http.Error String)  -- S3 key
-    | SubmitJobClicked
-    | JobSubmitted (Result Http.Error Job)
-
-    -- Jobs
-    | FetchJobs
-    | JobsFetched (Result Http.Error (List Job))
-    | RefreshClicked
-    | DownloadResult String  -- job ID
-    | PollTick Time.Posix
-```
-
-### Side Effects (Commands)
-
-**Authentication:**
-```elm
--- Use Cognito InitiateAuth API
-signIn : String -> String -> Cmd Msg
-
--- Get Identity Pool credentials
-getIdentityCredentials : String -> Cmd Msg  -- ID token
-```
-
-**S3 Upload:**
-```elm
--- Upload file using Identity Pool credentials
-uploadToS3 : File -> AuthTokens -> Cmd Msg
-```
-
-**API Calls:**
-```elm
--- All API calls include Authorization header with access token
-
-submitJob : String -> String -> Cmd Msg
--- POST /v1/models/marker/jobs
--- Body: {"s3_input_key": "...", "start_processing": true}
-
-fetchJobs : String -> Cmd Msg
--- GET /v1/models/marker/jobs
-
-getJobStatus : String -> String -> Cmd Msg
--- GET /v1/models/marker/jobs/{jobId}
-
-downloadResult : String -> String -> Cmd Msg
--- GET presigned S3 URL for output
-```
-
-### Subscriptions
-
-```elm
-subscriptions : Model -> Sub Msg
-subscriptions model =
-    case model.jobs.jobs of
-        [] ->
-            Sub.none
-
-        jobs ->
-            if List.any (\j -> j.status == Processing) jobs then
-                Time.every (10 * 1000) PollTick  -- Poll every 10s
-            else
-                Sub.none
-```
-
-## API Integration
-
-### Endpoints
-
-Base URL: `https://eykwwhrt16.execute-api.us-east-1.amazonaws.com`
-
-**Submit Job:**
-```
-POST /v1/models/marker/jobs
-Authorization: Bearer {accessToken}
-Content-Type: application/json
-
-{
-  "s3_input_key": "{identityId}/{jobId}.pdf",
-  "start_processing": true
-}
-
-Response 201:
-{
-  "job_id": "550e8400-e29b-41d4-a716-446655440000",
-  "status": "pending",
-  "s3_input_key": "...",
-  "submitted_at": "2025-01-02T12:00:00Z"
-}
-```
-
-**List Jobs:**
-```
-GET /v1/models/marker/jobs
-Authorization: Bearer {accessToken}
-
-Response 200:
-{
-  "jobs": [
-    {
-      "job_id": "...",
-      "status": "complete",
-      "s3_input_key": "...",
-      "s3_output_key": "...",
-      "submitted_at": "...",
-      "completed_at": "..."
-    }
-  ]
-}
-```
-
-**Get Job Status:**
-```
-GET /v1/models/marker/jobs/{jobId}
-Authorization: Bearer {accessToken}
-
-Response 200:
-{
-  "job_id": "...",
-  "status": "processing",
-  "s3_input_key": "...",
-  "submitted_at": "..."
-}
-```
-
-### Authentication Flow
-
-1. User submits email/password
-2. Call Cognito `InitiateAuth` with `USER_PASSWORD_AUTH` flow
-3. Receive `AccessToken`, `IdToken`, `RefreshToken`
-4. Exchange `IdToken` for Identity Pool credentials:
-   - Call `GetId` with ID token
-   - Call `GetCredentialsForIdentity`
-   - Receive temporary AWS credentials and `identityId`
-5. Store tokens in model
-6. Use `AccessToken` for API calls, Identity Pool credentials for S3
-
-### Error Handling
-
-**HTTP Errors:**
-- 401: Redirect to login, clear auth state
-- 403: Show "Access denied" message
-- 404: Show "Not found" message
-- 5xx: Show "Server error, please try again"
-
-**Network Errors:**
-- Show "Network error, check connection"
-- Provide retry button
-
-**Validation Errors:**
-- Show inline validation messages
-- Prevent form submission
 
 ## File Structure
 
 ```
 frontend/
 ├── elm.json
+├── build.sh                   -- Build script
+├── interop.js                 -- AWS Cognito/S3 JavaScript interop
 ├── src/
 │   ├── Main.elm              -- Application entry point, routing
 │   ├── Api.elm               -- HTTP API calls
-│   ├── Auth.elm              -- Cognito authentication logic
+│   ├── Auth.elm              -- Cognito authentication ports
+│   ├── S3.elm                -- S3 upload handling
 │   ├── Types.elm             -- Shared types (Model, Msg, etc.)
-│   ├── Styles.elm            -- Global elm-css styles and theme
+│   ├── Styles.elm            -- Design system tokens and utilities
 │   ├── Views/
-│   │   ├── Login.elm         -- Login page view
-│   │   ├── Upload.elm        -- Upload page view
-│   │   └── Jobs.elm          -- Jobs list view
+│   │   ├── Login.elm         -- Login page
+│   │   ├── SignUp.elm        -- Sign up + confirmation page
+│   │   ├── Upload.elm        -- File upload page
+│   │   └── Jobs.elm          -- Dashboard/jobs list
 │   └── Components/
-│       ├── Button.elm
-│       ├── Input.elm
-│       ├── Table.elm
-│       ├── StatusBadge.elm
-│       └── FileUploader.elm
-├── public/
-│   ├── index.html            -- HTML shell
-│   └── styles.css            -- Minimal reset/base styles
-└── DESIGN.md                 -- This document
+│       ├── Button.elm        -- Primary/Secondary/Ghost/Danger variants
+│       ├── Input.elm         -- Text input and textarea
+│       ├── StatusBadge.elm   -- Job status pills with animation
+│       └── Timeline.elm      -- Processing timeline
+├── dst/                       -- Built output
+│   ├── index.html
+│   ├── main.js
+│   └── interop.js
+└── docs/
+    ├── DESIGN.md             -- This document
+    └── DEPLOYMENT.md         -- Deployment instructions
 ```
-
-## Development Workflow
-
-**Local Development:**
-```bash
-cd frontend
-elm reactor  # or elm-live for hot reload
-```
-
-**Building for Production:**
-```bash
-elm make src/Main.elm --optimize --output=public/main.js
-```
-
-**Recommended Tools:**
-- `elm-format` for code formatting
-- `elm-analyse` for code quality
-- `elm-test` for testing (add later)
-
-## Implementation Phases
-
-### Phase 1: Foundation (1-2 hours)
-- Set up routing with `Browser.application`
-- Create global styles and theme with elm-css
-- Build core components: Button, Input, Table
-
-### Phase 2: Authentication (1-2 hours)
-- Implement Login view
-- Cognito authentication flow
-- Token storage in model
-- Protected route logic
-
-### Phase 3: Upload Flow (2-3 hours)
-- FileUploader component
-- S3 upload with Identity Pool credentials
-- Upload progress tracking
-- Job submission
-
-### Phase 4: Jobs List (1-2 hours)
-- Jobs list view and table
-- Status polling subscription
-- Download functionality
-- Error states
-
-### Phase 5: Polish (1 hour)
-- Loading states
-- Error messages
-- Responsive layout (if needed)
-- Testing on real backend
-
-## Future Enhancements (Post-MVP)
-
-**Features:**
-- Dark/light theme toggle
-- Drag-and-drop file upload
-- Job result preview (markdown rendering)
-- Batch upload
-- Search/filter jobs
-- LocalStorage for token persistence
-- Remember me checkbox
-- Password reset flow
-- Usage statistics dashboard
-
-**Technical:**
-- elm-test suite
-- CI/CD integration
-- Performance optimization
-- Accessibility improvements (ARIA labels, keyboard nav)
-- PWA support
 
 ## Configuration
 
-**API Endpoints:** Currently hardcoded, could be moved to:
-```elm
--- Config.elm
-type alias Config =
-    { apiBaseUrl : String
-    , cognitoUserPoolId : String
-    , cognitoClientId : String
-    , identityPoolId : String
-    , s3Bucket : String
-    }
-```
-
-**Environment-specific config:**
-- Development: localhost API proxy
-- Production: deployed API Gateway URL
-
-## Security Considerations
-
-- Never log or display sensitive tokens
-- Use HTTPS for all API calls
-- Validate file types before upload (PDF only)
-- Implement file size limits (frontend + backend)
-- Clear tokens on logout
-- Handle token expiration (refresh or re-login)
-- Sanitize user input
-- Use Content Security Policy headers
-
-## Browser Support
-
-**Target:**
-- Modern evergreen browsers (Chrome, Firefox, Safari, Edge)
-- ES6+ JavaScript output from Elm
-- No IE11 support needed
-
-**Required Browser APIs:**
-- File API (for file upload)
-- Fetch API (via elm/http)
-- LocalStorage (future enhancement)
-
-## Accessibility
-
-**MVP Standards:**
-- Semantic HTML from Elm's Html module
-- Keyboard navigation for all interactive elements
-- Focus states on inputs and buttons
-- Alt text for any icons/images
-- Color contrast meeting WCAG AA standards
-
-**Future:**
-- ARIA labels and roles
-- Screen reader testing
-- Keyboard shortcuts
-- Focus management on route changes
-
----
-
-## Quick Reference
-
-**Current Backend Status:**
-- ✅ Authentication: Cognito User Pool + Identity Pool
-- ✅ API: HTTP API Gateway with JWT authorizer
-- ✅ Storage: S3 with Identity Pool access
-- ✅ Processing: Step Functions + ECS Fargate
-- ✅ Integration tests passing
-
-**API Endpoint:**
-`https://eykwwhrt16.execute-api.us-east-1.amazonaws.com`
+**API Endpoint:** `https://api.epequeno.app`
 
 **Cognito Details:**
 - User Pool ID: `us-east-1_wslqPOxQd`
 - Client ID: `4tmf8s58738hrbrp4ff2utqg5`
 - Identity Pool ID: `us-east-1:1fd26b6e-8a1c-4dd7-940d-60ec7884f384`
 
-**Test User:**
+**Test Users:**
+
+*UI Testing (for agent-browser):*
+- Email: `ui-test@pdf-models.local`
+- Password: `UiTest123!`
+
+*Integration Testing:*
 - Email: `integration-test@pdf-models.local`
 - Password: `TestPass123!`
+
+## Development
+
+**Local Development:**
+```bash
+cd frontend
+./build.sh
+cd dst && python3 -m http.server 8000
+```
+
+**Building for Production:**
+```bash
+./build.sh
+```
+
+The build outputs to `dst/` which is deployed to S3/CloudFront.
+
+## Browser Support
+
+- Modern evergreen browsers (Chrome, Firefox, Safari, Edge)
+- ES6+ JavaScript output from Elm
+- No IE11 support needed
+
+## Accessibility
+
+- Semantic HTML from Elm's Html module
+- Keyboard navigation for all interactive elements
+- Focus rings on inputs and buttons
+- Color contrast meeting WCAG AA standards
+- Status announcements for screen readers
+
+---
+
+*Last updated: January 2026*
+*Design system version: Nexus 1.0*

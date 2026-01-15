@@ -4,7 +4,7 @@ import Components.Button as Button
 import Components.Input as Input
 import Css exposing (..)
 import Html.Styled exposing (..)
-import Html.Styled.Attributes exposing (css, href)
+import Html.Styled.Attributes exposing (css, href, type_)
 import Html.Styled.Events exposing (onSubmit)
 import Styles
 import Types exposing (..)
@@ -18,25 +18,44 @@ view model =
             , alignItems center
             , justifyContent center
             , minHeight (vh 100)
+            , padding Styles.spacing.xl
             ]
         ]
         [ div
             [ css
-                [ maxWidth (px 400)
+                [ maxWidth (px 420)
                 , width (pct 100)
-                , padding Styles.spacing.xl
                 ]
             ]
-            [ h1
+            [ -- Logo/Brand
+              div
                 [ css
-                    [ Css.fontSize Styles.fontSize.h1
-                    , fontWeight Styles.fontWeight.semibold
-                    , marginBottom Styles.spacing.xl
-                    , textAlign center
-                    , color Styles.colors.textPrimary
+                    [ textAlign center
+                    , marginBottom Styles.spacing.xxl
                     ]
                 ]
-                [ text "PDF Models" ]
+                [ div
+                    [ css
+                        [ Css.fontSize (px 48)
+                        , marginBottom Styles.spacing.md
+                        ]
+                    ]
+                    [ text "📄" ]
+                , h1
+                    [ css
+                        [ Styles.textDisplay
+                        , marginBottom Styles.spacing.xs
+                        ]
+                    ]
+                    [ text "PDF Models" ]
+                , p
+                    [ css
+                        [ Styles.textSecondary
+                        , margin zero
+                        ]
+                    ]
+                    [ text "Document processing platform" ]
+                ]
             , if model.signUpForm.success then
                 viewSuccess
 
@@ -54,17 +73,17 @@ viewForm model =
     Html.Styled.form
         [ onSubmit SignUpClicked
         , css
-            [ border3 (px 1) solid Styles.colors.border
-            , padding Styles.spacing.lg
-            , backgroundColor Styles.colors.surface
+            [ backgroundColor Styles.colors.surface
+            , border3 (px 1) solid Styles.colors.border
+            , borderRadius Styles.radius.xl
+            , padding Styles.spacing.xxl
             ]
         ]
         [ h2
             [ css
-                [ Css.fontSize Styles.fontSize.h2
-                , fontWeight Styles.fontWeight.semibold
-                , marginBottom Styles.spacing.lg
-                , color Styles.colors.textPrimary
+                [ Styles.textH1
+                , marginBottom Styles.spacing.xl
+                , textAlign center
                 ]
             ]
             [ text "Create Account" ]
@@ -73,7 +92,7 @@ viewForm model =
             , value = model.signUpForm.email
             , onInput = SignUpEmailChanged
             , inputType = "email"
-            , placeholder = "your@email.com"
+            , placeholder = "you@example.com"
             , hasError = False
             , autocomplete = "username"
             }
@@ -82,7 +101,7 @@ viewForm model =
             , value = model.signUpForm.password
             , onInput = SignUpPasswordChanged
             , inputType = "password"
-            , placeholder = "••••••••"
+            , placeholder = "Create a strong password"
             , hasError = passwordMismatch model.signUpForm
             , autocomplete = "new-password"
             }
@@ -91,16 +110,20 @@ viewForm model =
             , value = model.signUpForm.confirmPassword
             , onInput = SignUpConfirmPasswordChanged
             , inputType = "password"
-            , placeholder = "••••••••"
+            , placeholder = "Confirm your password"
             , hasError = passwordMismatch model.signUpForm
             , autocomplete = "new-password"
             }
         , if passwordMismatch model.signUpForm then
             div
                 [ css
-                    [ color Styles.colors.accentError
+                    [ backgroundColor Styles.colors.warningMuted
+                    , border3 (px 1) solid Styles.colors.warning
+                    , borderRadius Styles.radius.md
+                    , padding Styles.spacing.md
+                    , marginBottom Styles.spacing.lg
+                    , color Styles.colors.warning
                     , Css.fontSize Styles.fontSize.small
-                    , marginBottom Styles.spacing.sm
                     ]
                 ]
                 [ text "Passwords do not match" ]
@@ -111,43 +134,72 @@ viewForm model =
             Just err ->
                 div
                     [ css
-                        [ color Styles.colors.accentError
+                        [ backgroundColor Styles.colors.errorMuted
+                        , border3 (px 1) solid Styles.colors.error
+                        , borderRadius Styles.radius.md
+                        , padding Styles.spacing.md
+                        , marginBottom Styles.spacing.lg
+                        , color Styles.colors.error
                         , Css.fontSize Styles.fontSize.small
-                        , marginBottom Styles.spacing.sm
                         ]
                     ]
                     [ text err ]
 
             Nothing ->
                 text ""
-        , div [ css [ marginTop Styles.spacing.md ] ]
-            [ Button.button Button.Primary
-                (if model.auth == Authenticating then
-                    "Creating account..."
+        , div [ css [ marginTop Styles.spacing.lg ] ]
+            [ Html.Styled.button
+                [ type_ "submit"
+                , css
+                    [ Css.width (pct 100)
+                    , padding Styles.spacing.md
+                    , backgroundColor Styles.colors.accent
+                    , border zero
+                    , borderRadius Styles.radius.md
+                    , color Styles.colors.textInverse
+                    , fontWeight Styles.fontWeights.medium
+                    , Css.fontSize Styles.fontSize.body
+                    , cursor pointer
+                    , Styles.transitions.base
+                    , hover
+                        [ backgroundColor Styles.colors.accentHover
+                        ]
+                    , focus
+                        [ Styles.focusRing
+                        ]
+                    ]
+                ]
+                [ text
+                    (if model.auth == Authenticating then
+                        "Creating account..."
 
-                 else
-                    "Sign Up"
-                )
-                SignUpClicked
+                     else
+                        "Create Account"
+                    )
+                ]
             ]
         , div
             [ css
-                [ marginTop Styles.spacing.md
+                [ marginTop Styles.spacing.xl
                 , textAlign center
-                , Css.fontSize Styles.fontSize.small
-                , color Styles.colors.textSecondary
+                , Styles.textSmall
                 ]
             ]
             [ text "Already have an account? "
             , a
                 [ href (routeToPath Login)
                 , css
-                    [ color Styles.colors.accentPrimary
+                    [ color Styles.colors.accent
                     , textDecoration none
-                    , hover [ textDecoration underline ]
+                    , fontWeight Styles.fontWeights.medium
+                    , Styles.transitions.base
+                    , hover
+                        [ color Styles.colors.accentHover
+                        , textDecoration underline
+                        ]
                     ]
                 ]
-                [ text "Sign In" ]
+                [ text "Sign in" ]
             ]
         ]
 
@@ -157,38 +209,54 @@ viewConfirmation model =
     Html.Styled.form
         [ onSubmit ConfirmSignUpClicked
         , css
-            [ border3 (px 1) solid Styles.colors.border
-            , padding Styles.spacing.lg
-            , backgroundColor Styles.colors.surface
+            [ backgroundColor Styles.colors.surface
+            , border3 (px 1) solid Styles.colors.border
+            , borderRadius Styles.radius.xl
+            , padding Styles.spacing.xxl
             ]
         ]
-        [ h2
+        [ div
             [ css
-                [ Css.fontSize Styles.fontSize.h2
-                , fontWeight Styles.fontWeight.semibold
-                , marginBottom Styles.spacing.lg
-                , color Styles.colors.textPrimary
+                [ textAlign center
+                , marginBottom Styles.spacing.xl
                 ]
             ]
-            [ text "Check Your Email" ]
-        , p
-            [ css
-                [ color Styles.colors.textSecondary
-                , marginBottom Styles.spacing.md
-                , lineHeight (num 1.6)
+            [ div
+                [ css
+                    [ Css.fontSize (px 40)
+                    , marginBottom Styles.spacing.md
+                    ]
                 ]
-            ]
-            [ text "We've sent a confirmation code to "
-            , span [ css [ color Styles.colors.textPrimary, fontWeight Styles.fontWeight.semibold ] ]
-                [ text model.signUpForm.email ]
-            , text ". Enter the code below to verify your account."
+                [ text "📬" ]
+            , h2
+                [ css
+                    [ Styles.textH1
+                    , marginBottom Styles.spacing.sm
+                    ]
+                ]
+                [ text "Check Your Email" ]
+            , p
+                [ css
+                    [ Styles.textSecondary
+                    , lineHeight Styles.lineHeights.relaxed
+                    ]
+                ]
+                [ text "We've sent a confirmation code to "
+                , span
+                    [ css
+                        [ color Styles.colors.accent
+                        , fontWeight Styles.fontWeights.medium
+                        ]
+                    ]
+                    [ text model.signUpForm.email ]
+                ]
             ]
         , Input.input
             { label = "Confirmation Code"
             , value = model.signUpForm.confirmationCode
             , onInput = ConfirmationCodeChanged
             , inputType = "text"
-            , placeholder = "123456"
+            , placeholder = "Enter 6-digit code"
             , hasError = False
             , autocomplete = "off"
             }
@@ -196,25 +264,49 @@ viewConfirmation model =
             Just err ->
                 div
                     [ css
-                        [ color Styles.colors.accentError
+                        [ backgroundColor Styles.colors.errorMuted
+                        , border3 (px 1) solid Styles.colors.error
+                        , borderRadius Styles.radius.md
+                        , padding Styles.spacing.md
+                        , marginBottom Styles.spacing.lg
+                        , color Styles.colors.error
                         , Css.fontSize Styles.fontSize.small
-                        , marginTop Styles.spacing.sm
-                        , marginBottom Styles.spacing.sm
                         ]
                     ]
                     [ text err ]
 
             Nothing ->
                 text ""
-        , div [ css [ marginTop Styles.spacing.md ] ]
-            [ Button.button Button.Primary
-                (if model.signUpForm.confirming then
-                    "Confirming..."
+        , div [ css [ marginTop Styles.spacing.lg ] ]
+            [ Html.Styled.button
+                [ type_ "submit"
+                , css
+                    [ Css.width (pct 100)
+                    , padding Styles.spacing.md
+                    , backgroundColor Styles.colors.accent
+                    , border zero
+                    , borderRadius Styles.radius.md
+                    , color Styles.colors.textInverse
+                    , fontWeight Styles.fontWeights.medium
+                    , Css.fontSize Styles.fontSize.body
+                    , cursor pointer
+                    , Styles.transitions.base
+                    , hover
+                        [ backgroundColor Styles.colors.accentHover
+                        ]
+                    , focus
+                        [ Styles.focusRing
+                        ]
+                    ]
+                ]
+                [ text
+                    (if model.signUpForm.confirming then
+                        "Verifying..."
 
-                 else
-                    "Confirm Account"
-                )
-                ConfirmSignUpClicked
+                     else
+                        "Verify Account"
+                    )
+                ]
             ]
         ]
 
@@ -223,42 +315,54 @@ viewSuccess : Html Msg
 viewSuccess =
     div
         [ css
-            [ border3 (px 1) solid Styles.colors.accentSuccess
-            , padding Styles.spacing.lg
-            , backgroundColor Styles.colors.surface
+            [ backgroundColor Styles.colors.surface
+            , border3 (px 1) solid Styles.colors.success
+            , borderRadius Styles.radius.xl
+            , padding Styles.spacing.xxl
+            , textAlign center
             ]
         ]
-        [ h2
+        [ div
             [ css
-                [ Css.fontSize Styles.fontSize.h2
-                , fontWeight Styles.fontWeight.semibold
+                [ Css.fontSize (px 48)
                 , marginBottom Styles.spacing.md
-                , color Styles.colors.accentSuccess
                 ]
             ]
-            [ text "Account Confirmed!" ]
+            [ text "✓" ]
+        , h2
+            [ css
+                [ Styles.textH1
+                , color Styles.colors.success
+                , marginBottom Styles.spacing.sm
+                ]
+            ]
+            [ text "Account Verified" ]
         , p
             [ css
-                [ color Styles.colors.textPrimary
-                , marginBottom Styles.spacing.md
-                , lineHeight (num 1.6)
+                [ Styles.textSecondary
+                , marginBottom Styles.spacing.xl
+                , lineHeight Styles.lineHeights.relaxed
                 ]
             ]
-            [ text "Your email has been verified. You can now sign in with your credentials." ]
+            [ text "Your email has been verified. You can now sign in and start processing documents." ]
         , a
             [ href (routeToPath Login)
             , css
                 [ display inlineBlock
-                , padding2 Styles.spacing.sm Styles.spacing.md
-                , border3 (px 1) solid Styles.colors.accentPrimary
-                , color Styles.colors.accentPrimary
+                , padding2 Styles.spacing.md Styles.spacing.xl
+                , backgroundColor Styles.colors.accent
+                , borderRadius Styles.radius.md
+                , color Styles.colors.textInverse
                 , textDecoration none
-                , fontFamilies Styles.fontStack
+                , fontWeight Styles.fontWeights.medium
                 , Css.fontSize Styles.fontSize.body
-                , hover [ backgroundColor Styles.colors.hover ]
+                , Styles.transitions.base
+                , hover
+                    [ backgroundColor Styles.colors.accentHover
+                    ]
                 ]
             ]
-            [ text "Go to Sign In" ]
+            [ text "Continue to Sign In" ]
         ]
 
 

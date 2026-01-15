@@ -4,7 +4,7 @@ import Components.Button as Button
 import Components.Input as Input
 import Css exposing (..)
 import Html.Styled exposing (..)
-import Html.Styled.Attributes exposing (css, href)
+import Html.Styled.Attributes exposing (css, href, type_)
 import Html.Styled.Events exposing (onSubmit)
 import Styles
 import Types exposing (..)
@@ -18,39 +18,69 @@ view model =
             , alignItems center
             , justifyContent center
             , minHeight (vh 100)
+            , padding Styles.spacing.xl
             ]
         ]
         [ div
             [ css
-                [ maxWidth (px 400)
+                [ maxWidth (px 420)
                 , width (pct 100)
-                , padding Styles.spacing.xl
                 ]
             ]
-            [ h1
+            [ -- Logo/Brand
+              div
                 [ css
-                    [ Css.fontSize Styles.fontSize.h1
-                    , fontWeight Styles.fontWeight.semibold
-                    , marginBottom Styles.spacing.xl
-                    , textAlign center
-                    , color Styles.colors.textPrimary
+                    [ textAlign center
+                    , marginBottom Styles.spacing.xxl
                     ]
                 ]
-                [ text "PDF Models" ]
+                [ div
+                    [ css
+                        [ Css.fontSize (px 48)
+                        , marginBottom Styles.spacing.md
+                        ]
+                    ]
+                    [ text "📄" ]
+                , h1
+                    [ css
+                        [ Styles.textDisplay
+                        , marginBottom Styles.spacing.xs
+                        ]
+                    ]
+                    [ text "PDF Models" ]
+                , p
+                    [ css
+                        [ Styles.textSecondary
+                        , margin zero
+                        ]
+                    ]
+                    [ text "Document processing platform" ]
+                ]
+
+            -- Form card
             , Html.Styled.form
                 [ onSubmit SignInClicked
                 , css
-                    [ border3 (px 1) solid Styles.colors.border
-                    , padding Styles.spacing.lg
-                    , backgroundColor Styles.colors.surface
+                    [ backgroundColor Styles.colors.surface
+                    , border3 (px 1) solid Styles.colors.border
+                    , borderRadius Styles.radius.xl
+                    , padding Styles.spacing.xxl
                     ]
                 ]
-                [ Input.input
+                [ h2
+                    [ css
+                        [ Styles.textH1
+                        , marginBottom Styles.spacing.xl
+                        , textAlign center
+                        ]
+                    ]
+                    [ text "Sign In" ]
+                , Input.input
                     { label = "Email"
                     , value = model.loginForm.email
                     , onInput = EmailChanged
                     , inputType = "email"
-                    , placeholder = "your@email.com"
+                    , placeholder = "you@example.com"
                     , hasError = False
                     , autocomplete = "username"
                     }
@@ -59,7 +89,7 @@ view model =
                     , value = model.loginForm.password
                     , onInput = PasswordChanged
                     , inputType = "password"
-                    , placeholder = "••••••••"
+                    , placeholder = "Enter your password"
                     , hasError = False
                     , autocomplete = "current-password"
                     }
@@ -67,43 +97,72 @@ view model =
                     Just err ->
                         div
                             [ css
-                                [ color Styles.colors.accentError
+                                [ backgroundColor Styles.colors.errorMuted
+                                , border3 (px 1) solid Styles.colors.error
+                                , borderRadius Styles.radius.md
+                                , padding Styles.spacing.md
+                                , marginBottom Styles.spacing.lg
+                                , color Styles.colors.error
                                 , Css.fontSize Styles.fontSize.small
-                                , marginBottom Styles.spacing.sm
                                 ]
                             ]
                             [ text err ]
 
                     Nothing ->
                         text ""
-                , div [ css [ marginTop Styles.spacing.md ] ]
-                    [ Button.button Button.Primary
-                        (if model.auth == Authenticating then
-                            "Signing in..."
+                , div [ css [ marginTop Styles.spacing.lg ] ]
+                    [ Html.Styled.button
+                        [ type_ "submit"
+                        , css
+                            [ Css.width (pct 100)
+                            , padding Styles.spacing.md
+                            , backgroundColor Styles.colors.accent
+                            , border zero
+                            , borderRadius Styles.radius.md
+                            , color Styles.colors.textInverse
+                            , fontWeight Styles.fontWeights.medium
+                            , Css.fontSize Styles.fontSize.body
+                            , cursor pointer
+                            , Styles.transitions.base
+                            , hover
+                                [ backgroundColor Styles.colors.accentHover
+                                ]
+                            , focus
+                                [ Styles.focusRing
+                                ]
+                            ]
+                        ]
+                        [ text
+                            (if model.auth == Authenticating then
+                                "Signing in..."
 
-                         else
-                            "Sign In"
-                        )
-                        SignInClicked
+                             else
+                                "Sign In"
+                            )
+                        ]
                     ]
                 , div
                     [ css
-                        [ marginTop Styles.spacing.md
+                        [ marginTop Styles.spacing.xl
                         , textAlign center
-                        , Css.fontSize Styles.fontSize.small
-                        , color Styles.colors.textSecondary
+                        , Styles.textSmall
                         ]
                     ]
                     [ text "Don't have an account? "
                     , a
                         [ href (routeToPath SignUp)
                         , css
-                            [ color Styles.colors.accentPrimary
+                            [ color Styles.colors.accent
                             , textDecoration none
-                            , hover [ textDecoration underline ]
+                            , fontWeight Styles.fontWeights.medium
+                            , Styles.transitions.base
+                            , hover
+                                [ color Styles.colors.accentHover
+                                , textDecoration underline
+                                ]
                             ]
                         ]
-                        [ text "Sign Up" ]
+                        [ text "Create account" ]
                     ]
                 ]
             ]
