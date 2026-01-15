@@ -10,6 +10,7 @@ import Styles
 import Types
     exposing
         ( Capability
+        , ComputeType
         , Model
         , ModelCategory
         , ModelFilters
@@ -18,9 +19,11 @@ import Types
         , Route(..)
         , allCapabilities
         , allCategories
+        , allComputeTypes
         , allPdfModels
         , capabilityToString
         , categoryToString
+        , computeTypeToString
         , defaultPdfModel
         , filterModels
         , hasActiveFilters
@@ -202,6 +205,22 @@ viewSidebar filters =
                 (List.map (viewCategoryFilter filters.categories) allCategories)
             ]
 
+        -- Compute type filter
+        , div
+            [ css [ marginBottom Styles.spacing.xl ] ]
+            [ h3
+                [ css
+                    [ Styles.textCaption
+                    , marginBottom Styles.spacing.md
+                    , marginTop zero
+                    ]
+                ]
+                [ text "COMPUTE TYPE" ]
+            , div
+                [ css [ Styles.flexColumn, Styles.gap Styles.spacing.sm ] ]
+                (List.map (viewComputeTypeFilter filters.computeTypes) allComputeTypes)
+            ]
+
         -- Capabilities filter
         , div
             [ css [ marginBottom Styles.spacing.xl ] ]
@@ -308,6 +327,50 @@ viewCapabilityFilter activeCapabilities capability =
             ]
             []
         , text (capabilityToString capability)
+        ]
+
+
+viewComputeTypeFilter : List ComputeType -> ComputeType -> Html Msg
+viewComputeTypeFilter activeComputeTypes computeType =
+    let
+        isActive =
+            List.member computeType activeComputeTypes
+
+        icon =
+            case computeType of
+                Types.CpuCompute ->
+                    "⚙"
+
+                Types.GpuCompute ->
+                    "⚡"
+    in
+    label
+        [ css
+            [ Styles.flexRow
+            , Styles.gap Styles.spacing.sm
+            , cursor pointer
+            , color
+                (if isActive then
+                    Styles.colors.textPrimary
+
+                 else
+                    Styles.colors.textSecondary
+                )
+            , Styles.transitions.fast
+            , hover [ color Styles.colors.textPrimary ]
+            ]
+        ]
+        [ input
+            [ type_ "checkbox"
+            , onClick (ToggleComputeTypeFilter computeType)
+            , css
+                [ cursor pointer
+                , property "accent-color" Styles.colors.accent.value
+                ]
+            ]
+            []
+        , span [] [ text icon ]
+        , text (computeTypeToString computeType)
         ]
 
 

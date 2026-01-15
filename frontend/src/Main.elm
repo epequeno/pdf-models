@@ -690,8 +690,25 @@ update msg model =
             in
             ( { model | modelFilters = newFilters }, Cmd.none )
 
+        ToggleComputeTypeFilter computeType ->
+            let
+                oldFilters =
+                    model.modelFilters
+
+                newComputeTypes =
+                    if List.member computeType oldFilters.computeTypes then
+                        List.filter (\c -> c /= computeType) oldFilters.computeTypes
+
+                    else
+                        computeType :: oldFilters.computeTypes
+
+                newFilters =
+                    { oldFilters | computeTypes = newComputeTypes }
+            in
+            ( { model | modelFilters = newFilters }, Cmd.none )
+
         ClearModelFilters ->
-            ( { model | modelFilters = { categories = [], capabilities = [] } }, Cmd.none )
+            ( { model | modelFilters = { categories = [], capabilities = [], computeTypes = [] } }, Cmd.none )
 
         ToggleModelComparison pdfModel ->
             let

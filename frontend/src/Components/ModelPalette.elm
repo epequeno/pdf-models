@@ -9,11 +9,13 @@ import Json.Decode
 import Styles
 import Types
     exposing
-        ( ModelFilters
+        ( ComputeType(..)
+        , ModelFilters
         , Msg(..)
         , PdfModel
         , allPdfModels
         , categoryToString
+        , computeTypeToString
         , filterModels
         , modelMetadata
         , pdfModelToDisplayName
@@ -170,6 +172,9 @@ paletteItem config =
             , span
                 [ css [ Styles.categoryPillStyle (categoryToString metadata.category), Css.fontSize (px 10) ] ]
                 [ text (categoryToString metadata.category) ]
+
+            -- Compute type badge
+            , computeTypeBadgeSmall metadata.computeType
             ]
 
         -- Performance indicator
@@ -333,3 +338,27 @@ footerStyle =
         , borderTop3 (px 1) solid Styles.colors.border
         , backgroundColor Styles.colors.surface
         ]
+
+
+computeTypeBadgeSmall : ComputeType -> Html msg
+computeTypeBadgeSmall computeType =
+    let
+        ( icon, bgColor, textColor ) =
+            case computeType of
+                CpuCompute ->
+                    ( "⚙", Styles.colors.surface, Styles.colors.textTertiary )
+
+                GpuCompute ->
+                    ( "⚡", Styles.colors.warningMuted, Styles.colors.warning )
+    in
+    span
+        [ css
+            [ Css.fontSize (px 10)
+            , padding2 (px 2) Styles.spacing.xs
+            , backgroundColor bgColor
+            , border3 (px 1) solid Styles.colors.border
+            , borderRadius Styles.radius.sm
+            , color textColor
+            ]
+        ]
+        [ text (icon ++ " " ++ computeTypeToString computeType) ]

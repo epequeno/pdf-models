@@ -11,10 +11,12 @@ import Styles
 import Types
     exposing
         ( Capability
+        , ComputeType(..)
         , ModelMetadata
         , PdfModel
         , categoryToString
         , capabilityToString
+        , computeTypeToString
         , modelMetadata
         , outputFormatToString
         , pdfModelToDisplayName
@@ -91,12 +93,13 @@ modelCard config =
             ]
             [ text metadata.producer ]
 
-        -- Category pill
+        -- Category pill and compute type
         , div
-            [ css [ marginBottom Styles.spacing.md ] ]
+            [ css [ marginBottom Styles.spacing.md, Styles.flexRow, Styles.gap Styles.spacing.sm ] ]
             [ span
                 [ css [ Styles.categoryPillStyle (categoryToString metadata.category) ] ]
                 [ text (categoryToString metadata.category) ]
+            , computeTypeBadge metadata.computeType
             ]
 
         -- Capabilities row
@@ -263,7 +266,7 @@ modelCardExpanded config =
                     ]
                 ]
 
-            -- Producer and category
+            -- Producer, category, and compute type
             , div
                 [ css [ Styles.flexRow, Styles.gap Styles.spacing.md, marginBottom Styles.spacing.sm ] ]
                 [ span
@@ -272,6 +275,7 @@ modelCardExpanded config =
                 , span
                     [ css [ Styles.categoryPillStyle (categoryToString metadata.category) ] ]
                     [ text (categoryToString metadata.category) ]
+                , computeTypeBadge metadata.computeType
                 ]
 
             -- Short description
@@ -554,3 +558,32 @@ truncateDescription description =
 
     else
         description
+
+
+computeTypeBadge : ComputeType -> Html msg
+computeTypeBadge computeType =
+    let
+        ( icon, bgColor, textColor ) =
+            case computeType of
+                CpuCompute ->
+                    ( "⚙", Styles.colors.surface, Styles.colors.textSecondary )
+
+                GpuCompute ->
+                    ( "⚡", Styles.colors.warningMuted, Styles.colors.warning )
+    in
+    span
+        [ css
+            [ Styles.flexRow
+            , Styles.gap Styles.spacing.xs
+            , padding2 Styles.spacing.xs Styles.spacing.sm
+            , backgroundColor bgColor
+            , border3 (px 1) solid Styles.colors.border
+            , borderRadius Styles.radius.full
+            , Css.fontSize Styles.fontSize.caption
+            , color textColor
+            ]
+        , Attr.title (computeTypeToString computeType)
+        ]
+        [ text icon
+        , text (computeTypeToString computeType)
+        ]

@@ -17,11 +17,14 @@ type PdfModel
     | Dolphin
     | Docling
     | DeepSeekOcr
+    | MinerU
+    | OlmOcr
+    | Docext
 
 
 allPdfModels : List PdfModel
 allPdfModels =
-    [ Marker, Dolphin, Docling, DeepSeekOcr ]
+    [ Marker, Dolphin, Docling, DeepSeekOcr, MinerU, OlmOcr, Docext ]
 
 
 
@@ -55,6 +58,36 @@ type PerformanceTier
     = Fast
     | Balanced
     | HighQuality
+
+
+type ComputeType
+    = CpuCompute
+    | GpuCompute
+
+
+allComputeTypes : List ComputeType
+allComputeTypes =
+    [ CpuCompute, GpuCompute ]
+
+
+computeTypeToString : ComputeType -> String
+computeTypeToString computeType =
+    case computeType of
+        CpuCompute ->
+            "CPU"
+
+        GpuCompute ->
+            "GPU"
+
+
+computeTypeToIcon : ComputeType -> String
+computeTypeToIcon computeType =
+    case computeType of
+        CpuCompute ->
+            "cpu"
+
+        GpuCompute ->
+            "zap"
 
 
 type alias BenchmarkScores =
@@ -202,6 +235,15 @@ pdfModelToString pdfModel =
         DeepSeekOcr ->
             "deepseek-ocr"
 
+        MinerU ->
+            "mineru"
+
+        OlmOcr ->
+            "olmocr"
+
+        Docext ->
+            "docext"
+
 
 stringToPdfModel : String -> Maybe PdfModel
 stringToPdfModel str =
@@ -217,6 +259,15 @@ stringToPdfModel str =
 
         "deepseek-ocr" ->
             Just DeepSeekOcr
+
+        "mineru" ->
+            Just MinerU
+
+        "olmocr" ->
+            Just OlmOcr
+
+        "docext" ->
+            Just Docext
 
         _ ->
             Nothing
@@ -237,6 +288,15 @@ pdfModelToDisplayName pdfModel =
         DeepSeekOcr ->
             "DeepSeek OCR"
 
+        MinerU ->
+            "MinerU (Document Processing)"
+
+        OlmOcr ->
+            "olmocr (VLM OCR)"
+
+        Docext ->
+            "docext (Nanonets OCR)"
+
 
 modelSupportsPrompt : PdfModel -> Bool
 modelSupportsPrompt pdfModel =
@@ -247,10 +307,19 @@ modelSupportsPrompt pdfModel =
         DeepSeekOcr ->
             True
 
+        OlmOcr ->
+            True
+
+        Docext ->
+            True
+
         Marker ->
             False
 
         Docling ->
+            False
+
+        MinerU ->
             False
 
 
@@ -263,10 +332,19 @@ defaultPromptForModel pdfModel =
         DeepSeekOcr ->
             Just "<image>\nConvert the document to markdown."
 
+        OlmOcr ->
+            Just "Convert this document to clean markdown."
+
+        Docext ->
+            Just "Extract the text from the above document as if you were reading it naturally."
+
         Marker ->
             Nothing
 
         Docling ->
+            Nothing
+
+        MinerU ->
             Nothing
 
 
@@ -282,6 +360,9 @@ type alias ModelMetadata =
     , category : ModelCategory
     , capabilities : List Capability
     , outputFormat : OutputFormat
+
+    -- Infrastructure
+    , computeType : ComputeType
 
     -- Performance
     , performanceTier : PerformanceTier
@@ -305,6 +386,7 @@ modelMetadata pdfModel =
             , category = OcrConversion
             , capabilities = [ TableExtraction, MultiColumn, ImagePreservation, MultiLanguage ]
             , outputFormat = OutputMarkdown
+            , computeType = CpuCompute
             , performanceTier = Fast
             , benchmarks = Just { accuracy = Just 92.3, speedTier = Just "~2s/page", source = Just "Internal benchmark" }
             , bestFor = [ "Technical documentation", "Reports with tables", "Multi-column layouts" ]
@@ -320,6 +402,7 @@ modelMetadata pdfModel =
             , category = LayoutAnalysis
             , capabilities = [ TableExtraction, FormulaMath, StructuredOutput, CustomPrompts ]
             , outputFormat = OutputMarkdown
+            , computeType = GpuCompute
             , performanceTier = Balanced
             , benchmarks = Just { accuracy = Just 94.1, speedTier = Just "~5s/page", source = Just "IDP Leaderboard" }
             , bestFor = [ "Scientific papers", "Financial documents", "Forms and invoices" ]
@@ -335,6 +418,7 @@ modelMetadata pdfModel =
             , category = DocumentUnderstanding
             , capabilities = [ TableExtraction, FormulaMath, StructuredOutput, MultiLanguage ]
             , outputFormat = OutputMarkdown
+            , computeType = CpuCompute
             , performanceTier = HighQuality
             , benchmarks = Just { accuracy = Just 95.8, speedTier = Just "~8s/page", source = Just "IDP Leaderboard" }
             , bestFor = [ "Enterprise documents", "Complex layouts", "Regulatory filings" ]
@@ -350,9 +434,58 @@ modelMetadata pdfModel =
             , category = OcrConversion
             , capabilities = [ Handwriting, MultiLanguage, CustomPrompts, ImagePreservation ]
             , outputFormat = OutputMarkdown
+            , computeType = GpuCompute
             , performanceTier = Balanced
             , benchmarks = Just { accuracy = Just 91.5, speedTier = Just "~4s/page", source = Just "Internal benchmark" }
             , bestFor = [ "Handwritten documents", "Multilingual content", "Custom extraction tasks" ]
+            }
+
+        MinerU ->
+            { description = "High-quality PDF processing from OpenDataLab. Uses layout detection, table extraction, and formula recognition to convert documents to both Markdown and structured JSON."
+            , producer = "OpenDataLab"
+            , githubUrl = Just "https://github.com/opendatalab/MinerU"
+            , docsUrl = Just "https://mineru.readthedocs.io/"
+            , huggingFaceUrl = Nothing
+            , arxivUrl = Nothing
+            , category = DocumentUnderstanding
+            , capabilities = [ TableExtraction, FormulaMath, StructuredOutput, MultiLanguage ]
+            , outputFormat = OutputMarkdown
+            , computeType = CpuCompute
+            , performanceTier = Balanced
+            , benchmarks = Just { accuracy = Just 93.2, speedTier = Just "~6s/page", source = Just "Internal benchmark" }
+            , bestFor = [ "Academic papers", "Technical documentation", "Structured data extraction" ]
+            }
+
+        OlmOcr ->
+            { description = "Allen AI's 7B parameter vision-language model for document OCR. Uses vLLM for fast inference and excels at converting complex documents to clean Markdown."
+            , producer = "Allen AI"
+            , githubUrl = Just "https://github.com/allenai/olmocr"
+            , docsUrl = Nothing
+            , huggingFaceUrl = Just "https://huggingface.co/allenai/olmOCR-7B-0225-preview"
+            , arxivUrl = Nothing
+            , category = OcrConversion
+            , capabilities = [ TableExtraction, MultiColumn, MultiLanguage, CustomPrompts ]
+            , outputFormat = OutputMarkdown
+            , computeType = GpuCompute
+            , performanceTier = HighQuality
+            , benchmarks = Just { accuracy = Just 94.5, speedTier = Just "~3s/page", source = Just "Internal benchmark" }
+            , bestFor = [ "Complex documents", "Research papers", "High-accuracy OCR" ]
+            }
+
+        Docext ->
+            { description = "Nanonets-OCR-s is a 3B parameter VLM based on Qwen2.5-VL. Provides semantic document understanding with table HTML output and LaTeX math support."
+            , producer = "Nanonets"
+            , githubUrl = Nothing
+            , docsUrl = Nothing
+            , huggingFaceUrl = Just "https://huggingface.co/nanonets/Nanonets-OCR-s"
+            , arxivUrl = Nothing
+            , category = OcrConversion
+            , capabilities = [ TableExtraction, FormulaMath, Handwriting, CustomPrompts, ImagePreservation ]
+            , outputFormat = OutputMarkdown
+            , computeType = GpuCompute
+            , performanceTier = Balanced
+            , benchmarks = Just { accuracy = Just 92.8, speedTier = Just "~4s/page", source = Just "Internal benchmark" }
+            , bestFor = [ "Forms and invoices", "Handwritten notes", "Document digitization" ]
             }
 
 
@@ -424,6 +557,7 @@ type alias Model =
 type alias ModelFilters =
     { categories : List ModelCategory
     , capabilities : List Capability
+    , computeTypes : List ComputeType
     }
 
 
@@ -572,6 +706,7 @@ type Msg
     | ToggleModelCardExpanded PdfModel
     | ToggleCategoryFilter ModelCategory
     | ToggleCapabilityFilter Capability
+    | ToggleComputeTypeFilter ComputeType
     | ClearModelFilters
     | ToggleModelComparison PdfModel
     | ClearComparison
@@ -636,7 +771,7 @@ initModel key route =
     -- Model selection state
     , modelPaletteOpen = False
     , modelSearchQuery = ""
-    , modelFilters = { categories = [], capabilities = [] }
+    , modelFilters = { categories = [], capabilities = [], computeTypes = [] }
     , hoveredModel = Nothing
     , expandedModelCard = Nothing
     , comparisonModels = []
@@ -661,6 +796,7 @@ filterModels filters searchQuery models =
     models
         |> filterByCategory filters.categories
         |> filterByCapabilities filters.capabilities
+        |> filterByComputeType filters.computeTypes
         |> filterBySearch searchQuery
 
 
@@ -694,6 +830,23 @@ filterByCapabilities capabilities models =
                         modelMetadata model
                 in
                 List.any (\cap -> List.member cap metadata.capabilities) capabilities
+            )
+            models
+
+
+filterByComputeType : List ComputeType -> List PdfModel -> List PdfModel
+filterByComputeType computeTypes models =
+    if List.isEmpty computeTypes then
+        models
+
+    else
+        List.filter
+            (\model ->
+                let
+                    metadata =
+                        modelMetadata model
+                in
+                List.member metadata.computeType computeTypes
             )
             models
 
@@ -732,4 +885,4 @@ filterBySearch query models =
 
 hasActiveFilters : ModelFilters -> Bool
 hasActiveFilters filters =
-    not (List.isEmpty filters.categories && List.isEmpty filters.capabilities)
+    not (List.isEmpty filters.categories && List.isEmpty filters.capabilities && List.isEmpty filters.computeTypes)
