@@ -434,25 +434,35 @@ def handler(event, context):
             dynamodb_table_name,
         )
 
-        # Create DynamoDB update task for job status (unused currently but keeping for future error handling)
-        update_job_status = tasks.DynamoUpdateItem(
-            self,
-            "UpdateJobStatus",
-            table=jobs_table,
-            key={
-                "job_id": tasks.DynamoAttributeValue.from_string(
-                    sfn.JsonPath.string_at("$.job_id")
-                )
+        # Create error handler state using CustomState for full control
+        # This state updates DynamoDB when the ECS task fails
+        # The error info is captured in $.error by the Parallel's Catch block
+        # Error structure: { Error: "error type", Cause: "error details" }
+        mark_job_failed_state = {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::dynamodb:updateItem",
+            "Parameters": {
+                "TableName": dynamodb_table_name,
+                "Key": {
+                    "job_id": {"S.$": "$.job_id"}
+                },
+                "UpdateExpression": "SET #status = :status, completed_at = :completed_at, #error = :error",
+                "ExpressionAttributeNames": {
+                    "#status": "status",
+                    "#error": "error"
+                },
+                "ExpressionAttributeValues": {
+                    ":status": {"S": "failed"},
+                    ":completed_at": {"S.$": "$$.State.EnteredTime"},
+                    ":error": {"S.$": "States.Format('Step Functions error: {} - {}', $.error.Error, States.JsonToString($.error.Cause))"}
+                }
             },
-            update_expression="SET #status = :status, completed_at = :completed_at",
-            expression_attribute_names={"#status": "status"},
-            expression_attribute_values={
-                ":status": tasks.DynamoAttributeValue.from_string("failed"),
-                ":completed_at": tasks.DynamoAttributeValue.from_string(
-                    sfn.JsonPath.string_at("$$.State.EnteredTime")
-                ),
-            },
-            result_path=sfn.JsonPath.DISCARD,
+            "ResultPath": None,
+            "End": True
+        }
+
+        mark_job_failed = sfn.CustomState(
+            self, "MarkJobFailed", state_json=mark_job_failed_state
         )
 
         # Step 1: Resolve the current task definition ARN from SSM
@@ -549,8 +559,16 @@ def handler(event, context):
             self, f"Run{model_name.title()}Task", state_json=run_task_state
         )
 
-        # Create state machine definition with dynamic task definition resolution
-        definition = resolve_task_def.next(run_task)
+        # Create state machine definition with error handling
+        # Use Parallel as a wrapper to enable Catch on the CustomState
+        # The Parallel has only one branch (run_task) but allows us to catch all errors
+        run_with_error_handling = (
+            sfn.Parallel(self, "RunTaskWithErrorHandling")
+            .branch(run_task)
+            .add_catch(mark_job_failed, result_path="$.error")
+        )
+
+        definition = resolve_task_def.next(run_with_error_handling)
 
         # Create state machine with model-specific timeout
         state_machine = sfn.StateMachine(
