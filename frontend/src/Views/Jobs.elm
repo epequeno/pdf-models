@@ -43,17 +43,21 @@ viewHeader =
             ]
         ]
         [ div []
-            [ h1
-                [ css
-                    [ Styles.textDisplay
-                    , marginBottom Styles.spacing.xs
+            [ a
+                [ href (routeToPath (Upload defaultPdfModel))
+                , css
+                    [ Styles.textH1
+                    , color Styles.colors.textPrimary
+                    , textDecoration none
+                    , hover [ color Styles.colors.accent ]
                     ]
                 ]
-                [ text "Dashboard" ]
+                [ text "PDF Models" ]
             , p
                 [ css
                     [ Styles.textSecondary
                     , margin zero
+                    , marginTop Styles.spacing.xs
                     ]
                 ]
                 [ text "Monitor your PDF processing jobs" ]
@@ -67,12 +71,16 @@ viewHeader =
             [ a
                 [ href (routeToPath Models)
                 , css
-                    [ color Styles.colors.textSecondary
+                    [ padding2 Styles.spacing.sm Styles.spacing.base
+                    , border3 (px 1) solid Styles.colors.border
+                    , borderRadius Styles.radius.md
+                    , color Styles.colors.textSecondary
                     , textDecoration none
                     , Css.fontSize Styles.fontSize.body
                     , Styles.transitions.base
                     , hover
-                        [ color Styles.colors.textPrimary
+                        [ backgroundColor Styles.colors.overlay
+                        , borderColor Styles.colors.borderStrong
                         ]
                     ]
                 ]

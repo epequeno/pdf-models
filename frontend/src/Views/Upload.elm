@@ -157,7 +157,7 @@ viewHeader =
         ]
         [ div []
             [ a
-                [ href (routeToPath Jobs)
+                [ href (routeToPath (Upload defaultPdfModel))
                 , css
                     [ Styles.textH1
                     , color Styles.colors.textPrimary

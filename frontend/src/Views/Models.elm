@@ -126,7 +126,7 @@ viewHeader =
         ]
         [ div []
             [ a
-                [ href (routeToPath Jobs)
+                [ href (routeToPath (Upload defaultPdfModel))
                 , css
                     [ Styles.textH1
                     , color Styles.colors.textPrimary
@@ -145,7 +145,9 @@ viewHeader =
             [ a
                 [ href (routeToPath (Upload defaultPdfModel))
                 , css
-                    [ padding2 Styles.spacing.sm Styles.spacing.base
+                    [ Styles.flexRow
+                    , Styles.gap Styles.spacing.sm
+                    , padding2 Styles.spacing.sm Styles.spacing.base
                     , backgroundColor Styles.colors.accent
                     , borderRadius Styles.radius.md
                     , color Styles.colors.textInverse
@@ -155,10 +157,13 @@ viewHeader =
                     , Styles.transitions.base
                     , hover
                         [ backgroundColor Styles.colors.accentHover
+                        , color Styles.colors.textInverse
                         ]
                     ]
                 ]
-                [ text "New Job" ]
+                [ span [] [ text "+" ]
+                , text "New Job"
+                ]
             , a
                 [ href (routeToPath Jobs)
                 , css
