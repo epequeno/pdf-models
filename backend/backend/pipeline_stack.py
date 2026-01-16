@@ -131,6 +131,8 @@ class PipelineStack(Stack):
             install_commands=[
                 # Install CDK CLI (Node.js is pre-installed in STANDARD_7_0)
                 "npm install -g aws-cdk",
+                # Remove .python-version (for local dev) to use CodeBuild's Python
+                "rm -f backend/.python-version",
                 # Install Python dependencies
                 "cd backend && pip install -e .",
             ],
@@ -176,6 +178,7 @@ class PipelineStack(Stack):
             "UnitTests",
             input=source,
             install_commands=[
+                "rm -f backend/.python-version",
                 "cd backend && pip install -e '.[dev]'",
             ],
             commands=[
