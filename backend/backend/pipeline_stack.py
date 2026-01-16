@@ -124,20 +124,18 @@ class PipelineStack(Stack):
             branch="main",
         )
 
-        # Synth step: Install uv, CDK CLI, sync dependencies, run cdk synth
+        # Synth step: Install dependencies and run cdk synth
         synth = pipelines.CodeBuildStep(
             "Synth",
             input=source,
             install_commands=[
-                # Install uv for Python dependency management
-                "curl -LsSf https://astral.sh/uv/install.sh | sh",
                 # Install CDK CLI (Node.js is pre-installed in STANDARD_7_0)
                 "npm install -g aws-cdk",
-                # Sync Python dependencies
-                "cd backend && $HOME/.local/bin/uv sync",
+                # Install Python dependencies
+                "cd backend && pip install -e .",
             ],
             commands=[
-                "cd backend && $HOME/.local/bin/uv run cdk synth",
+                "cd backend && cdk synth",
             ],
             primary_output_directory="backend/cdk.out",
             build_environment=codebuild.BuildEnvironment(
@@ -168,11 +166,10 @@ class PipelineStack(Stack):
             "UnitTests",
             input=source,
             install_commands=[
-                "curl -LsSf https://astral.sh/uv/install.sh | sh",
-                "cd backend && $HOME/.local/bin/uv sync",
+                "cd backend && pip install -e '.[dev]'",
             ],
             commands=[
-                "cd backend && $HOME/.local/bin/uv run pytest tests/unit/ -v --junitxml=test-results.xml",
+                "cd backend && pytest tests/unit/ -v --junitxml=test-results.xml",
             ],
             partial_build_spec=codebuild.BuildSpec.from_object({
                 "version": "0.2",
