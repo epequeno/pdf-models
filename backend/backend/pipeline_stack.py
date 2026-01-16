@@ -143,7 +143,8 @@ class PipelineStack(Stack):
                 # Already in backend/ due to install_commands cd
                 "cdk synth",
             ],
-            primary_output_directory="cdk.out",
+            # Path relative to repo root
+            primary_output_directory="backend/cdk.out",
             build_environment=codebuild.BuildEnvironment(
                 build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
                 compute_type=codebuild.ComputeType.MEDIUM,
