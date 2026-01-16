@@ -4,7 +4,8 @@
         cdk-synth cdk-diff cdk-deploy cdk-destroy cdk-deploy-all \
         aws-logs aws-s3-ls aws-stepfunctions-list aws-ecs-force-new-deployment \
         container-build base-image-build lambda-build lambda-build-status lambda-clean \
-        frontend-build frontend-deploy frontend-deploy-quick setup
+        frontend-build frontend-deploy frontend-deploy-quick setup \
+        user-create user-list
 
 # Configuration
 AWS_PROFILE := arch
@@ -44,6 +45,10 @@ help:
 	@echo "  make aws-s3-ls                     - List S3 buckets"
 	@echo "  make aws-stepfunctions-list        - List Step Functions state machines"
 	@echo "  make aws-ecs-force-new-deployment  - Force ECS to pull latest container image"
+	@echo ""
+	@echo "User Management:"
+	@echo "  make user-create EMAIL=<email>     - Create a new Cognito user (sends temp password via email)"
+	@echo "  make user-list                     - List all Cognito users"
 	@echo ""
 	@echo "Build Commands:"
 	@echo "  make base-image-build              - Build Rust Lambda builder base image (runs in CodeBuild)"
@@ -368,3 +373,26 @@ setup:
 	@echo "Installing CDK dependencies..."
 	cd backend/cdk && uv sync
 	@echo "Setup complete! Use 'make help' to see available commands."
+
+# User Management
+user-create:
+	@if [ -z "$(EMAIL)" ]; then \
+		echo "Error: EMAIL parameter required. Usage: make user-create EMAIL=user@example.com"; \
+		exit 1; \
+	fi
+	@echo "Creating Cognito user: $(EMAIL)..."
+	@USER_POOL_ID=$$($(AWS) ssm get-parameter --name /pdf-models/core/cognito-user-pool-id --query Parameter.Value --output text) && \
+	$(AWS) cognito-idp admin-create-user \
+		--user-pool-id "$$USER_POOL_ID" \
+		--username "$(EMAIL)" \
+		--user-attributes Name=email,Value=$(EMAIL) Name=email_verified,Value=true \
+		--desired-delivery-mediums EMAIL && \
+	echo "User created! A temporary password has been sent to $(EMAIL)"
+
+user-list:
+	@echo "Listing Cognito users..."
+	@USER_POOL_ID=$$($(AWS) ssm get-parameter --name /pdf-models/core/cognito-user-pool-id --query Parameter.Value --output text) && \
+	$(AWS) cognito-idp list-users \
+		--user-pool-id "$$USER_POOL_ID" \
+		--query 'Users[*].{Email:Attributes[?Name==`email`].Value|[0],Status:UserStatus,Created:UserCreateDate}' \
+		--output table
