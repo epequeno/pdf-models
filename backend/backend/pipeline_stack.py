@@ -132,15 +132,14 @@ class PipelineStack(Stack):
                 # Install CDK CLI (Node.js is pre-installed in STANDARD_7_0)
                 "npm install -g aws-cdk",
                 # Remove .python-version (for local dev) to use CodeBuild's Python
-                "rm -f backend/.python-version",
-                # Install Python dependencies
-                "cd backend && pip install -e .",
+                "rm -f .python-version",
+                # Install Python dependencies (we're already in backend/)
+                "pip install -e .",
             ],
             commands=[
-                # Debug: show full directory structure
-                "pwd && ls -la && ls -la backend/ && cd backend && ls -la && cdk synth",
+                "cdk synth",
             ],
-            primary_output_directory="backend/cdk.out",
+            primary_output_directory="cdk.out",
             build_environment=codebuild.BuildEnvironment(
                 build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
                 compute_type=codebuild.ComputeType.MEDIUM,
@@ -179,11 +178,11 @@ class PipelineStack(Stack):
             "UnitTests",
             input=source,
             install_commands=[
-                "rm -f backend/.python-version",
-                "cd backend && pip install -e '.[dev]'",
+                "rm -f .python-version",
+                "pip install -e '.[dev]'",
             ],
             commands=[
-                "cd backend && pytest tests/unit/ -v --junitxml=test-results.xml",
+                "pytest tests/unit/ -v --junitxml=test-results.xml",
             ],
             partial_build_spec=codebuild.BuildSpec.from_object({
                 "version": "0.2",
@@ -196,7 +195,7 @@ class PipelineStack(Stack):
                 },
                 "reports": {
                     "unit-tests": {
-                        "files": ["backend/test-results.xml"],
+                        "files": ["test-results.xml"],
                         "file-format": "JUNITXML",
                     }
                 },
