@@ -3,6 +3,14 @@ CDK App for pdf-models serverless platform.
 
 CRITICAL: Account and region are determined by AWS_PROFILE at deployment time.
 The Makefile ensures all CDK commands use AWS_PROFILE=arch.
+
+This app defines both:
+1. Individual stacks for manual deployment (make cdk-deploy STACK=X)
+2. PipelineStack for automated CI/CD deployment
+
+Once PipelineStack is deployed, it will automatically deploy all other stacks
+on commits to the main branch. Manual stack deployment remains available for
+ad-hoc operations during the transition period.
 """
 
 import aws_cdk as cdk
@@ -15,9 +23,27 @@ from backend.frontend_stack import FrontendStack
 from backend.model_stack import ModelStack
 from backend.monitoring_stack import MonitoringStack
 from backend.networking_stack import NetworkingStack
+from backend.pipeline_stack import PipelineStack
 from backend.stack_config import MODELS
 
 app = cdk.App()
+
+# ============================================================================
+# CI/CD Pipeline Stack (deploy once, self-mutates after)
+# ============================================================================
+# This pipeline automatically deploys all other stacks on commits to main.
+# Deploy with: make cdk-deploy STACK=PipelineStack
+PipelineStack(
+    app,
+    "PipelineStack",
+    description="Self-mutating CDK Pipeline for automated infrastructure deployments",
+)
+
+# ============================================================================
+# Individual Stacks (for manual deployment during transition)
+# ============================================================================
+# These can still be deployed manually with: make cdk-deploy STACK=<name>
+# Once the pipeline is fully operational, manual deploys are only for emergencies.
 
 # Stack 1: Foundation (ECR repositories, future DNS/certs)
 # No env= specified - AWS_PROFILE handles account/region automatically
