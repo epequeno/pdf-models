@@ -142,6 +142,16 @@ class PipelineStack(Stack):
                 build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
                 compute_type=codebuild.ComputeType.MEDIUM,
             ),
+            partial_build_spec=codebuild.BuildSpec.from_object({
+                "version": "0.2",
+                "phases": {
+                    "install": {
+                        "runtime-versions": {
+                            "python": "3.12",
+                        },
+                    },
+                },
+            }),
         )
 
         # Create the pipeline
@@ -173,6 +183,13 @@ class PipelineStack(Stack):
             ],
             partial_build_spec=codebuild.BuildSpec.from_object({
                 "version": "0.2",
+                "phases": {
+                    "install": {
+                        "runtime-versions": {
+                            "python": "3.12",
+                        },
+                    },
+                },
                 "reports": {
                     "unit-tests": {
                         "files": ["backend/test-results.xml"],
