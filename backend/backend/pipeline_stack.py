@@ -137,13 +137,10 @@ class PipelineStack(Stack):
                 "cd backend && pip install -e .",
             ],
             commands=[
-                "echo '=== DEBUG: Current directory ===' && pwd",
-                "echo '=== DEBUG: List root ===' && ls -la",
-                "echo '=== DEBUG: List backend ===' && ls -la backend/",
-                "echo '=== DEBUG: Check cdk.json ===' && cat backend/cdk.json | head -5",
-                "cd backend && pwd && ls -la && cdk synth",
+                # Already in backend/ due to install_commands cd
+                "cdk synth",
             ],
-            primary_output_directory="backend/cdk.out",
+            primary_output_directory="cdk.out",
             build_environment=codebuild.BuildEnvironment(
                 build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
                 compute_type=codebuild.ComputeType.MEDIUM,
@@ -186,7 +183,8 @@ class PipelineStack(Stack):
                 "cd backend && pip install -e '.[dev]'",
             ],
             commands=[
-                "cd backend && pytest tests/unit/ -v --junitxml=test-results.xml",
+                # Already in backend/ due to install_commands cd
+                "pytest tests/unit/ -v --junitxml=test-results.xml",
             ],
             partial_build_spec=codebuild.BuildSpec.from_object({
                 "version": "0.2",
@@ -199,7 +197,7 @@ class PipelineStack(Stack):
                 },
                 "reports": {
                     "unit-tests": {
-                        "files": ["backend/test-results.xml"],
+                        "files": ["test-results.xml"],
                         "file-format": "JUNITXML",
                     }
                 },
