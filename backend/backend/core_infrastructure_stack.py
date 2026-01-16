@@ -169,8 +169,8 @@ class CoreInfrastructureStack(Stack):
             self,
             "UserPool",
             user_pool_name=CONFIG.COGNITO_USER_POOL_NAME,
-            # Self-registration: Enabled for public sign-up
-            self_sign_up_enabled=True,
+            # Self-registration: Disabled - only admins can create users
+            self_sign_up_enabled=False,
             # Sign-in: Email as username (more user-friendly)
             sign_in_aliases=cognito.SignInAliases(
                 email=True,
