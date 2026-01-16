@@ -307,6 +307,15 @@ class ApiV2Stack(Stack):
             },
         )
 
+        # Create CloudWatch log group for API Gateway access logs
+        api_access_log_group = logs.LogGroup(
+            self,
+            "ApiAccessLogGroup",
+            log_group_name=f"/aws/apigateway/{CONFIG.PROJECT_NAME}-http-api-access",
+            retention=logs.RetentionDays.ONE_WEEK,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+
         # Create HTTP API Gateway (v2)
         http_api = apigwv2.HttpApi(
             self,
@@ -323,6 +332,14 @@ class ApiV2Stack(Stack):
                 allow_headers=["Content-Type", "Authorization"],
                 max_age=Duration.hours(1),
             ),
+        )
+
+        # Configure access logging on the default stage
+        # HTTP APIs automatically create a $default stage
+        cfn_stage = http_api.default_stage.node.default_child
+        cfn_stage.access_log_settings = apigwv2.CfnStage.AccessLogSettingsProperty(
+            destination_arn=api_access_log_group.log_group_arn,
+            format='{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","path":"$context.path","status":"$context.status","responseLength":"$context.responseLength","latency":"$context.responseLatency","integrationLatency":"$context.integrationLatency","errorMessage":"$context.error.message"}',
         )
 
         # Import the existing hosted zone (same pattern as FrontendStack)
