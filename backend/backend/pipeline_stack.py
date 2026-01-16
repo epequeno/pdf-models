@@ -137,7 +137,11 @@ class PipelineStack(Stack):
                 "cd backend && pip install -e .",
             ],
             commands=[
-                "cd backend && cdk synth",
+                "echo '=== DEBUG: Current directory ===' && pwd",
+                "echo '=== DEBUG: List root ===' && ls -la",
+                "echo '=== DEBUG: List backend ===' && ls -la backend/",
+                "echo '=== DEBUG: Check cdk.json ===' && cat backend/cdk.json | head -5",
+                "cd backend && pwd && ls -la && cdk synth",
             ],
             primary_output_directory="backend/cdk.out",
             build_environment=codebuild.BuildEnvironment(
