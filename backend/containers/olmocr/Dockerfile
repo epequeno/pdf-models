@@ -6,8 +6,9 @@
 # Model: allenai/olmOCR-7B-0225-preview (pre-downloaded at build time)
 
 # Use NVIDIA CUDA base image from NGC (avoids Docker Hub rate limits)
-# olmocr requires CUDA 12.x for vLLM compatibility
-FROM nvcr.io/nvidia/cuda:12.4.0-devel-ubuntu22.04 AS builder
+# Use CUDA 12.1 for compatibility with ECS GPU AMI (has driver ~535.x)
+# CUDA 12.4 requires driver 550.x+ which ECS AMI doesn't have yet
+FROM nvcr.io/nvidia/cuda:12.1.0-devel-ubuntu22.04 AS builder
 
 # Install Python and build dependencies
 RUN apt-get update && apt-get install -y \
@@ -25,14 +26,14 @@ RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 &
 
 # Install PyTorch with CUDA support first (required for flash-attn build)
 RUN pip3 install --no-cache-dir \
-    torch torchvision --index-url https://download.pytorch.org/whl/cu124
+    torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
 # Install flash-attention (needs CUDA dev tools to build)
 RUN pip3 install --no-cache-dir packaging wheel
 RUN pip3 install flash-attn --no-build-isolation
 
 # Runtime stage - smaller image without build tools
-FROM nvcr.io/nvidia/cuda:12.4.0-runtime-ubuntu22.04
+FROM nvcr.io/nvidia/cuda:12.1.0-runtime-ubuntu22.04
 
 # Install Python and runtime dependencies (including fonts for PDF rendering)
 RUN apt-get update && apt-get install -y \
@@ -68,12 +69,12 @@ COPY --from=builder /usr/local/lib/python3.11/dist-packages /usr/local/lib/pytho
 
 # Install PyTorch with CUDA support
 RUN pip3 install --no-cache-dir \
-    torch torchvision --index-url https://download.pytorch.org/whl/cu124
+    torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
 # Install olmocr with GPU support
 # Use the PyTorch CUDA wheel index for compatible packages
 RUN pip3 install --no-cache-dir \
-    olmocr[gpu] --extra-index-url https://download.pytorch.org/whl/cu124
+    olmocr[gpu] --extra-index-url https://download.pytorch.org/whl/cu121
 
 # Install additional dependencies for our task script
 RUN pip3 install --no-cache-dir \
