@@ -129,11 +129,14 @@ class PipelineStack(Stack):
             "Synth",
             input=source,
             install_commands=[
-                # Install CDK CLI (Node.js is pre-installed in STANDARD_7_0)
-                "npm install -g aws-cdk",
+                # Install CDK CLI and Elm (Node.js is pre-installed in STANDARD_7_0)
+                "npm install -g aws-cdk elm",
                 # Remove .python-version (for local dev) to use CodeBuild's Python
                 "rm -f backend/.python-version",
-                # Install Python dependencies
+                # Build frontend (FrontendStack requires frontend/dst to exist)
+                # Use subshell to avoid changing cwd
+                "(cd frontend && ./build.sh)",
+                # Install Python dependencies (this changes cwd to backend/)
                 "cd backend && pip install -e .",
             ],
             commands=[
