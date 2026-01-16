@@ -44,7 +44,7 @@ help:
 	@echo "  make aws-logs LOGGROUP=<name>      - Tail CloudWatch logs"
 	@echo "  make aws-s3-ls                     - List S3 buckets"
 	@echo "  make aws-stepfunctions-list        - List Step Functions state machines"
-	@echo "  make aws-ecs-force-new-deployment  - Force ECS to pull latest container image"
+	@echo "  make aws-ecs-force-new-deployment MODEL=<name> - Force task definition update and SSM sync"
 	@echo ""
 	@echo "User Management:"
 	@echo "  make user-create EMAIL=<email>     - Create a new Cognito user (sends temp password via email)"
@@ -254,16 +254,21 @@ aws-stepfunctions-list:
 	$(AWS) stepfunctions list-state-machines
 
 aws-ecs-force-new-deployment:
-	@echo "Forcing new ECS task definition to pull latest container image..."
-	@echo "This updates the task definition to force ECS to pull the latest :latest image"
-	$(AWS) ecs register-task-definition \
-		--cli-input-json "$$($(AWS) ecs describe-task-definition --task-definition pdf-models-marker --query 'taskDefinition' | \
+	@if [ -z "$(MODEL)" ]; then \
+		echo "Error: MODEL parameter required. Usage: make aws-ecs-force-new-deployment MODEL=marker"; \
+		exit 1; \
+	fi
+	@echo "Forcing new ECS task definition for $(MODEL) to pull latest container image..."
+	@NEW_ARN=$$($(AWS) ecs register-task-definition \
+		--cli-input-json "$$($(AWS) ecs describe-task-definition --task-definition pdf-models-$(MODEL) --query 'taskDefinition' | \
 		python3 -c 'import sys, json; td = json.load(sys.stdin); \
 		del td["taskDefinitionArn"]; del td["revision"]; del td["status"]; \
 		del td["requiresAttributes"]; del td["compatibilities"]; del td["registeredAt"]; del td["registeredBy"]; \
 		print(json.dumps(td))')" \
-		--query 'taskDefinition.taskDefinitionArn' --output text
-	@echo "New task definition revision created. ECS will now pull the latest container image."
+		--query 'taskDefinition.taskDefinitionArn' --output text) && \
+	echo "Registered new task definition: $$NEW_ARN" && \
+	$(AWS) ssm put-parameter --name "/pdf-models/$(MODEL)/task-definition-arn" --value "$$NEW_ARN" --type String --overwrite && \
+	echo "Updated SSM parameter /pdf-models/$(MODEL)/task-definition-arn"
 
 # Container Commands (triggers CodeBuild)
 container-build:

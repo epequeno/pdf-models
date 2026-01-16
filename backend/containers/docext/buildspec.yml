@@ -36,3 +36,13 @@ phases:
       - echo "Updating SSM parameter with image tag..."
       - aws ssm put-parameter --name "/pdf-models/cicd/docext-image-tag" --value "$IMAGE_TAG" --type String --overwrite
       - echo "SSM parameter /pdf-models/cicd/docext-image-tag updated to $IMAGE_TAG"
+      # Update ECS task definition with new image
+      - echo "Updating ECS task definition..."
+      - TASK_DEF_FAMILY="pdf-models-docext"
+      - |
+        CURRENT_TASK_DEF=$(aws ecs describe-task-definition --task-definition $TASK_DEF_FAMILY --query 'taskDefinition' --output json)
+        NEW_TASK_DEF=$(echo "$CURRENT_TASK_DEF" | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy) | .containerDefinitions[0].image = "'"$ECR_REPOSITORY_URI:$IMAGE_TAG"'"')
+        NEW_ARN=$(aws ecs register-task-definition --cli-input-json "$NEW_TASK_DEF" --query 'taskDefinition.taskDefinitionArn' --output text)
+        echo "Registered new task definition: $NEW_ARN"
+        aws ssm put-parameter --name "/pdf-models/docext/task-definition-arn" --value "$NEW_ARN" --type String --overwrite
+        echo "Updated /pdf-models/docext/task-definition-arn to $NEW_ARN"
