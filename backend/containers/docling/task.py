@@ -50,6 +50,7 @@ def update_job_status(
     table_name: str,
     job_id: str,
     status: str,
+    substatus: str = None,
     s3_result_key: str = None,
     s3_result_keys: dict = None,
     error: str = None
@@ -63,6 +64,10 @@ def update_job_status(
         ":status": status,
         ":completed_at": datetime.now(timezone.utc).isoformat()
     }
+
+    if substatus:
+        update_expr += ", substatus = :substatus"
+        expr_attr_values[":substatus"] = substatus
 
     # For backwards compatibility, set s3_result_key to markdown result
     if s3_result_key:
@@ -85,7 +90,7 @@ def update_job_status(
         ExpressionAttributeNames=expr_attr_names,
         ExpressionAttributeValues=expr_attr_values
     )
-    logger.info(f"Updated job {job_id} to status: {status}")
+    logger.info(f"Updated job {job_id} to status: {status}" + (f" ({substatus})" if substatus else ""))
 
 
 def process_pdf_with_docling(input_path: str) -> dict:
@@ -159,8 +164,8 @@ def main():
     dynamodb = boto3.resource("dynamodb")
 
     try:
-        # Update status to processing
-        update_job_status(dynamodb, table_name, job_id, "processing")
+        # Update status to processing - downloading
+        update_job_status(dynamodb, table_name, job_id, "processing", substatus="downloading")
 
         # Create temporary directory for processing
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -172,6 +177,12 @@ def main():
             s3.download_file(bucket_name, input_key, str(input_pdf))
             logger.info(f"Downloaded PDF: {input_pdf.stat().st_size} bytes")
 
+            # Update substatus - loading models (Docling loads models internally)
+            update_job_status(dynamodb, table_name, job_id, "processing", substatus="loading_models")
+
+            # Update substatus - converting
+            update_job_status(dynamodb, table_name, job_id, "processing", substatus="converting")
+
             # Process with Docling
             results = process_pdf_with_docling(str(input_pdf))
 
@@ -180,6 +191,9 @@ def main():
             user_id = input_key.split("/")[0]
             json_result_key = f"{user_id}/{job_id}-result.json"
             md_result_key = f"{user_id}/{job_id}-result.md"
+
+            # Update substatus - uploading
+            update_job_status(dynamodb, table_name, job_id, "processing", substatus="uploading")
 
             # Write and upload JSON result
             json_file = temp_path / "output.json"

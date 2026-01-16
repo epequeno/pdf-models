@@ -69,6 +69,8 @@ struct JobResponse {
     user_id: String,
     model: String,
     status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    substatus: Option<String>,
     s3_input_key: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     s3_result_key: Option<String>,
@@ -204,6 +206,7 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
                     user_id: job_user_id.to_string(),
                     model: item.get("model").and_then(|v| v.as_s().ok()).map_or("", |v| v).to_string(),
                     status: item.get("status").and_then(|v| v.as_s().ok()).map_or("unknown", |v| v).to_string(),
+                    substatus: item.get("substatus").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
                     s3_input_key: item.get("s3_input_key").and_then(|v| v.as_s().ok()).map_or("", |v| v).to_string(),
                     s3_result_key,
                     download_url,
@@ -244,6 +247,7 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
                     user_id: item.get("user_id")?.as_s().ok()?.to_string(),
                     model: item.get("model")?.as_s().ok()?.to_string(),
                     status: item.get("status")?.as_s().ok()?.to_string(),
+                    substatus: item.get("substatus").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
                     s3_input_key: item.get("s3_input_key")?.as_s().ok()?.to_string(),
                     s3_result_key: item.get("s3_result_key").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
                     download_url: None,  // Not generated for list view

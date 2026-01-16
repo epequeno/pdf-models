@@ -648,6 +648,7 @@ type alias Job =
     , pdfModel : PdfModel
     , submittedAt : Time.Posix
     , status : JobStatus
+    , substatus : Maybe String
     , s3InputKey : String
     , s3OutputKey : Maybe String
     , completedAt : Maybe Time.Posix

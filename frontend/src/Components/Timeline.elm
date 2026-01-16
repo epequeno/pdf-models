@@ -93,7 +93,7 @@ buildTimeline _ job =
                     { label = "Processing"
                     , timestamp = Nothing
                     , status = EventActive
-                    , detail = Just "Converting document..."
+                    , detail = Just (substatusToString job.substatus)
                     }
 
                 Complete ->
@@ -368,3 +368,25 @@ formatTimestamp currentTime maybeTime =
 
         Nothing ->
             ""
+
+
+substatusToString : Maybe String -> String
+substatusToString maybeSubstatus =
+    case maybeSubstatus of
+        Just "downloading" ->
+            "Downloading file..."
+
+        Just "loading_models" ->
+            "Loading models..."
+
+        Just "converting" ->
+            "Converting document..."
+
+        Just "uploading" ->
+            "Uploading results..."
+
+        Just other ->
+            other ++ "..."
+
+        Nothing ->
+            "Processing..."

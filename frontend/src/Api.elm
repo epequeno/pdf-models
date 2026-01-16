@@ -107,6 +107,7 @@ jobWithDownloadDecoder =
         |> required "model" pdfModelDecoder
         |> required "created_at" iso8601Decoder
         |> required "status" jobStatusDecoder
+        |> optional "substatus" (Decode.maybe Decode.string) Nothing
         |> required "s3_input_key" Decode.string
         |> optional "s3_result_key" (Decode.maybe Decode.string) Nothing
         |> optional "completed_at" (Decode.maybe iso8601Decoder) Nothing
@@ -122,6 +123,7 @@ jobDecoder =
         |> required "model" pdfModelDecoder
         |> required "created_at" iso8601Decoder
         |> required "status" jobStatusDecoder
+        |> optional "substatus" (Decode.maybe Decode.string) Nothing
         |> required "s3_input_key" Decode.string
         |> optional "s3_result_key" (Decode.maybe Decode.string) Nothing
         |> optional "completed_at" (Decode.maybe iso8601Decoder) Nothing
