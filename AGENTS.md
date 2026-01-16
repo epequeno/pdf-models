@@ -219,6 +219,21 @@ FROM nvcr.io/nvidia/cuda:12.1.0-runtime-ubuntu22.04  # NVIDIA NGC for CUDA
 ```
 **Note**: This happens consistently when adding new containers - always use ECR Public or NGC
 
+### ❌ Manually editing frontend/elm.json
+**Symptom**: Elm build fails with "dependencies elm.json in were edited by hand (or by a 3rd party tool) leaving them in an invalid state"
+**Root Cause**: Elm's dependency resolver is strict about version consistency. Hand-editing elm.json often introduces invalid version combinations.
+**Solution**: NEVER edit elm.json directly. ALWAYS use `elm install <package>` to add or update dependencies.
+**Example**:
+```bash
+# ❌ WRONG - editing elm.json directly
+# Manually changing "elm/html": "1.0.0" to "1.0.1"
+
+# ✅ CORRECT - use elm install
+cd frontend && yes | elm install elm/html
+```
+**Recovery**: If elm.json is corrupted, delete it and elm-stuff/, then reinstall all packages with `elm install`
+**This is a critical requirement** - even minor version edits can break the build
+
 ## Quick Reference
 
 | Task | Command |
