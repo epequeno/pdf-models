@@ -145,8 +145,8 @@ class PipelineStack(Stack):
             "Synth",
             input=source,
             install_commands=[
-                # Install CDK CLI and Elm (Node.js is pre-installed in STANDARD_7_0)
-                "npm install -g aws-cdk elm",
+                # Install CDK CLI, Elm, and elm-test (Node.js is pre-installed in STANDARD_7_0)
+                "npm install -g aws-cdk elm elm-test",
                 # Remove .python-version (for local dev) to use CodeBuild's Python
                 "rm -f backend/.python-version",
                 # Build frontend (FrontendStack requires frontend/dst to exist)
@@ -231,8 +231,33 @@ class PipelineStack(Stack):
             ),
         )
 
-        # Add deployment stage with pre-deployment tests
+        # Frontend tests step - runs Elm tests before deployment
+        frontend_tests = pipelines.CodeBuildStep(
+            "FrontendTests",
+            input=source,
+            install_commands=[
+                "npm install -g elm elm-test",
+            ],
+            commands=[
+                "cd frontend && elm-test --report junit > test-results.xml",
+            ],
+            partial_build_spec=codebuild.BuildSpec.from_object({
+                "version": "0.2",
+                "reports": {
+                    "frontend-tests": {
+                        "files": ["frontend/test-results.xml"],
+                        "file-format": "JUNITXML",
+                    }
+                },
+            }),
+            build_environment=codebuild.BuildEnvironment(
+                build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
+                compute_type=codebuild.ComputeType.SMALL,
+            ),
+        )
+
+        # Add deployment stage with pre-deployment tests (run in parallel)
         pipeline.add_stage(
             PdfModelsStage(self, "Prod"),
-            pre=[unit_tests],
+            pre=[unit_tests, frontend_tests],
         )
