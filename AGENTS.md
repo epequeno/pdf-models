@@ -55,11 +55,15 @@ uv add boto3
 To avoid manually prefixing commands, use the Makefile:
 
 ```bash
-# CDK operations
+# Pipeline (primary deployment method)
+make pipeline-start        # Deploy all stacks (runs tests first)
+make pipeline-status       # Check current pipeline status
+make pipeline-executions   # List recent executions
+
+# CDK operations (for local dev/recovery only)
 make cdk-synth
 make cdk-diff STACK=FoundationStack
 make cdk-deploy STACK=FoundationStack
-make cdk-destroy STACK=FoundationStack
 
 # AWS operations
 make aws-logs LOGGROUP=/aws/lambda/my-function
@@ -70,6 +74,28 @@ make container-build MODEL=marker
 ```
 
 See `Makefile` for all available commands.
+
+## Deployment Workflow
+
+The CDK Pipeline is the **primary deployment method**. It does NOT auto-trigger on push.
+
+**Standard workflow:**
+1. Make changes locally
+2. `git add . && git commit -m "message"`
+3. `git push`
+4. `make pipeline-start` (when ready to deploy)
+
+The pipeline will:
+1. Pull latest code from CodeCommit
+2. Build the frontend
+3. Run `cdk synth`
+4. Run unit tests
+5. Deploy all stacks in correct order
+
+**When to use manual `make cdk-deploy`:**
+- Deploying PipelineStack itself (bootstrap/updates)
+- Quick iteration during development
+- Recovery scenarios
 
 ## Project-Specific Patterns
 
@@ -94,8 +120,9 @@ bucket_name = ssm.StringParameter.value_from_lookup(
 
 ### No Local AWS Operations
 - All container builds happen in CodeBuild (not locally)
-- All deployments eventually happen in CodePipeline
+- All deployments go through the pipeline (`make pipeline-start`)
 - Local development is for code editing and CDK synthesis only
+- Exception: `make cdk-deploy STACK=PipelineStack` for pipeline updates
 
 ### 🚨 CodeCommit is Source of Truth for Lambda Builds
 
@@ -238,9 +265,11 @@ cd frontend && yes | elm install elm/html
 
 | Task | Command |
 |------|---------|
+| **Deploy all stacks** | `make pipeline-start` |
+| Check pipeline status | `make pipeline-status` |
+| List pipeline executions | `make pipeline-executions` |
 | Synth all stacks | `make cdk-synth` |
-| Deploy a stack | `make cdk-deploy STACK=FoundationStack` |
-| Deploy all stacks | `make cdk-deploy-all` |
+| Deploy a single stack | `make cdk-deploy STACK=FoundationStack` |
 | Check what will change | `make cdk-diff STACK=CoreInfrastructureStack` |
 | View logs | `make aws-logs LOGGROUP=/aws/lambda/function-name` |
 | List S3 buckets | `make aws-s3-ls` |
@@ -252,13 +281,13 @@ cd frontend && yes | elm install elm/html
 
 ## Stack Deployment Order
 
-Always deploy in this order to satisfy dependencies (or use `make cdk-deploy-all`):
+The pipeline (`make pipeline-start`) handles deployment order automatically. For manual deployments, use this order:
 
 1. `FoundationStack` - ECR repositories, certificates, Route53
 2. `NetworkingStack` - VPC, subnets, security groups
 3. `CoreInfrastructureStack` - Cognito, S3, DynamoDB
 4. `CiCdStack` - CodeBuild projects for containers, Lambda, and tests
-5. `MarkerStack` - Model-specific ECS tasks and Step Functions
+5. Model stacks (MarkerStack, DoclingStack, etc.) - ECS tasks and Step Functions
 6. `ApiV2Stack` - HTTP API Gateway, Lambda handlers
 7. `MonitoringStack` - CloudWatch dashboards and alarms
 8. `FrontendStack` - S3 static site, CloudFront distribution
@@ -389,4 +418,5 @@ agent-browser close
 2. Review architecture.md for system design
 3. Use Makefile for all AWS/CDK operations
 4. Remember: AWS_PROFILE=arch and uv are non-negotiable
-5. Use agent-browser for frontend UI testing
+5. Deploy via `make pipeline-start` (not manual cdk-deploy)
+6. Use agent-browser for frontend UI testing
