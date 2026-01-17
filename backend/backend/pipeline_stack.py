@@ -15,6 +15,7 @@ from aws_cdk import (
     Stage,
     aws_codecommit as codecommit,
     aws_codebuild as codebuild,
+    aws_codepipeline_actions as codepipeline_actions,
     aws_iam as iam,
     pipelines,
 )
@@ -136,7 +137,7 @@ class PipelineStack(Stack):
                 self, "Repo", "pdf-models"
             ),
             branch="main",
-            trigger=pipelines.CodeCommitTrigger.NONE,  # Manual trigger only
+            trigger=codepipeline_actions.CodeCommitTrigger.NONE,  # Manual trigger only
         )
 
         # Synth step: Install dependencies and run cdk synth
