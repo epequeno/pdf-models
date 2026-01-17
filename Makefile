@@ -1,6 +1,7 @@
 .PHONY: help test test-watch test-integration test-integration-setup test-integration-auto test-integration-debug \
         test-unit-cloud test-integration-cloud test-cloud-status \
         test-frontend test-frontend-watch \
+        pipeline-status pipeline-start pipeline-executions \
         cdk-synth cdk-diff cdk-deploy cdk-destroy cdk-deploy-all \
         aws-logs aws-s3-ls aws-stepfunctions-list aws-ecs-force-new-deployment \
         container-build base-image-build lambda-build lambda-build-status lambda-clean \
@@ -18,6 +19,15 @@ BACKEND_UV := cd backend && AWS_PROFILE=$(AWS_PROFILE) uv run
 help:
 	@echo "pdf-models Makefile"
 	@echo ""
+	@echo "Pipeline Commands (primary deployment method):"
+	@echo "  make pipeline-start                - Deploy infrastructure (runs tests, then deploys all stacks)"
+	@echo "  make pipeline-status               - Check current pipeline status"
+	@echo "  make pipeline-executions           - List recent pipeline executions"
+	@echo ""
+	@echo "  Workflow: Push changes to main, then run 'make pipeline-start' to deploy."
+	@echo "  The pipeline runs unit tests before deploying. Manual cdk-deploy commands"
+	@echo "  are for local development, PipelineStack updates, or recovery scenarios."
+	@echo ""
 	@echo "Testing Commands (Local):"
 	@echo "  make test                          - Run all backend unit tests"
 	@echo "  make test-watch                    - Run backend tests in watch mode"
@@ -33,7 +43,7 @@ help:
 	@echo "  make test-integration-cloud MODEL=<name> - Run integration tests for specific model"
 	@echo "  make test-cloud-status             - Check status of latest cloud test builds"
 	@echo ""
-	@echo "CDK Commands:"
+	@echo "CDK Commands (for local dev/recovery - pipeline handles normal deploys):"
 	@echo "  make cdk-synth                     - Synthesize all CDK stacks"
 	@echo "  make cdk-diff STACK=<name>         - Show changes for a specific stack"
 	@echo "  make cdk-deploy STACK=<name>       - Deploy a specific stack"
@@ -61,16 +71,6 @@ help:
 	@echo "  make frontend-build                - Build Elm frontend (compiles to frontend/dst)"
 	@echo "  make frontend-deploy               - Build and deploy frontend to S3+CloudFront"
 	@echo "  make frontend-deploy-quick         - Deploy frontend (assumes already built)"
-	@echo ""
-	@echo "Stack Deployment Order (make cdk-deploy-all):"
-	@echo "  1. FoundationStack"
-	@echo "  2. NetworkingStack"
-	@echo "  3. CoreInfrastructureStack"
-	@echo "  4. CiCdStack"
-	@echo "  5. MarkerStack"
-	@echo "  6. ApiV2Stack"
-	@echo "  7. MonitoringStack"
-	@echo "  8. FrontendStack"
 	@echo ""
 	@echo "Note: All commands automatically use AWS_PROFILE=$(AWS_PROFILE) and uv"
 
@@ -186,6 +186,27 @@ test-cloud-status:
 	else \
 		echo "No builds found"; \
 	fi
+
+# Pipeline Commands
+pipeline-status:
+	@echo "Checking pipeline status..."
+	@$(AWS) codepipeline get-pipeline-state --name pdf-models-infrastructure \
+		--query 'stageStates[*].{Stage:stageName,Status:latestExecution.status}' --output table
+
+pipeline-start:
+	@echo "Starting pipeline execution..."
+	@EXEC_ID=$$($(AWS) codepipeline start-pipeline-execution \
+		--name pdf-models-infrastructure \
+		--query 'pipelineExecutionId' --output text) && \
+	echo "Pipeline started: $$EXEC_ID" && \
+	echo "Monitor with: make pipeline-status"
+
+pipeline-executions:
+	@echo "Recent pipeline executions..."
+	@$(AWS) codepipeline list-pipeline-executions --pipeline-name pdf-models-infrastructure \
+		--max-items 5 \
+		--query 'pipelineExecutionSummaries[*].{Id:pipelineExecutionId,Status:status,StartTime:startTime}' \
+		--output table
 
 # CDK Commands
 cdk-synth:

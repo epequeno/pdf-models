@@ -117,11 +117,11 @@ class PdfModelsStage(Stage):
 
 class PipelineStack(Stack):
     """
-    Self-mutating CDK Pipeline for automated infrastructure deployments.
+    Self-mutating CDK Pipeline for infrastructure deployments.
 
     This pipeline:
-    1. Triggers on commits to main branch in CodeCommit
-    2. Runs CDK synth using uv for Python dependency management
+    1. Manually triggered via `make pipeline-start` (no auto-trigger on push)
+    2. Runs CDK synth
     3. Runs unit tests before deployment
     4. Deploys all application stacks
     5. Updates itself when pipeline definition changes
@@ -130,12 +130,13 @@ class PipelineStack(Stack):
     def __init__(self, scope: Construct, id: str, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
-        # Source: CodeCommit repository
+        # Source: CodeCommit repository (manual trigger only)
         source = pipelines.CodePipelineSource.code_commit(
             repository=codecommit.Repository.from_repository_name(
                 self, "Repo", "pdf-models"
             ),
             branch="main",
+            trigger=pipelines.CodeCommitTrigger.NONE,  # Manual trigger only
         )
 
         # Synth step: Install dependencies and run cdk synth
