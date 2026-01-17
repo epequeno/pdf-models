@@ -37,6 +37,10 @@ class PdfModelsStage(Stage):
 
     This stage wraps all the application stacks so they can be deployed
     together as a unit by CDK Pipelines.
+
+    IMPORTANT: Each stack has an explicit stack_name to match existing stacks.
+    This allows the pipeline to update existing infrastructure instead of
+    creating new stacks with a stage prefix (e.g., "Prod-FoundationStack").
     """
 
     def __init__(self, scope: Construct, id: str, **kwargs) -> None:
@@ -46,6 +50,7 @@ class PdfModelsStage(Stage):
         FoundationStack(
             self,
             "FoundationStack",
+            stack_name="FoundationStack",
             description="Foundation infrastructure: ECR repositories",
         )
 
@@ -53,6 +58,7 @@ class PdfModelsStage(Stage):
         NetworkingStack(
             self,
             "NetworkingStack",
+            stack_name="NetworkingStack",
             description="Networking infrastructure: VPC with VPC endpoints",
         )
 
@@ -60,6 +66,7 @@ class PdfModelsStage(Stage):
         CoreInfrastructureStack(
             self,
             "CoreInfrastructureStack",
+            stack_name="CoreInfrastructureStack",
             description="Core infrastructure: S3 bucket, DynamoDB table, Cognito auth",
         )
 
@@ -67,14 +74,18 @@ class PdfModelsStage(Stage):
         CiCdStack(
             self,
             "CiCdStack",
+            stack_name="CiCdStack",
             description="CI/CD: CodeCommit repository and CodeBuild projects",
         )
 
         # Stack 5: Model Processing Stacks (one per model)
         for model_name, model_config in MODELS.items():
+            # Generate stack name matching existing stacks (e.g., "MarkerStack")
+            stack_id = f"{model_name.title()}Stack"
             ModelStack(
                 self,
-                f"{model_name.title()}Stack",
+                stack_id,
+                stack_name=stack_id,
                 model_config=model_config,
                 description=f"{model_name.title()} processing: ECS, Step Functions",
             )
@@ -83,6 +94,7 @@ class PdfModelsStage(Stage):
         ApiV2Stack(
             self,
             "ApiV2Stack",
+            stack_name="ApiV2Stack",
             description="HTTP API Gateway with Cognito JWT authorizer",
         )
 
@@ -90,6 +102,7 @@ class PdfModelsStage(Stage):
         MonitoringStack(
             self,
             "MonitoringStack",
+            stack_name="MonitoringStack",
             description="CloudWatch dashboards and alarms",
         )
 
@@ -97,6 +110,7 @@ class PdfModelsStage(Stage):
         FrontendStack(
             self,
             "FrontendStack",
+            stack_name="FrontendStack",
             description="Frontend: S3, CloudFront, Route53",
         )
 
@@ -170,6 +184,9 @@ class PipelineStack(Stack):
             self_mutation=True,
             docker_enabled_for_synth=True,
             docker_enabled_for_self_mutation=True,
+            # Use single CodeBuild project for assets to reduce console clutter
+            # (trades parallel publishing for fewer persistent CodeBuild projects)
+            publish_assets_in_parallel=False,
             code_build_defaults=pipelines.CodeBuildOptions(
                 build_environment=codebuild.BuildEnvironment(
                     build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
