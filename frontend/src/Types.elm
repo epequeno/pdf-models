@@ -611,6 +611,7 @@ type alias JobsState =
     , lastRefresh : Maybe Time.Posix
     , downloadError : Maybe DownloadError
     , expandedJobIds : Set String
+    , expandedErrorIds : Set String
     }
 
 
@@ -722,6 +723,7 @@ type Msg
     | CurrentTimeReceived Time.Posix
     | ClearDownloadError
     | ToggleJobExpanded String
+    | ToggleErrorExpanded String
     | TokenRefreshReceived String
 
 
@@ -764,6 +766,7 @@ initModel key route =
         , lastRefresh = Nothing
         , downloadError = Nothing
         , expandedJobIds = Set.empty
+        , expandedErrorIds = Set.empty
         }
     , currentTime = Time.millisToPosix 0
     , pendingRetry = Nothing

@@ -123,7 +123,7 @@ buildTimeline _ job =
                     { label = "Failed"
                     , timestamp = job.completedAt
                     , status = EventFailed
-                    , detail = job.error
+                    , detail = Just "See error details below"
                     }
 
                 _ ->

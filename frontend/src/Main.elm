@@ -1130,6 +1130,23 @@ update msg model =
             in
             ( { model | jobs = newJobs }, Cmd.none )
 
+        ToggleErrorExpanded jobId ->
+            let
+                oldJobs =
+                    model.jobs
+
+                newExpandedErrorIds =
+                    if Set.member jobId oldJobs.expandedErrorIds then
+                        Set.remove jobId oldJobs.expandedErrorIds
+
+                    else
+                        Set.insert jobId oldJobs.expandedErrorIds
+
+                newJobs =
+                    { oldJobs | expandedErrorIds = newExpandedErrorIds }
+            in
+            ( { model | jobs = newJobs }, Cmd.none )
+
         TokenRefreshReceived jsonString ->
             case Decode.decodeString Auth.tokenRefreshResponseDecoder jsonString of
                 Ok response ->

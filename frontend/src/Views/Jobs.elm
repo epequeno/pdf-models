@@ -222,7 +222,7 @@ viewJobsSection model =
                             , Styles.gap Styles.spacing.md
                             ]
                         ]
-                        (List.map (viewJobCard model.currentTime model.jobs.expandedJobIds) model.jobs.jobs)
+                        (List.map (viewJobCard model.currentTime model.jobs.expandedJobIds model.jobs.expandedErrorIds) model.jobs.jobs)
         ]
 
 
@@ -307,11 +307,14 @@ viewEmptyState isLoading =
         ]
 
 
-viewJobCard : Time.Posix -> Set String -> Job -> Html Msg
-viewJobCard currentTime expandedJobIds job =
+viewJobCard : Time.Posix -> Set String -> Set String -> Job -> Html Msg
+viewJobCard currentTime expandedJobIds expandedErrorIds job =
     let
         isExpanded =
             Set.member job.id expandedJobIds
+
+        isErrorExpanded =
+            Set.member job.id expandedErrorIds
     in
     div
         [ css
@@ -465,31 +468,120 @@ viewJobCard currentTime expandedJobIds job =
                 , -- Error message if failed
                   case job.error of
                     Just errorMsg ->
+                        let
+                            errorSummary =
+                                extractErrorSummary errorMsg
+                        in
                         div
                             [ css
                                 [ marginTop Styles.spacing.lg
-                                , padding Styles.spacing.base
                                 , backgroundColor Styles.colors.errorMuted
                                 , border3 (px 1) solid Styles.colors.error
                                 , borderRadius Styles.radius.md
+                                , overflow Css.hidden
                                 ]
                             ]
-                            [ div
+                            [ -- Clickable header
+                              div
                                 [ css
-                                    [ fontWeight Styles.fontWeights.medium
-                                    , color Styles.colors.error
-                                    , marginBottom Styles.spacing.sm
+                                    [ padding Styles.spacing.base
+                                    , cursor pointer
+                                    , Styles.flexBetween
+                                    , Styles.transitions.base
+                                    , hover
+                                        [ backgroundColor (rgba 255 0 0 0.1)
+                                        ]
+                                    ]
+                                , onClick (ToggleErrorExpanded job.id)
+                                ]
+                                [ div
+                                    [ css
+                                        [ Styles.flexRow
+                                        , Styles.gap Styles.spacing.sm
+                                        ]
+                                    ]
+                                    [ -- Expand indicator
+                                      span
+                                        [ css
+                                            [ color Styles.colors.error
+                                            , Css.fontSize Styles.fontSize.small
+                                            , Css.width (px 16)
+                                            , Styles.transitions.base
+                                            , transform
+                                                (if isErrorExpanded then
+                                                    rotate (deg 90)
+
+                                                 else
+                                                    rotate (deg 0)
+                                                )
+                                            ]
+                                        ]
+                                        [ text "▶" ]
+                                    , span
+                                        [ css
+                                            [ fontWeight Styles.fontWeights.medium
+                                            , color Styles.colors.error
+                                            ]
+                                        ]
+                                        [ text "Error Details" ]
+                                    ]
+                                , span
+                                    [ css
+                                        [ Css.fontSize Styles.fontSize.small
+                                        , color Styles.colors.error
+                                        , opacity (num 0.7)
+                                        ]
+                                    ]
+                                    [ text
+                                        (if isErrorExpanded then
+                                            "Click to collapse"
+
+                                         else
+                                            "Click to expand"
+                                        )
                                     ]
                                 ]
-                                [ text "Error Details" ]
-                            , div
+                            , -- Summary always visible
+                              div
                                 [ css
-                                    [ Styles.textCode
-                                    , color Styles.colors.error
-                                    , whiteSpace preWrap
+                                    [ padding2 zero Styles.spacing.base
+                                    , paddingBottom Styles.spacing.base
                                     ]
                                 ]
-                                [ text errorMsg ]
+                                [ div
+                                    [ css
+                                        [ Styles.textCode
+                                        , color Styles.colors.error
+                                        , Css.fontSize Styles.fontSize.body
+                                        ]
+                                    ]
+                                    [ text errorSummary ]
+                                ]
+                            , -- Full details (expandable)
+                              if isErrorExpanded then
+                                div
+                                    [ css
+                                        [ padding Styles.spacing.base
+                                        , paddingTop zero
+                                        , borderTop3 (px 1) solid Styles.colors.error
+                                        , maxHeight (px 400)
+                                        , overflowY auto
+                                        ]
+                                    ]
+                                    [ div
+                                        [ css
+                                            [ Styles.textCode
+                                            , color Styles.colors.error
+                                            , whiteSpace preWrap
+                                            , Css.fontSize Styles.fontSize.small
+                                            , marginTop Styles.spacing.base
+                                            ]
+                                        ]
+                                        [ text errorMsg ]
+                                    ]
+
+                              else
+                                text ""
                             ]
 
                     Nothing ->
@@ -539,3 +631,45 @@ truncateJobId jobId =
 
     else
         jobId
+
+
+extractErrorSummary : String -> String
+extractErrorSummary errorMsg =
+    -- Extract the main error type from a Python traceback or error message
+    -- Look for common patterns like "AssertionError", "ValueError", etc.
+    let
+        lines =
+            String.lines errorMsg
+
+        -- Try to find the last line that looks like an error (e.g., "AssertionError: message")
+        errorLine =
+            lines
+                |> List.reverse
+                |> List.filter (\line -> String.contains "Error" line || String.contains "Exception" line)
+                |> List.head
+
+        -- Get the first meaningful line as fallback
+        firstLine =
+            lines
+                |> List.filter (\line -> not (String.isEmpty (String.trim line)))
+                |> List.head
+                |> Maybe.withDefault "An error occurred"
+    in
+    case errorLine of
+        Just line ->
+            let
+                trimmed =
+                    String.trim line
+            in
+            if String.length trimmed > 100 then
+                String.left 100 trimmed ++ "..."
+
+            else
+                trimmed
+
+        Nothing ->
+            if String.length firstLine > 100 then
+                String.left 100 firstLine ++ "..."
+
+            else
+                firstLine
