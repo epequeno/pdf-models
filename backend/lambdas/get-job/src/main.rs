@@ -83,6 +83,8 @@ struct JobResponse {
     error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     prompt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    original_filename: Option<String>,
 }
 
 impl Response {
@@ -214,6 +216,7 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
                     completed_at: item.get("completed_at").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
                     error: item.get("error").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
                     prompt: item.get("prompt").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
+                    original_filename: item.get("original_filename").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
                 };
 
                 Ok(Response::new(200, json!(job)))
@@ -255,6 +258,7 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
                     completed_at: item.get("completed_at").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
                     error: item.get("error").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
                     prompt: item.get("prompt").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
+                    original_filename: item.get("original_filename").and_then(|v| v.as_s().ok()).map(|s| s.to_string()),
                 })
             })
             .collect();

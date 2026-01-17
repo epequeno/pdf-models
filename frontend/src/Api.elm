@@ -29,8 +29,8 @@ apiBaseUrl =
 -- SUBMIT JOB
 
 
-submitJob : String -> PdfModel -> String -> Maybe String -> (Result Http.Error Job -> msg) -> Cmd msg
-submitJob accessToken pdfModel s3Key maybePrompt toMsg =
+submitJob : String -> PdfModel -> String -> Maybe String -> Maybe String -> (Result Http.Error Job -> msg) -> Cmd msg
+submitJob accessToken pdfModel s3Key maybePrompt maybeFilename toMsg =
     let
         baseFields =
             [ ( "s3_input_key", Encode.string s3Key )
@@ -49,8 +49,16 @@ submitJob accessToken pdfModel s3Key maybePrompt toMsg =
                 Nothing ->
                     []
 
+        filenameField =
+            case maybeFilename of
+                Just filename ->
+                    [ ( "original_filename", Encode.string filename ) ]
+
+                Nothing ->
+                    []
+
         bodyFields =
-            baseFields ++ promptField
+            baseFields ++ promptField ++ filenameField
     in
     Http.request
         { method = "POST"
@@ -114,6 +122,7 @@ jobWithDownloadDecoder =
         |> optional "error" (Decode.maybe Decode.string) Nothing
         |> optional "download_url" (Decode.maybe Decode.string) Nothing
         |> optional "prompt" (Decode.maybe Decode.string) Nothing
+        |> optional "original_filename" (Decode.maybe Decode.string) Nothing
 
 
 jobDecoder : Decoder Job
@@ -130,6 +139,7 @@ jobDecoder =
         |> optional "error" (Decode.maybe Decode.string) Nothing
         |> optional "download_url" (Decode.maybe Decode.string) Nothing
         |> optional "prompt" (Decode.maybe Decode.string) Nothing
+        |> optional "original_filename" (Decode.maybe Decode.string) Nothing
 
 
 jobsListDecoder : Decoder (List Job)

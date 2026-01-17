@@ -68,6 +68,9 @@ struct SubmitJobBody {
     /// Optional custom prompt for VLM models (dolphin, deepseek-ocr)
     /// If not provided, the model uses its default prompt
     prompt: Option<String>,
+    /// Optional original filename (before renaming to UUID)
+    /// Used for display purposes in the UI
+    original_filename: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -139,6 +142,7 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
             s3_input_key: None,
             start_processing: false,
             prompt: None,
+            original_filename: None,
         },
     };
 
@@ -247,6 +251,14 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
         put_item_request = put_item_request.item(
             "prompt",
             aws_sdk_dynamodb::types::AttributeValue::S(prompt.clone()),
+        );
+    }
+
+    // Add original_filename if provided (for display in UI)
+    if let Some(ref original_filename) = body.original_filename {
+        put_item_request = put_item_request.item(
+            "original_filename",
+            aws_sdk_dynamodb::types::AttributeValue::S(original_filename.clone()),
         );
     }
 

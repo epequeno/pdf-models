@@ -364,14 +364,14 @@ viewJobCard currentTime expandedJobIds expandedErrorIds job =
                         ]
                     ]
                     [ text "▶" ]
-                , -- Job ID
+                , -- Filename or Job ID
                   span
                     [ css
                         [ fontWeight Styles.fontWeights.medium
                         , color Styles.colors.textPrimary
                         ]
                     ]
-                    [ text ("Job " ++ truncateJobId job.id) ]
+                    [ text (displayJobName job) ]
                 , -- Model badge
                   span
                     [ css
@@ -423,16 +423,56 @@ viewJobCard currentTime expandedJobIds expandedErrorIds job =
                 [ -- File info
                   div
                     [ css
-                        [ Styles.textCode
-                        , marginBottom Styles.spacing.lg
+                        [ marginBottom Styles.spacing.lg
                         , marginTop Styles.spacing.lg
                         , padding Styles.spacing.md
                         , backgroundColor Styles.colors.surfaceRaised
                         , borderRadius Styles.radius.sm
-                        , overflowX auto
                         ]
                     ]
-                    [ text job.s3InputKey ]
+                    (case job.originalFilename of
+                        Just filename ->
+                            [ div
+                                [ css
+                                    [ Styles.textCaption
+                                    , marginBottom Styles.spacing.xs
+                                    ]
+                                ]
+                                [ text "ORIGINAL FILE" ]
+                            , div
+                                [ css
+                                    [ fontWeight Styles.fontWeights.medium
+                                    , color Styles.colors.textPrimary
+                                    , marginBottom Styles.spacing.sm
+                                    ]
+                                ]
+                                [ text filename ]
+                            , div
+                                [ css
+                                    [ Styles.textCaption
+                                    , marginBottom Styles.spacing.xs
+                                    ]
+                                ]
+                                [ text "S3 KEY" ]
+                            , div
+                                [ css
+                                    [ Styles.textCode
+                                    , overflowX auto
+                                    ]
+                                ]
+                                [ text job.s3InputKey ]
+                            ]
+
+                        Nothing ->
+                            [ div
+                                [ css
+                                    [ Styles.textCode
+                                    , overflowX auto
+                                    ]
+                                ]
+                                [ text job.s3InputKey ]
+                            ]
+                    )
                 , -- Prompt if present
                   case job.prompt of
                     Just promptText ->
@@ -631,6 +671,20 @@ truncateJobId jobId =
 
     else
         jobId
+
+
+displayJobName : Job -> String
+displayJobName job =
+    case job.originalFilename of
+        Just filename ->
+            if String.length filename > 40 then
+                String.left 37 filename ++ "..."
+
+            else
+                filename
+
+        Nothing ->
+            "Job " ++ truncateJobId job.id
 
 
 extractErrorSummary : String -> String

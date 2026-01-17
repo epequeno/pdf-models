@@ -569,6 +569,7 @@ update msg model =
                         newUpload =
                             { oldUpload
                                 | selectedFile = Just file
+                                , selectedFilename = Just (File.name file)
                                 , uploadProgress = Nothing
                                 , s3Key = Nothing
                                 , error = Nothing
@@ -590,6 +591,7 @@ update msg model =
                         newUpload =
                             { oldUpload
                                 | selectedFile = Just file
+                                , selectedFilename = Just (File.name file)
                                 , uploadProgress = Nothing
                                 , s3Key = Nothing
                                 , error = Nothing
@@ -828,7 +830,7 @@ update msg model =
                                                     Nothing
                                         in
                                         ( { model | upload = newUpload }
-                                        , Api.submitJob tokens.accessToken pdfModel s3Key maybePrompt JobSubmitted
+                                        , Api.submitJob tokens.accessToken pdfModel s3Key maybePrompt model.upload.selectedFilename JobSubmitted
                                         )
 
                                     _ ->
@@ -905,7 +907,7 @@ update msg model =
                                 Nothing
                     in
                     ( { model | upload = newUpload }
-                    , Api.submitJob tokens.accessToken pdfModel s3Key maybePrompt JobSubmitted
+                    , Api.submitJob tokens.accessToken pdfModel s3Key maybePrompt model.upload.selectedFilename JobSubmitted
                     )
 
                 _ ->
@@ -922,6 +924,7 @@ update msg model =
                             { oldUpload
                                 | submitting = False
                                 , selectedFile = Nothing
+                                , selectedFilename = Nothing
                                 , s3Key = Nothing
                                 , uploadProgress = Nothing
                                 , error = Nothing
@@ -1184,7 +1187,7 @@ update msg model =
                                                         else
                                                             Nothing
                                                 in
-                                                Api.submitJob accessToken retryPdfModel s3Key maybePrompt JobSubmitted
+                                                Api.submitJob accessToken retryPdfModel s3Key maybePrompt model.upload.selectedFilename JobSubmitted
 
                                             Nothing ->
                                                 Cmd.none

@@ -596,6 +596,7 @@ type alias SignUpForm =
 
 type alias UploadState =
     { selectedFile : Maybe File
+    , selectedFilename : Maybe String
     , uploadProgress : Maybe Float
     , s3Key : Maybe String
     , submitting : Bool
@@ -656,6 +657,7 @@ type alias Job =
     , error : Maybe String
     , downloadUrl : Maybe String
     , prompt : Maybe String
+    , originalFilename : Maybe String
     }
 
 
@@ -753,6 +755,7 @@ initModel key route =
         }
     , upload =
         { selectedFile = Nothing
+        , selectedFilename = Nothing
         , uploadProgress = Nothing
         , s3Key = Nothing
         , submitting = False
