@@ -159,6 +159,7 @@ class StackConfig:
     # SSM Parameter Names - Core
     SSM_S3_BUCKET_NAME: str = "/pdf-models/core/s3-bucket-name"
     SSM_DYNAMODB_TABLE_NAME: str = "/pdf-models/core/dynamodb-table-name"
+    SSM_CONFIGURATIONS_TABLE_NAME: str = "/pdf-models/core/configurations-table-name"
     SSM_COGNITO_USER_POOL_ID: str = "/pdf-models/core/cognito-user-pool-id"
     SSM_COGNITO_IDENTITY_POOL_ID: str = "/pdf-models/core/cognito-identity-pool-id"
     SSM_COGNITO_USER_POOL_CLIENT_ID: str = (
@@ -172,17 +173,24 @@ class StackConfig:
         "pdf-models-docs"  # Actual name will be: {prefix}-{account-id}
     )
     DYNAMODB_TABLE_NAME: str = "pdf-models-jobs"
+    DYNAMODB_CONFIGURATIONS_TABLE_NAME: str = "pdf-models-configurations"
     COGNITO_USER_POOL_NAME: str = "pdf-models-users"
     COGNITO_IDENTITY_POOL_NAME: str = "pdf-models-identity-pool"
+    COGNITO_ADMIN_GROUP_NAME: str = "pdf-models-admins"
 
     # S3 Configuration
     S3_EXPIRATION_DAYS: int = 7
 
-    # DynamoDB Schema
+    # DynamoDB Schema - Jobs Table
     DYNAMODB_PK: str = "job_id"
     DYNAMODB_GSI_NAME: str = "user_id-created_at-index"
     DYNAMODB_GSI_PK: str = "user_id"
     DYNAMODB_GSI_SK: str = "created_at"
+
+    # DynamoDB Schema - Configurations Table
+    DYNAMODB_CONFIGS_PK: str = "config_id"
+    DYNAMODB_CONFIGS_GSI_USER: str = "user_id-created_at-index"
+    DYNAMODB_CONFIGS_GSI_VISIBILITY: str = "visibility-model-index"
 
 
 # Single instance to import across stacks

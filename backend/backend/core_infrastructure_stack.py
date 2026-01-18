@@ -162,6 +162,68 @@ class CoreInfrastructureStack(Stack):
         )
 
         # ========================================
+        # DynamoDB Table for User Configurations
+        # ========================================
+
+        configurations_table = dynamodb.Table(
+            self,
+            "ConfigurationsTable",
+            table_name=CONFIG.DYNAMODB_CONFIGURATIONS_TABLE_NAME,
+            # Partition key: config_id (UUID)
+            partition_key=dynamodb.Attribute(
+                name=CONFIG.DYNAMODB_CONFIGS_PK,
+                type=dynamodb.AttributeType.STRING,
+            ),
+            # Billing: On-demand (pay-per-request, auto-scaling)
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            # MVP: Allow deletion
+            removal_policy=RemovalPolicy.DESTROY,
+            # Point-in-time recovery: Off for MVP (cost saving)
+            point_in_time_recovery_specification=dynamodb.PointInTimeRecoverySpecification(
+                point_in_time_recovery_enabled=False
+            ),
+            # Encryption: AWS-managed keys (default, free)
+            encryption=dynamodb.TableEncryption.AWS_MANAGED,
+        )
+
+        # GSI: Query configurations by user_id, sorted by created_at
+        configurations_table.add_global_secondary_index(
+            index_name=CONFIG.DYNAMODB_CONFIGS_GSI_USER,
+            partition_key=dynamodb.Attribute(
+                name="user_id",
+                type=dynamodb.AttributeType.STRING,
+            ),
+            sort_key=dynamodb.Attribute(
+                name="created_at",
+                type=dynamodb.AttributeType.STRING,
+            ),
+            projection_type=dynamodb.ProjectionType.ALL,
+        )
+
+        # GSI: Discover public configurations by model
+        configurations_table.add_global_secondary_index(
+            index_name=CONFIG.DYNAMODB_CONFIGS_GSI_VISIBILITY,
+            partition_key=dynamodb.Attribute(
+                name="visibility",
+                type=dynamodb.AttributeType.STRING,
+            ),
+            sort_key=dynamodb.Attribute(
+                name="model",
+                type=dynamodb.AttributeType.STRING,
+            ),
+            projection_type=dynamodb.ProjectionType.ALL,
+        )
+
+        # Export configurations table name to SSM
+        ssm.StringParameter(
+            self,
+            "ConfigurationsTableNameParam",
+            parameter_name=CONFIG.SSM_CONFIGURATIONS_TABLE_NAME,
+            string_value=configurations_table.table_name,
+            description="DynamoDB table name for user configurations",
+        )
+
+        # ========================================
         # Cognito User Pool (Authentication)
         # ========================================
 
@@ -242,6 +304,19 @@ class CoreInfrastructureStack(Stack):
             parameter_name=CONFIG.SSM_COGNITO_USER_POOL_CLIENT_ID,
             string_value=user_pool_client.user_pool_client_id,
             description="Cognito User Pool Client ID for API access",
+        )
+
+        # ========================================
+        # Cognito Admin Group
+        # ========================================
+        # Group for users who can approve/reject configurations
+
+        cognito.CfnUserPoolGroup(
+            self,
+            "AdminGroup",
+            user_pool_id=user_pool.user_pool_id,
+            group_name=CONFIG.COGNITO_ADMIN_GROUP_NAME,
+            description="Administrators who can approve/reject user configurations",
         )
 
         # ========================================
