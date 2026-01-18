@@ -15,14 +15,15 @@ def test_core_infrastructure_synthesizes():
 
     # Assert all major resources exist
     template.resource_count_is("AWS::S3::Bucket", 1)
-    template.resource_count_is("AWS::DynamoDB::Table", 1)
+    template.resource_count_is("AWS::DynamoDB::Table", 2)  # jobs + configurations
     template.resource_count_is("AWS::Cognito::UserPool", 1)
     template.resource_count_is("AWS::Cognito::IdentityPool", 1)
+    template.resource_count_is("AWS::Cognito::UserPoolGroup", 1)  # admin group
 
-    # Assert SSM parameters (6 total for core infrastructure)
-    # S3 bucket name, S3 bucket ARN, DynamoDB table name,
+    # Assert SSM parameters (7 total for core infrastructure)
+    # S3 bucket name, S3 bucket ARN, DynamoDB table name, Configurations table name,
     # Cognito User Pool ID, User Pool Client ID, Identity Pool ID
-    template.resource_count_is("AWS::SSM::Parameter", 6)
+    template.resource_count_is("AWS::SSM::Parameter", 7)
 
 
 def test_s3_bucket_configuration():
@@ -247,6 +248,7 @@ def test_ssm_parameters_exported():
     expected_params = [
         CONFIG.SSM_S3_BUCKET_NAME,
         CONFIG.SSM_DYNAMODB_TABLE_NAME,
+        CONFIG.SSM_CONFIGURATIONS_TABLE_NAME,
         CONFIG.SSM_COGNITO_USER_POOL_ID,
         CONFIG.SSM_COGNITO_IDENTITY_POOL_ID,
         CONFIG.SSM_COGNITO_USER_POOL_CLIENT_ID,
@@ -261,3 +263,59 @@ def test_ssm_parameters_exported():
                 "Type": "String",
             },
         )
+
+
+def test_configurations_table_schema():
+    """Test configurations DynamoDB table has correct keys and GSIs."""
+    app = cdk.App()
+    stack = CoreInfrastructureStack(app, "TestCoreStack")
+    template = Template.from_stack(stack)
+
+    # Verify configurations table properties
+    template.has_resource_properties(
+        "AWS::DynamoDB::Table",
+        {
+            "TableName": CONFIG.DYNAMODB_CONFIGURATIONS_TABLE_NAME,
+            "BillingMode": "PAY_PER_REQUEST",
+            # Primary key
+            "KeySchema": [
+                {
+                    "AttributeName": CONFIG.DYNAMODB_CONFIGS_PK,
+                    "KeyType": "HASH",
+                },
+            ],
+            # GSIs for user queries and public config discovery
+            "GlobalSecondaryIndexes": Match.array_with([
+                Match.object_like({
+                    "IndexName": CONFIG.DYNAMODB_CONFIGS_GSI_USER,
+                    "KeySchema": [
+                        {"AttributeName": "user_id", "KeyType": "HASH"},
+                        {"AttributeName": "created_at", "KeyType": "RANGE"},
+                    ],
+                }),
+                Match.object_like({
+                    "IndexName": CONFIG.DYNAMODB_CONFIGS_GSI_VISIBILITY,
+                    "KeySchema": [
+                        {"AttributeName": "visibility", "KeyType": "HASH"},
+                        {"AttributeName": "model", "KeyType": "RANGE"},
+                    ],
+                }),
+            ]),
+        },
+    )
+
+
+def test_cognito_admin_group():
+    """Test Cognito admin group is created."""
+    app = cdk.App()
+    stack = CoreInfrastructureStack(app, "TestCoreStack")
+    template = Template.from_stack(stack)
+
+    # Verify admin group exists
+    template.has_resource_properties(
+        "AWS::Cognito::UserPoolGroup",
+        {
+            "GroupName": CONFIG.COGNITO_ADMIN_GROUP_NAME,
+            "Description": "Administrators who can approve/reject user configurations",
+        },
+    )
