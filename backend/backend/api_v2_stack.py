@@ -101,6 +101,9 @@ class ApiV2Stack(Stack):
         config_crud_version = ssm.StringParameter.value_for_string_parameter(
             self, "/pdf-models/lambda/config-crud-version"
         )
+        config_admin_version = ssm.StringParameter.value_for_string_parameter(
+            self, "/pdf-models/lambda/config-admin-version"
+        )
 
         # Create CloudWatch log groups for Lambdas
         submit_job_log_group = logs.LogGroup(
@@ -131,6 +134,14 @@ class ApiV2Stack(Stack):
             self,
             "ConfigCrudLogGroup",
             log_group_name=f"/aws/lambda/{CONFIG.PROJECT_NAME}-config-crud",
+            retention=logs.RetentionDays.ONE_WEEK,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+
+        config_admin_log_group = logs.LogGroup(
+            self,
+            "ConfigAdminLogGroup",
+            log_group_name=f"/aws/lambda/{CONFIG.PROJECT_NAME}-config-admin",
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY,
         )
@@ -277,6 +288,45 @@ class ApiV2Stack(Stack):
             )
         )
 
+        # Create Lambda execution role for config-admin
+        config_admin_role = iam.Role(
+            self,
+            "ConfigAdminLambdaRole",
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name(
+                    "service-role/AWSLambdaBasicExecutionRole"
+                )
+            ],
+        )
+
+        # Grant DynamoDB permissions to config-admin role for configurations table
+        config_admin_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:GetItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:Scan",
+                ],
+                resources=[
+                    f"arn:aws:dynamodb:{self.region}:{self.account}:table/{configurations_table_name}",
+                    f"arn:aws:dynamodb:{self.region}:{self.account}:table/{configurations_table_name}/index/*",
+                ],
+            )
+        )
+
+        # Grant Lambda invoke permission for register-task-def Lambda
+        config_admin_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["lambda:InvokeFunction"],
+                resources=[
+                    f"arn:aws:lambda:{self.region}:{self.account}:function:{CONFIG.PROJECT_NAME}-register-task-def",
+                ],
+            )
+        )
+
         # Create submit-job Lambda function
         submit_job_function = lambda_.Function(
             self,
@@ -372,6 +422,31 @@ class ApiV2Stack(Stack):
             log_group=config_crud_log_group,
             environment={
                 "CONFIGURATIONS_TABLE_NAME": configurations_table_name,
+            },
+        )
+
+        # Create config-admin Lambda function
+        config_admin_function = lambda_.Function(
+            self,
+            "ConfigAdminFunction",
+            function_name=f"{CONFIG.PROJECT_NAME}-config-admin",
+            runtime=lambda_.Runtime.PROVIDED_AL2023,
+            handler="bootstrap",
+            code=lambda_.Code.from_bucket(
+                bucket=s3.Bucket.from_bucket_name(
+                    self, "LambdaArtifactsBucket5", s3_bucket_name
+                ),
+                key="lambda-artifacts/config-admin.zip",
+                object_version=config_admin_version,
+            ),
+            architecture=lambda_.Architecture.ARM_64,
+            role=config_admin_role,
+            timeout=Duration.seconds(30),
+            memory_size=256,
+            log_group=config_admin_log_group,
+            environment={
+                "CONFIGURATIONS_TABLE_NAME": configurations_table_name,
+                "REGISTER_TASK_DEF_FUNCTION": f"{CONFIG.PROJECT_NAME}-register-task-def",
             },
         )
 
@@ -496,6 +571,11 @@ class ApiV2Stack(Stack):
             config_crud_function,
         )
 
+        config_admin_integration = apigwv2_integrations.HttpLambdaIntegration(
+            "ConfigAdminIntegration",
+            config_admin_function,
+        )
+
         # Add routes with Cognito authorizer
         # POST /v1/models/{model}/upload-url - get pre-signed upload URL
         http_api.add_routes(
@@ -586,6 +666,42 @@ class ApiV2Stack(Stack):
             path="/v1/configs/discover",
             methods=[apigwv2.HttpMethod.GET],
             integration=config_crud_integration,
+            authorizer=authorizer,
+        )
+
+        # ============================================
+        # Configuration Admin Routes
+        # ============================================
+
+        # GET /v1/admin/configs/pending - list pending configurations
+        http_api.add_routes(
+            path="/v1/admin/configs/pending",
+            methods=[apigwv2.HttpMethod.GET],
+            integration=config_admin_integration,
+            authorizer=authorizer,
+        )
+
+        # POST /v1/admin/configs/{config_id}/approve - approve configuration
+        http_api.add_routes(
+            path="/v1/admin/configs/{config_id}/approve",
+            methods=[apigwv2.HttpMethod.POST],
+            integration=config_admin_integration,
+            authorizer=authorizer,
+        )
+
+        # POST /v1/admin/configs/{config_id}/reject - reject configuration
+        http_api.add_routes(
+            path="/v1/admin/configs/{config_id}/reject",
+            methods=[apigwv2.HttpMethod.POST],
+            integration=config_admin_integration,
+            authorizer=authorizer,
+        )
+
+        # POST /v1/admin/configs/{config_id}/revoke - revoke configuration
+        http_api.add_routes(
+            path="/v1/admin/configs/{config_id}/revoke",
+            methods=[apigwv2.HttpMethod.POST],
+            integration=config_admin_integration,
             authorizer=authorizer,
         )
 

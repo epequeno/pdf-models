@@ -42,6 +42,14 @@ phases:
       - CONFIG_CRUD_VERSION=$(aws s3api put-object --bucket ${S3_BUCKET_NAME} --key lambda-artifacts/config-crud.zip --body config-crud.zip --query 'VersionId' --output text)
       - echo "config-crud.zip uploaded with version ${CONFIG_CRUD_VERSION}"
       - aws ssm put-parameter --name /pdf-models/lambda/config-crud-version --value ${CONFIG_CRUD_VERSION} --type String --overwrite
+      - cd ..
+
+      # Create and upload config-admin.zip
+      - cd config-admin
+      - zip config-admin.zip bootstrap
+      - CONFIG_ADMIN_VERSION=$(aws s3api put-object --bucket ${S3_BUCKET_NAME} --key lambda-artifacts/config-admin.zip --body config-admin.zip --query 'VersionId' --output text)
+      - echo "config-admin.zip uploaded with version ${CONFIG_ADMIN_VERSION}"
+      - aws ssm put-parameter --name /pdf-models/lambda/config-admin-version --value ${CONFIG_ADMIN_VERSION} --type String --overwrite
 
       - echo "Lambda artifacts uploaded to S3"
 
@@ -55,4 +63,5 @@ artifacts:
     - backend/lambdas/target/lambda/get-job/bootstrap
     - backend/lambdas/target/lambda/get-upload-url/bootstrap
     - backend/lambdas/target/lambda/config-crud/bootstrap
+    - backend/lambdas/target/lambda/config-admin/bootstrap
   name: rust-lambda-builds

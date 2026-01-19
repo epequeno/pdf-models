@@ -5,6 +5,7 @@ members = [
     "get-job",
     "get-upload-url",
     "config-crud",
+    "config-admin",
 ]
 
 # Shared release profile for all workspace members

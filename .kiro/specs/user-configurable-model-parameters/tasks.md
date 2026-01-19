@@ -126,14 +126,14 @@ This implementation plan follows a phased approach:
     - GET /v1/configs/discover - discover public
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 7.1, 7.2_
 
-- [ ] 5. Implement config-admin Lambda (Rust)
-  - [ ] 5.1 Create config-admin Lambda project structure
+- [x] 5. Implement config-admin Lambda (Rust)
+  - [x] 5.1 Create config-admin Lambda project structure
     - Create `backend/lambdas/config-admin/` directory
     - Create `Cargo.toml` with dependencies
     - Add to workspace
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
   
-  - [ ] 5.2 Implement admin verification
+  - [x] 5.2 Implement admin verification
     - Parse cognito:groups claim from JWT
     - Check for pdf-models-admins group membership
     - Return 403 if not admin
@@ -143,7 +143,7 @@ This implementation plan follows a phased approach:
     - **Property 11: Admin Authorization**
     - **Validates: Requirements 4.5, 9.2**
   
-  - [ ] 5.4 Implement list pending configurations handler
+  - [x] 5.4 Implement list pending configurations handler
     - Query all configs with approval_status = pending_approval
     - _Requirements: 4.1_
   
@@ -151,18 +151,18 @@ This implementation plan follows a phased approach:
     - **Property 9: Pending Configurations Listing**
     - **Validates: Requirements 4.1**
   
-  - [ ] 5.6 Implement approve configuration handler
+  - [x] 5.6 Implement approve configuration handler
     - Set approval_status to approved
     - Record approved_by and approved_at
     - Invoke register-task-def Lambda
     - _Requirements: 4.2_
   
-  - [ ] 5.7 Implement reject configuration handler
+  - [x] 5.7 Implement reject configuration handler
     - Set approval_status to rejected
     - Record rejection_reason
     - _Requirements: 4.3_
   
-  - [ ] 5.8 Implement revoke configuration handler
+  - [x] 5.8 Implement revoke configuration handler
     - Set approval_status to pending_approval
     - Clear task_definition_arn
     - _Requirements: 4.4_
@@ -171,21 +171,21 @@ This implementation plan follows a phased approach:
     - **Property 10: Approval State Transitions**
     - **Validates: Requirements 4.2, 4.3, 4.4**
 
-- [ ] 6. Add config-admin API routes to ApiV2Stack
-  - [ ] 6.1 Create Lambda function resource for config-admin
+- [x] 6. Add config-admin API routes to ApiV2Stack
+  - [x] 6.1 Create Lambda function resource for config-admin
     - Add SSM parameter for Lambda version
     - Create IAM role with DynamoDB permissions and Lambda invoke for register-task-def
     - Create Lambda function resource
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
   
-  - [ ] 6.2 Add API routes for config-admin
+  - [x] 6.2 Add API routes for config-admin
     - GET /v1/admin/configs/pending - list pending
     - POST /v1/admin/configs/{config_id}/approve - approve
     - POST /v1/admin/configs/{config_id}/reject - reject
     - POST /v1/admin/configs/{config_id}/revoke - revoke
     - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 7. Checkpoint - Admin Lambda complete
+- [-] 7. Checkpoint - Admin Lambda complete
   - Ensure all tests pass, ask the user if questions arise.
   - Commit and push changes to CodeCommit
   - Trigger Lambda build
