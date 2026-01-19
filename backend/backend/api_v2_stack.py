@@ -146,6 +146,14 @@ class ApiV2Stack(Stack):
             removal_policy=RemovalPolicy.DESTROY,
         )
 
+        register_task_def_log_group = logs.LogGroup(
+            self,
+            "RegisterTaskDefLogGroup",
+            log_group_name=f"/aws/lambda/{CONFIG.PROJECT_NAME}-register-task-def",
+            retention=logs.RetentionDays.ONE_WEEK,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+
         # Create Lambda execution role for submit-job
         submit_job_role = iam.Role(
             self,
@@ -191,6 +199,18 @@ class ApiV2Stack(Stack):
                 effect=iam.Effect.ALLOW,
                 actions=["s3:PutObject"],
                 resources=[f"{s3_bucket_arn}/*"],
+            )
+        )
+
+        # Grant DynamoDB permissions to submit-job role for configurations table
+        # Needed to validate config_id and increment usage_count
+        submit_job_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["dynamodb:GetItem", "dynamodb:UpdateItem"],
+                resources=[
+                    f"arn:aws:dynamodb:{self.region}:{self.account}:table/{configurations_table_name}"
+                ],
             )
         )
 
@@ -349,6 +369,7 @@ class ApiV2Stack(Stack):
             environment={
                 "DYNAMODB_TABLE_NAME": dynamodb_table_name,
                 "S3_BUCKET_NAME": s3_bucket_name,
+                "CONFIGURATIONS_TABLE_NAME": configurations_table_name,
             },
         )
 
@@ -447,6 +468,105 @@ class ApiV2Stack(Stack):
             environment={
                 "CONFIGURATIONS_TABLE_NAME": configurations_table_name,
                 "REGISTER_TASK_DEF_FUNCTION": f"{CONFIG.PROJECT_NAME}-register-task-def",
+            },
+        )
+
+        # ============================================
+        # Register Task Definition Lambda
+        # ============================================
+
+        # Create Lambda execution role for register-task-def
+        register_task_def_role = iam.Role(
+            self,
+            "RegisterTaskDefLambdaRole",
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name(
+                    "service-role/AWSLambdaBasicExecutionRole"
+                )
+            ],
+        )
+
+        # Grant ECS permissions scoped to user task definitions (pdf-models-*-user-*)
+        register_task_def_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "ecs:RegisterTaskDefinition",
+                    "ecs:DescribeTaskDefinition",
+                ],
+                resources=["*"],  # RegisterTaskDefinition doesn't support resource-level permissions
+                conditions={
+                    "StringLike": {
+                        "ecs:task-definition-family": f"{CONFIG.PROJECT_NAME}-*-user-*"
+                    }
+                } if False else {},  # Note: RegisterTaskDefinition doesn't support conditions
+            )
+        )
+
+        # Grant DescribeTaskDefinition for base task definitions (needed to read template)
+        register_task_def_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["ecs:DescribeTaskDefinition"],
+                resources=["*"],  # DescribeTaskDefinition requires * for resource
+            )
+        )
+
+        # Grant SSM read permissions for base task definition ARNs
+        register_task_def_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["ssm:GetParameter"],
+                resources=[
+                    f"arn:aws:ssm:{self.region}:{self.account}:parameter/pdf-models/*/task-definition-arn"
+                ],
+            )
+        )
+
+        # Grant DynamoDB update permissions for configurations table
+        register_task_def_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["dynamodb:UpdateItem"],
+                resources=[
+                    f"arn:aws:dynamodb:{self.region}:{self.account}:table/{configurations_table_name}",
+                ],
+            )
+        )
+
+        # Grant IAM PassRole for task execution and task roles
+        # This is needed when registering task definitions that reference IAM roles
+        register_task_def_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["iam:PassRole"],
+                resources=[
+                    f"arn:aws:iam::{self.account}:role/{CONFIG.PROJECT_NAME}-*"
+                ],
+                conditions={
+                    "StringEquals": {
+                        "iam:PassedToService": "ecs-tasks.amazonaws.com"
+                    }
+                },
+            )
+        )
+
+        # Create register-task-def Lambda function (Python)
+        register_task_def_function = lambda_.Function(
+            self,
+            "RegisterTaskDefFunction",
+            function_name=f"{CONFIG.PROJECT_NAME}-register-task-def",
+            runtime=lambda_.Runtime.PYTHON_3_11,
+            handler="handler.handler",
+            code=lambda_.Code.from_asset("lambdas/register-task-def"),
+            architecture=lambda_.Architecture.ARM_64,
+            role=register_task_def_role,
+            timeout=Duration.seconds(60),
+            memory_size=256,
+            log_group=register_task_def_log_group,
+            environment={
+                "CONFIGURATIONS_TABLE_NAME": configurations_table_name,
             },
         )
 

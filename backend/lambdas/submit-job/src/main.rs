@@ -30,6 +30,7 @@ struct PathParameters {
 #[derive(Deserialize)]
 struct RequestContext {
     #[serde(rename = "requestId")]
+    #[allow(dead_code)]
     request_id: String,
     authorizer: Option<Authorizer>,
 }
@@ -71,6 +72,9 @@ struct SubmitJobBody {
     /// Optional original filename (before renaming to UUID)
     /// Used for display purposes in the UI
     original_filename: Option<String>,
+    /// Optional configuration ID for custom model parameters
+    /// If provided, the configuration must be approved and accessible to the user
+    config_id: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -113,6 +117,115 @@ impl Response {
     }
 }
 
+// ============================================================================
+// Configuration Types and Validation
+// ============================================================================
+
+/// Configuration data from DynamoDB
+#[derive(Debug)]
+#[allow(dead_code)]
+struct ConfigurationData {
+    config_id: String,
+    user_id: String,
+    approval_status: String,
+    visibility: String,
+}
+
+/// Fetch and validate a configuration for job submission
+/// Returns the configuration if valid, or an error Response
+async fn validate_configuration(
+    dynamodb_client: &DynamoDbClient,
+    config_table_name: &str,
+    config_id: &str,
+    user_id: &str,
+) -> Result<ConfigurationData, Response> {
+    use aws_sdk_dynamodb::types::AttributeValue;
+
+    // Fetch configuration from DynamoDB
+    let result = dynamodb_client
+        .get_item()
+        .table_name(config_table_name)
+        .key("config_id", AttributeValue::S(config_id.to_string()))
+        .send()
+        .await
+        .map_err(|e| {
+            info!("Failed to fetch configuration {}: {}", config_id, e);
+            Response::error(500, "Failed to fetch configuration")
+        })?;
+
+    let item = result.item().ok_or_else(|| {
+        Response::error(404, &format!("Configuration '{}' not found", config_id))
+    })?;
+
+    // Parse configuration fields
+    let config_user_id = item
+        .get("user_id")
+        .and_then(|v| v.as_s().ok())
+        .ok_or_else(|| Response::error(500, "Invalid configuration: missing user_id"))?;
+
+    let approval_status = item
+        .get("approval_status")
+        .and_then(|v| v.as_s().ok())
+        .ok_or_else(|| Response::error(500, "Invalid configuration: missing approval_status"))?;
+
+    let visibility = item
+        .get("visibility")
+        .and_then(|v| v.as_s().ok())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "private".to_string());
+
+    // Verify approval status is "approved"
+    if approval_status != "approved" {
+        return Err(Response::error(
+            400,
+            &format!(
+                "Configuration '{}' is not approved (status: {})",
+                config_id, approval_status
+            ),
+        ));
+    }
+
+    // Verify user has access: owner OR public+approved
+    let is_owner = config_user_id == user_id;
+    let is_public = visibility == "public";
+
+    if !is_owner && !is_public {
+        return Err(Response::error(
+            403,
+            "Access denied to this configuration",
+        ));
+    }
+
+    Ok(ConfigurationData {
+        config_id: config_id.to_string(),
+        user_id: config_user_id.to_string(),
+        approval_status: approval_status.to_string(),
+        visibility,
+    })
+}
+
+/// Increment the usage_count for a configuration atomically
+async fn increment_config_usage_count(
+    dynamodb_client: &DynamoDbClient,
+    config_table_name: &str,
+    config_id: &str,
+) -> Result<(), String> {
+    use aws_sdk_dynamodb::types::AttributeValue;
+
+    dynamodb_client
+        .update_item()
+        .table_name(config_table_name)
+        .key("config_id", AttributeValue::S(config_id.to_string()))
+        .update_expression("SET usage_count = if_not_exists(usage_count, :zero) + :inc")
+        .expression_attribute_values(":zero", AttributeValue::N("0".to_string()))
+        .expression_attribute_values(":inc", AttributeValue::N("1".to_string()))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to increment usage_count: {}", e))?;
+
+    Ok(())
+}
+
 async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error> {
     let (request, _context) = event.into_parts();
 
@@ -143,6 +256,7 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
             start_processing: false,
             prompt: None,
             original_filename: None,
+            config_id: None,
         },
     };
 
@@ -206,6 +320,29 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
         }
     };
 
+    // Validate configuration if config_id is provided
+    let validated_config_id: Option<String> = if let Some(ref config_id) = body.config_id {
+        // Get configurations table name from environment
+        let config_table_name = env::var("CONFIGURATIONS_TABLE_NAME")
+            .unwrap_or_else(|_| "pdf-models-configurations".to_string());
+
+        // Validate the configuration (checks approval status and access)
+        match validate_configuration(&dynamodb_client, &config_table_name, config_id, user_id).await {
+            Ok(config_data) => {
+                info!(
+                    "Validated configuration {} for job submission (owner: {}, visibility: {})",
+                    config_data.config_id, config_data.user_id, config_data.visibility
+                );
+                Some(config_data.config_id)
+            }
+            Err(error_response) => {
+                return Ok(error_response);
+            }
+        }
+    } else {
+        None
+    };
+
     // Generate pre-signed URL for upload only if no S3 key was provided
     let upload_url = if body.s3_input_key.is_none() {
         let presigning_config = PresigningConfig::expires_in(Duration::from_secs(900))?;
@@ -262,6 +399,14 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
         );
     }
 
+    // Add config_id if provided (for custom model parameters)
+    if let Some(ref config_id) = validated_config_id {
+        put_item_request = put_item_request.item(
+            "config_id",
+            aws_sdk_dynamodb::types::AttributeValue::S(config_id.clone()),
+        );
+    }
+
     put_item_request.send().await?;
 
     info!("Created job record in DynamoDB: {}", job_id);
@@ -279,6 +424,11 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
             execution_input["prompt"] = json!(prompt);
         }
 
+        // Add config_id to execution input if provided
+        if let Some(ref config_id) = validated_config_id {
+            execution_input["config_id"] = json!(config_id);
+        }
+
         sfn_client
             .start_execution()
             .state_machine_arn(&state_machine_arn)
@@ -288,6 +438,19 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, Error
             .await?;
 
         info!("Started Step Functions execution for job: {}", job_id);
+
+        // Increment usage_count for the configuration if one was used
+        if let Some(ref config_id) = validated_config_id {
+            let config_table_name = env::var("CONFIGURATIONS_TABLE_NAME")
+                .unwrap_or_else(|_| "pdf-models-configurations".to_string());
+
+            if let Err(e) = increment_config_usage_count(&dynamodb_client, &config_table_name, config_id).await {
+                // Log the error but don't fail the job submission
+                info!("Warning: Failed to increment usage_count for config {}: {}", config_id, e);
+            } else {
+                info!("Incremented usage_count for configuration: {}", config_id);
+            }
+        }
     }
 
     // Return response

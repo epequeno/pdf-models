@@ -325,8 +325,14 @@ class ModelStack(Stack):
             assumed_by=iam.ServicePrincipal("states.amazonaws.com"),
         )
 
-        # Create a simple Lambda function to resolve the current task definition ARN
+        # Get configurations table name from SSM for config support
+        configurations_table_name = ssm.StringParameter.value_for_string_parameter(
+            self, CONFIG.SSM_CONFIGURATIONS_TABLE_NAME
+        )
+
+        # Create a Lambda function to resolve the current task definition ARN
         # This eliminates all caching issues by reading from SSM at execution time
+        # Also supports user configurations: if config_id is provided, fetch from DynamoDB
         resolve_lambda = lambda_.Function(
             self,
             "ResolveTaskDefLambda",
@@ -337,18 +343,57 @@ import boto3
 
 def handler(event, context):
     ssm = boto3.client('ssm')
+    dynamodb = boto3.resource('dynamodb')
 
-    # Get the current task definition ARN from SSM
-    response = ssm.get_parameter(Name='/pdf-models/{model_name}/task-definition-arn')
-    task_def_arn = response['Parameter']['Value']
+    config_id = event.get('config_id')
 
-    # Return the original event with the resolved task definition ARN
-    # Ensure prompt has a default empty string if not provided (for VLM models)
-    return {{
-        **event,
-        'task_definition_arn': task_def_arn,
-        'prompt': event.get('prompt', '')
-    }}
+    if config_id:
+        # User configuration provided - fetch from DynamoDB
+        table = dynamodb.Table('{configurations_table_name}')
+        response = table.get_item(Key={{'config_id': config_id}})
+
+        if 'Item' not in response:
+            raise ValueError(f'Configuration not found: {{config_id}}')
+
+        config = response['Item']
+
+        # Verify configuration is approved
+        if config.get('approval_status') != 'approved':
+            raise ValueError(f'Configuration not approved: {{config_id}}')
+
+        # Use configuration's task definition ARN
+        task_def_arn = config.get('task_definition_arn')
+        if not task_def_arn:
+            raise ValueError(f'Configuration has no task definition: {{config_id}}')
+
+        # Get inference params for environment overrides
+        inference_params = config.get('inference_params', {{}})
+
+        # Use prompt from config if not overridden in job submission
+        prompt = event.get('prompt') or inference_params.get('prompt', '')
+
+        # Get custom environment variables from config
+        custom_env_vars = inference_params.get('custom_env_vars', {{}})
+
+        return {{
+            **event,
+            'task_definition_arn': task_def_arn,
+            'prompt': prompt,
+            'custom_env_vars': custom_env_vars
+        }}
+    else:
+        # No config_id - use default task definition from SSM
+        response = ssm.get_parameter(Name='/pdf-models/{model_name}/task-definition-arn')
+        task_def_arn = response['Parameter']['Value']
+
+        # Return the original event with the resolved task definition ARN
+        # Ensure prompt has a default empty string if not provided (for VLM models)
+        return {{
+            **event,
+            'task_definition_arn': task_def_arn,
+            'prompt': event.get('prompt', ''),
+            'custom_env_vars': {{}}
+        }}
             """),
             timeout=Duration.seconds(30),
         )
@@ -360,6 +405,17 @@ def handler(event, context):
                 actions=["ssm:GetParameter"],
                 resources=[
                     f"arn:aws:ssm:{self.region}:{self.account}:parameter/pdf-models/{model_name}/task-definition-arn"
+                ],
+            )
+        )
+
+        # Grant DynamoDB read permissions for configurations table
+        resolve_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=["dynamodb:GetItem"],
+                resources=[
+                    f"arn:aws:dynamodb:{self.region}:{self.account}:table/{configurations_table_name}"
                 ],
             )
         )
@@ -380,6 +436,9 @@ def handler(event, context):
                     # Use wildcard to allow any revision of the task definition family
                     f"arn:aws:ecs:{self.region}:{self.account}:task-definition/{CONFIG.PROJECT_NAME}-{model_name}:*",
                     f"arn:aws:ecs:{self.region}:{self.account}:task-definition/{CONFIG.PROJECT_NAME}-{model_name}",
+                    # Allow user configuration task definitions (pattern: pdf-models-{model}-user-*)
+                    f"arn:aws:ecs:{self.region}:{self.account}:task-definition/{CONFIG.PROJECT_NAME}-{model_name}-user-*:*",
+                    f"arn:aws:ecs:{self.region}:{self.account}:task-definition/{CONFIG.PROJECT_NAME}-{model_name}-user-*",
                 ],
             )
         )
@@ -476,6 +535,8 @@ def handler(event, context):
 
         # Step 2: Use the resolved ARN in a custom ECS RunTask state
         # Build different parameters for EC2 vs Fargate
+        # Note: custom_env_vars from user configurations are passed as a JSON string
+        # that containers can parse to apply custom environment variables
         if model_config.use_gpu:
             # EC2 with GPU: Use CapacityProviderStrategy instead of LaunchType
             run_task_params = {
@@ -504,6 +565,8 @@ def handler(event, context):
                                 {"Name": "DYNAMODB_TABLE", "Value": dynamodb_table_name},
                                 {"Name": "AWS_DEFAULT_REGION", "Value": self.region},
                                 {"Name": "PROMPT", "Value.$": "$.prompt"},
+                                # Pass custom env vars from user configuration as JSON string
+                                {"Name": "CUSTOM_ENV_VARS", "Value.$": "States.JsonToString($.custom_env_vars)"},
                             ],
                         }
                     ]
@@ -533,6 +596,8 @@ def handler(event, context):
                                 {"Name": "S3_BUCKET", "Value": s3_bucket_name},
                                 {"Name": "DYNAMODB_TABLE", "Value": dynamodb_table_name},
                                 {"Name": "PROMPT", "Value.$": "$.prompt"},
+                                # Pass custom env vars from user configuration as JSON string
+                                {"Name": "CUSTOM_ENV_VARS", "Value.$": "States.JsonToString($.custom_env_vars)"},
                             ],
                         }
                     ]

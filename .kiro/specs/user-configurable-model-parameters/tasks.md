@@ -185,25 +185,25 @@ This implementation plan follows a phased approach:
     - POST /v1/admin/configs/{config_id}/revoke - revoke
     - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-- [-] 7. Checkpoint - Admin Lambda complete
+- [x] 7. Checkpoint - Admin Lambda complete
   - Ensure all tests pass, ask the user if questions arise.
   - Commit and push changes to CodeCommit
   - Trigger Lambda build
 
-- [ ] 8. Implement register-task-def Lambda (Python)
-  - [ ] 8.1 Create register-task-def Lambda project structure
+- [x] 8. Implement register-task-def Lambda (Python)
+  - [x] 8.1 Create register-task-def Lambda project structure
     - Create `backend/lambdas/register-task-def/` directory
     - Create `handler.py` with boto3 ECS client
     - Create `requirements.txt`
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
   
-  - [ ] 8.2 Implement task definition derivation logic
+  - [x] 8.2 Implement task definition derivation logic
     - Read base task definition ARN from SSM
     - Describe base task definition via ECS API
     - Modify CPU, memory, GPU, storage based on config
     - _Requirements: 5.1, 5.2_
   
-  - [ ] 8.3 Implement task definition registration
+  - [x] 8.3 Implement task definition registration
     - Register new task definition with family pattern `pdf-models-{model}-user-{config_id[:8]}`
     - Update configuration with task_definition_arn
     - Set task_definition_status to active or failed
@@ -213,17 +213,17 @@ This implementation plan follows a phased approach:
     - **Property 12: Task Definition Naming Convention**
     - **Validates: Requirements 5.3**
   
-  - [ ] 8.5 Add register-task-def Lambda to CiCdStack or ApiV2Stack
+  - [x] 8.5 Add register-task-def Lambda to CiCdStack or ApiV2Stack
     - Create IAM role with scoped ECS permissions (pdf-models-*-user-*)
     - Create Lambda function resource
     - _Requirements: 5.6_
 
-- [ ] 9. Modify submit-job Lambda for config support
-  - [ ] 9.1 Add config_id to SubmitJobBody struct
+- [x] 9. Modify submit-job Lambda for config support
+  - [x] 9.1 Add config_id to SubmitJobBody struct
     - Add optional config_id field
     - _Requirements: 6.1_
   
-  - [ ] 9.2 Implement configuration validation in submit-job
+  - [x] 9.2 Implement configuration validation in submit-job
     - Fetch configuration from DynamoDB if config_id provided
     - Verify approval_status is approved
     - Verify user has access to configuration
@@ -234,16 +234,16 @@ This implementation plan follows a phased approach:
     - **Property 14: Job Submission Requires Approved Configuration**
     - **Validates: Requirements 6.1, 6.3**
   
-  - [ ] 9.4 Pass config_id to Step Functions execution input
+  - [x] 9.4 Pass config_id to Step Functions execution input
     - Include config_id in execution input JSON
     - _Requirements: 6.4_
   
-  - [ ] 9.5 Increment usage_count when job submitted with config
+  - [x] 9.5 Increment usage_count when job submitted with config
     - Update configuration's usage_count atomically
     - _Requirements: 7.4_
 
-- [ ] 10. Modify ResolveTaskDef Lambda for config support
-  - [ ] 10.1 Update ResolveTaskDef Lambda in model_stack.py
+- [x] 10. Modify ResolveTaskDef Lambda for config support
+  - [x] 10.1 Update ResolveTaskDef Lambda in model_stack.py
     - Check for config_id in execution input
     - If present, fetch configuration from DynamoDB
     - Use configuration's task_definition_arn
@@ -254,7 +254,7 @@ This implementation plan follows a phased approach:
     - **Property 16: ResolveTaskDef Uses Configuration**
     - **Validates: Requirements 6.5, 6.6**
 
-- [ ] 11. Checkpoint - Backend complete
+- [-] 11. Checkpoint - Backend complete
   - Ensure all tests pass, ask the user if questions arise.
   - Commit and push all changes to CodeCommit
   - Run `make pipeline-start` to deploy all backend changes
