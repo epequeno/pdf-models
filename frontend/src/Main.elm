@@ -25,6 +25,8 @@ import Views.Login
 import Views.Models
 import Views.SignUp
 import Views.Upload
+import Views.Configs
+import Views.AdminConfigs
 
 
 main : Program Flags Model Msg
@@ -70,6 +72,8 @@ routeParser =
         , Parser.map (Upload defaultPdfModel) (Parser.s "upload")
         , Parser.map Jobs (Parser.s "jobs")
         , Parser.map Models (Parser.s "models")
+        , Parser.map Configs (Parser.s "configs")
+        , Parser.map AdminConfigs (Parser.s "admin" </> Parser.s "configs")
         ]
 
 
@@ -157,6 +161,37 @@ update msg model =
                                     )
                                     defaultPdfModel
                                     JobsFetched
+
+                            else
+                                Cmd.none
+
+                        Configs ->
+                            if Types.isAuthenticated model then
+                                Api.getConfigs
+                                    (case model.auth of
+                                        Authenticated tokens ->
+                                            tokens.accessToken
+
+                                        _ ->
+                                            ""
+                                    )
+                                    defaultPdfModel
+                                    ConfigsFetched
+
+                            else
+                                Cmd.none
+
+                        AdminConfigs ->
+                            if Types.isAuthenticated model then
+                                Api.getPendingConfigs
+                                    (case model.auth of
+                                        Authenticated tokens ->
+                                            tokens.accessToken
+
+                                        _ ->
+                                            ""
+                                    )
+                                    PendingConfigsFetched
 
                             else
                                 Cmd.none
@@ -828,9 +863,12 @@ update msg model =
 
                                                 else
                                                     Nothing
+
+                                            maybeConfigId =
+                                                Maybe.map .configId model.upload.selectedConfig
                                         in
                                         ( { model | upload = newUpload }
-                                        , Api.submitJob tokens.accessToken pdfModel s3Key maybePrompt model.upload.selectedFilename JobSubmitted
+                                        , Api.submitJob tokens.accessToken pdfModel s3Key maybePrompt model.upload.selectedFilename maybeConfigId JobSubmitted
                                         )
 
                                     _ ->
@@ -905,9 +943,12 @@ update msg model =
 
                             else
                                 Nothing
+
+                        maybeConfigId =
+                            Maybe.map .configId model.upload.selectedConfig
                     in
                     ( { model | upload = newUpload }
-                    , Api.submitJob tokens.accessToken pdfModel s3Key maybePrompt model.upload.selectedFilename JobSubmitted
+                    , Api.submitJob tokens.accessToken pdfModel s3Key maybePrompt model.upload.selectedFilename maybeConfigId JobSubmitted
                     )
 
                 _ ->
@@ -929,6 +970,7 @@ update msg model =
                                 , uploadProgress = Nothing
                                 , error = Nothing
                                 , prompt = ""
+                                , selectedConfig = Nothing
                             }
                     in
                     ( { model | upload = newUpload }
@@ -1186,8 +1228,11 @@ update msg model =
 
                                                         else
                                                             Nothing
+
+                                                    maybeConfigId =
+                                                        Maybe.map .configId model.upload.selectedConfig
                                                 in
-                                                Api.submitJob accessToken retryPdfModel s3Key maybePrompt model.upload.selectedFilename JobSubmitted
+                                                Api.submitJob accessToken retryPdfModel s3Key maybePrompt model.upload.selectedFilename maybeConfigId JobSubmitted
 
                                             Nothing ->
                                                 Cmd.none
@@ -1232,6 +1277,722 @@ update msg model =
 
         CurrentTimeReceived time ->
             ( { model | currentTime = time }, Cmd.none )
+
+        -- Configuration messages
+        FetchConfigs ->
+            case model.auth of
+                Authenticated tokens ->
+                    let
+                        oldConfigs =
+                            model.configs
+
+                        newConfigs =
+                            { oldConfigs | loading = True, error = Nothing }
+                    in
+                    ( { model | configs = newConfigs }
+                    , Api.getConfigs tokens.accessToken defaultPdfModel ConfigsFetched
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        ConfigsFetched result ->
+            case result of
+                Ok configurations ->
+                    let
+                        oldConfigs =
+                            model.configs
+
+                        newConfigs =
+                            { oldConfigs
+                                | configurations = configurations
+                                , loading = False
+                                , error = Nothing
+                            }
+                    in
+                    ( { model | configs = newConfigs }, Cmd.none )
+
+                Err error ->
+                    let
+                        oldConfigs =
+                            model.configs
+
+                        newConfigs =
+                            { oldConfigs
+                                | loading = False
+                                , error = Just (httpErrorToString error)
+                            }
+                    in
+                    ( { model | configs = newConfigs }, Cmd.none )
+
+        ConfigSearchChanged query ->
+            let
+                oldConfigs =
+                    model.configs
+
+                newConfigs =
+                    { oldConfigs | searchQuery = query }
+            in
+            ( { model | configs = newConfigs }, Cmd.none )
+
+        ToggleConfigApprovalFilter status ->
+            let
+                oldConfigs =
+                    model.configs
+
+                oldFilters =
+                    oldConfigs.filters
+
+                newStatuses =
+                    if List.member status oldFilters.approvalStatuses then
+                        List.filter (\s -> s /= status) oldFilters.approvalStatuses
+
+                    else
+                        status :: oldFilters.approvalStatuses
+
+                newFilters =
+                    { oldFilters | approvalStatuses = newStatuses }
+
+                newConfigs =
+                    { oldConfigs | filters = newFilters }
+            in
+            ( { model | configs = newConfigs }, Cmd.none )
+
+        ToggleConfigVisibilityFilter visibility ->
+            let
+                oldConfigs =
+                    model.configs
+
+                oldFilters =
+                    oldConfigs.filters
+
+                newVisibilities =
+                    if List.member visibility oldFilters.visibilities then
+                        List.filter (\v -> v /= visibility) oldFilters.visibilities
+
+                    else
+                        visibility :: oldFilters.visibilities
+
+                newFilters =
+                    { oldFilters | visibilities = newVisibilities }
+
+                newConfigs =
+                    { oldConfigs | filters = newFilters }
+            in
+            ( { model | configs = newConfigs }, Cmd.none )
+
+        ToggleConfigModelFilter pdfModel ->
+            let
+                oldConfigs =
+                    model.configs
+
+                oldFilters =
+                    oldConfigs.filters
+
+                newModels =
+                    if List.member pdfModel oldFilters.models then
+                        List.filter (\m -> m /= pdfModel) oldFilters.models
+
+                    else
+                        pdfModel :: oldFilters.models
+
+                newFilters =
+                    { oldFilters | models = newModels }
+
+                newConfigs =
+                    { oldConfigs | filters = newFilters }
+            in
+            ( { model | configs = newConfigs }, Cmd.none )
+
+        ClearConfigFilters ->
+            let
+                oldConfigs =
+                    model.configs
+
+                newConfigs =
+                    { oldConfigs
+                        | filters = emptyConfigFilters
+                        , searchQuery = ""
+                    }
+            in
+            ( { model | configs = newConfigs }, Cmd.none )
+
+        ShowCreateConfigForm pdfModel ->
+            let
+                oldConfigs =
+                    model.configs
+
+                newConfigs =
+                    { oldConfigs
+                        | showCreateForm = False
+                        , editingConfig = Just (initConfigFormState pdfModel)
+                    }
+            in
+            ( { model | configs = newConfigs }, Cmd.none )
+
+        HideConfigForm ->
+            let
+                oldConfigs =
+                    model.configs
+
+                newConfigs =
+                    { oldConfigs
+                        | showCreateForm = False
+                        , editingConfig = Nothing
+                    }
+            in
+            ( { model | configs = newConfigs }, Cmd.none )
+
+        EditConfig config ->
+            let
+                oldConfigs =
+                    model.configs
+
+                newConfigs =
+                    { oldConfigs
+                        | editingConfig = Just (configFormFromConfiguration config)
+                    }
+            in
+            ( { model | configs = newConfigs }, Cmd.none )
+
+        ConfigFormNameChanged name ->
+            updateConfigForm model (\form -> { form | name = name })
+
+        ConfigFormDescriptionChanged description ->
+            updateConfigForm model (\form -> { form | description = description })
+
+        ConfigFormPromptChanged prompt ->
+            updateConfigForm model (\form -> { form | prompt = prompt })
+
+        ConfigFormOutputFormatChanged outputFormat ->
+            updateConfigForm model (\form -> { form | outputFormat = outputFormat })
+
+        ConfigFormCpuChanged cpu ->
+            updateConfigForm model (\form -> { form | cpu = cpu })
+
+        ConfigFormMemoryChanged memory ->
+            updateConfigForm model (\form -> { form | memoryMib = memory })
+
+        ConfigFormGpuChanged gpu ->
+            updateConfigForm model (\form -> { form | gpuCount = gpu })
+
+        ConfigFormTimeoutChanged timeout ->
+            updateConfigForm model (\form -> { form | timeoutMinutes = timeout })
+
+        ConfigFormEphemeralStorageChanged storage ->
+            updateConfigForm model (\form -> { form | ephemeralStorageGib = storage })
+
+        ConfigFormEbsVolumeChanged volume ->
+            updateConfigForm model (\form -> { form | ebsVolumeSizeGb = volume })
+
+        ConfigFormSpotEnabledChanged enabled ->
+            updateConfigForm model (\form -> { form | spotEnabled = enabled })
+
+        ConfigFormVisibilityChanged visibility ->
+            updateConfigForm model (\form -> { form | visibility = visibility })
+
+        SaveConfig ->
+            case ( model.auth, model.configs.editingConfig ) of
+                ( Authenticated tokens, Just formState ) ->
+                    let
+                        oldConfigs =
+                            model.configs
+
+                        newFormState =
+                            { formState | saving = True, errors = [] }
+
+                        newConfigs =
+                            { oldConfigs | editingConfig = Just newFormState }
+
+                        inferenceParams =
+                            { prompt =
+                                if String.isEmpty formState.prompt then
+                                    Nothing
+
+                                else
+                                    Just formState.prompt
+                            , outputFormat =
+                                if String.isEmpty formState.outputFormat then
+                                    Nothing
+
+                                else
+                                    Just formState.outputFormat
+                            , customEnvVars = formState.customEnvVars
+                            }
+
+                        infraParams =
+                            { cpu = String.toInt formState.cpu
+                            , memoryMib = String.toInt formState.memoryMib
+                            , gpuCount = String.toInt formState.gpuCount
+                            , timeoutMinutes = String.toInt formState.timeoutMinutes
+                            , ephemeralStorageGib = String.toInt formState.ephemeralStorageGib
+                            , ebsVolumeSizeGb = String.toInt formState.ebsVolumeSizeGb
+                            , spotEnabled =
+                                if formState.spotEnabled then
+                                    Just True
+
+                                else
+                                    Nothing
+                            }
+
+                        cmd =
+                            case formState.configId of
+                                Just configId ->
+                                    Api.updateConfig tokens.accessToken
+                                        formState.model
+                                        configId
+                                        { name = Just formState.name
+                                        , description =
+                                            if String.isEmpty formState.description then
+                                                Nothing
+
+                                            else
+                                                Just formState.description
+                                        , inferenceParams = Just inferenceParams
+                                        , infraParams = Just infraParams
+                                        , visibility = Just formState.visibility
+                                        }
+                                        ConfigSaved
+
+                                Nothing ->
+                                    Api.createConfig tokens.accessToken
+                                        formState.model
+                                        { name = formState.name
+                                        , description =
+                                            if String.isEmpty formState.description then
+                                                Nothing
+
+                                            else
+                                                Just formState.description
+                                        , inferenceParams = Just inferenceParams
+                                        , infraParams = Just infraParams
+                                        , visibility = Just formState.visibility
+                                        }
+                                        ConfigSaved
+                    in
+                    ( { model | configs = newConfigs }, cmd )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        ConfigSaved result ->
+            case result of
+                Ok savedConfig ->
+                    let
+                        oldConfigs =
+                            model.configs
+
+                        updatedConfigurations =
+                            case model.configs.editingConfig of
+                                Just formState ->
+                                    case formState.configId of
+                                        Just _ ->
+                                            List.map
+                                                (\c ->
+                                                    if c.configId == savedConfig.configId then
+                                                        savedConfig
+
+                                                    else
+                                                        c
+                                                )
+                                                oldConfigs.configurations
+
+                                        Nothing ->
+                                            savedConfig :: oldConfigs.configurations
+
+                                Nothing ->
+                                    oldConfigs.configurations
+
+                        newConfigs =
+                            { oldConfigs
+                                | configurations = updatedConfigurations
+                                , editingConfig = Nothing
+                                , showCreateForm = False
+                            }
+                    in
+                    ( { model | configs = newConfigs }, Cmd.none )
+
+                Err error ->
+                    let
+                        oldConfigs =
+                            model.configs
+
+                        newFormState =
+                            case oldConfigs.editingConfig of
+                                Just form ->
+                                    Just { form | saving = False, errors = [ httpErrorToString error ] }
+
+                                Nothing ->
+                                    Nothing
+
+                        newConfigs =
+                            { oldConfigs | editingConfig = newFormState }
+                    in
+                    ( { model | configs = newConfigs }, Cmd.none )
+
+        DeleteConfigClicked configId ->
+            let
+                oldConfigs =
+                    model.configs
+
+                newConfigs =
+                    { oldConfigs | deleteConfirmation = Just configId }
+            in
+            ( { model | configs = newConfigs }, Cmd.none )
+
+        ConfirmDeleteConfig configId ->
+            case model.auth of
+                Authenticated tokens ->
+                    ( model, Api.deleteConfig tokens.accessToken defaultPdfModel configId ConfigDeleted )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        CancelDeleteConfig ->
+            let
+                oldConfigs =
+                    model.configs
+
+                newConfigs =
+                    { oldConfigs | deleteConfirmation = Nothing }
+            in
+            ( { model | configs = newConfigs }, Cmd.none )
+
+        ConfigDeleted result ->
+            case result of
+                Ok _ ->
+                    let
+                        oldConfigs =
+                            model.configs
+
+                        deletedId =
+                            oldConfigs.deleteConfirmation
+
+                        newConfigurations =
+                            case deletedId of
+                                Just id ->
+                                    List.filter (\c -> c.configId /= id) oldConfigs.configurations
+
+                                Nothing ->
+                                    oldConfigs.configurations
+
+                        newConfigs =
+                            { oldConfigs
+                                | configurations = newConfigurations
+                                , deleteConfirmation = Nothing
+                            }
+                    in
+                    ( { model | configs = newConfigs }, Cmd.none )
+
+                Err error ->
+                    let
+                        oldConfigs =
+                            model.configs
+
+                        newConfigs =
+                            { oldConfigs
+                                | error = Just (httpErrorToString error)
+                                , deleteConfirmation = Nothing
+                            }
+                    in
+                    ( { model | configs = newConfigs }, Cmd.none )
+
+        ForkConfigClicked configId ->
+            case model.auth of
+                Authenticated tokens ->
+                    ( model, Api.forkConfig tokens.accessToken defaultPdfModel configId ConfigForked )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        ConfigForked result ->
+            case result of
+                Ok forkedConfig ->
+                    let
+                        oldConfigs =
+                            model.configs
+
+                        newConfigs =
+                            { oldConfigs
+                                | configurations = forkedConfig :: oldConfigs.configurations
+                            }
+                    in
+                    ( { model | configs = newConfigs }, Cmd.none )
+
+                Err error ->
+                    let
+                        oldConfigs =
+                            model.configs
+
+                        newConfigs =
+                            { oldConfigs | error = Just (httpErrorToString error) }
+                    in
+                    ( { model | configs = newConfigs }, Cmd.none )
+
+        SelectConfigForUpload maybeConfig ->
+            let
+                oldUpload =
+                    model.upload
+
+                newUpload =
+                    { oldUpload | selectedConfig = maybeConfig }
+            in
+            ( { model | upload = newUpload }, Cmd.none )
+
+        -- Admin Configuration messages
+        FetchPendingConfigs ->
+            case model.auth of
+                Authenticated tokens ->
+                    let
+                        oldAdminConfigs =
+                            model.adminConfigs
+
+                        newAdminConfigs =
+                            { oldAdminConfigs | loading = True, error = Nothing }
+                    in
+                    ( { model | adminConfigs = newAdminConfigs }
+                    , Api.getPendingConfigs tokens.accessToken PendingConfigsFetched
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        PendingConfigsFetched result ->
+            case result of
+                Ok configs ->
+                    let
+                        oldAdminConfigs =
+                            model.adminConfigs
+
+                        newAdminConfigs =
+                            { oldAdminConfigs
+                                | pendingConfigs = configs
+                                , loading = False
+                                , error = Nothing
+                            }
+                    in
+                    ( { model | adminConfigs = newAdminConfigs }, Cmd.none )
+
+                Err error ->
+                    let
+                        oldAdminConfigs =
+                            model.adminConfigs
+
+                        newAdminConfigs =
+                            { oldAdminConfigs
+                                | loading = False
+                                , error = Just (httpErrorToString error)
+                            }
+                    in
+                    ( { model | adminConfigs = newAdminConfigs }, Cmd.none )
+
+        ShowApproveConfirmation configId ->
+            let
+                oldAdminConfigs =
+                    model.adminConfigs
+
+                newAdminConfigs =
+                    { oldAdminConfigs | approveConfirmation = Just configId }
+            in
+            ( { model | adminConfigs = newAdminConfigs }, Cmd.none )
+
+        CancelApproveConfig ->
+            let
+                oldAdminConfigs =
+                    model.adminConfigs
+
+                newAdminConfigs =
+                    { oldAdminConfigs | approveConfirmation = Nothing }
+            in
+            ( { model | adminConfigs = newAdminConfigs }, Cmd.none )
+
+        ConfirmApproveConfig configId ->
+            case model.auth of
+                Authenticated tokens ->
+                    let
+                        oldAdminConfigs =
+                            model.adminConfigs
+
+                        newAdminConfigs =
+                            { oldAdminConfigs
+                                | approveConfirmation = Nothing
+                                , processing = True
+                            }
+                    in
+                    ( { model | adminConfigs = newAdminConfigs }
+                    , Api.approveConfig tokens.accessToken configId ConfigApproved
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        ConfigApproved result ->
+            case result of
+                Ok approvedConfig ->
+                    let
+                        oldAdminConfigs =
+                            model.adminConfigs
+
+                        newPendingConfigs =
+                            List.filter (\c -> c.configId /= approvedConfig.configId) oldAdminConfigs.pendingConfigs
+
+                        newAdminConfigs =
+                            { oldAdminConfigs
+                                | pendingConfigs = newPendingConfigs
+                                , processing = False
+                            }
+                    in
+                    ( { model | adminConfigs = newAdminConfigs }, Cmd.none )
+
+                Err error ->
+                    let
+                        oldAdminConfigs =
+                            model.adminConfigs
+
+                        newAdminConfigs =
+                            { oldAdminConfigs
+                                | processing = False
+                                , error = Just (httpErrorToString error)
+                            }
+                    in
+                    ( { model | adminConfigs = newAdminConfigs }, Cmd.none )
+
+        ShowRejectModal configId ->
+            let
+                oldAdminConfigs =
+                    model.adminConfigs
+
+                newAdminConfigs =
+                    { oldAdminConfigs
+                        | rejectingConfigId = Just configId
+                        , rejectionReason = ""
+                    }
+            in
+            ( { model | adminConfigs = newAdminConfigs }, Cmd.none )
+
+        CancelRejectConfig ->
+            let
+                oldAdminConfigs =
+                    model.adminConfigs
+
+                newAdminConfigs =
+                    { oldAdminConfigs
+                        | rejectingConfigId = Nothing
+                        , rejectionReason = ""
+                    }
+            in
+            ( { model | adminConfigs = newAdminConfigs }, Cmd.none )
+
+        RejectReasonChanged reason ->
+            let
+                oldAdminConfigs =
+                    model.adminConfigs
+
+                newAdminConfigs =
+                    { oldAdminConfigs | rejectionReason = reason }
+            in
+            ( { model | adminConfigs = newAdminConfigs }, Cmd.none )
+
+        ConfirmRejectConfig configId reason ->
+            case model.auth of
+                Authenticated tokens ->
+                    let
+                        oldAdminConfigs =
+                            model.adminConfigs
+
+                        newAdminConfigs =
+                            { oldAdminConfigs
+                                | rejectingConfigId = Nothing
+                                , rejectionReason = ""
+                                , processing = True
+                            }
+                    in
+                    ( { model | adminConfigs = newAdminConfigs }
+                    , Api.rejectConfig tokens.accessToken configId reason ConfigRejected
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        ConfigRejected result ->
+            case result of
+                Ok rejectedConfig ->
+                    let
+                        oldAdminConfigs =
+                            model.adminConfigs
+
+                        newPendingConfigs =
+                            List.filter (\c -> c.configId /= rejectedConfig.configId) oldAdminConfigs.pendingConfigs
+
+                        newAdminConfigs =
+                            { oldAdminConfigs
+                                | pendingConfigs = newPendingConfigs
+                                , processing = False
+                            }
+                    in
+                    ( { model | adminConfigs = newAdminConfigs }, Cmd.none )
+
+                Err error ->
+                    let
+                        oldAdminConfigs =
+                            model.adminConfigs
+
+                        newAdminConfigs =
+                            { oldAdminConfigs
+                                | processing = False
+                                , error = Just (httpErrorToString error)
+                            }
+                    in
+                    ( { model | adminConfigs = newAdminConfigs }, Cmd.none )
+
+        RevokeConfigClicked configId ->
+            case model.auth of
+                Authenticated tokens ->
+                    let
+                        oldAdminConfigs =
+                            model.adminConfigs
+
+                        newAdminConfigs =
+                            { oldAdminConfigs | processing = True }
+                    in
+                    ( { model | adminConfigs = newAdminConfigs }
+                    , Api.revokeConfig tokens.accessToken configId ConfigRevoked
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        ConfigRevoked result ->
+            case result of
+                Ok revokedConfig ->
+                    let
+                        oldAdminConfigs =
+                            model.adminConfigs
+
+                        -- Add the revoked config back to pending list
+                        newPendingConfigs =
+                            revokedConfig :: oldAdminConfigs.pendingConfigs
+
+                        newAdminConfigs =
+                            { oldAdminConfigs
+                                | pendingConfigs = newPendingConfigs
+                                , processing = False
+                            }
+                    in
+                    ( { model | adminConfigs = newAdminConfigs }, Cmd.none )
+
+                Err error ->
+                    let
+                        oldAdminConfigs =
+                            model.adminConfigs
+
+                        newAdminConfigs =
+                            { oldAdminConfigs
+                                | processing = False
+                                , error = Just (httpErrorToString error)
+                            }
+                    in
+                    ( { model | adminConfigs = newAdminConfigs }, Cmd.none )
 
 
 
@@ -1434,6 +2195,20 @@ viewContent model =
             else
                 viewLoginPlaceholder model
 
+        Configs ->
+            if Types.isAuthenticated model then
+                Views.Configs.view model
+
+            else
+                viewLoginPlaceholder model
+
+        AdminConfigs ->
+            if Types.isAuthenticated model then
+                Views.AdminConfigs.view model
+
+            else
+                viewLoginPlaceholder model
+
         NotFound ->
             div [] [ text "404 - Not Found" ]
 
@@ -1523,6 +2298,21 @@ httpErrorToString error =
 
         Http.BadBody message ->
             "Invalid response: " ++ message
+
+
+updateConfigForm : Model -> (ConfigFormState -> ConfigFormState) -> ( Model, Cmd Msg )
+updateConfigForm model updateFn =
+    let
+        oldConfigs =
+            model.configs
+
+        newEditingConfig =
+            Maybe.map updateFn oldConfigs.editingConfig
+
+        newConfigs =
+            { oldConfigs | editingConfig = newEditingConfig }
+    in
+    ( { model | configs = newConfigs }, Cmd.none )
 
 
 getNextInList : a -> List a -> Maybe a

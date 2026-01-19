@@ -499,6 +499,8 @@ type Route
     | Upload PdfModel
     | Jobs
     | Models
+    | Configs
+    | AdminConfigs
     | NotFound
 
 
@@ -520,6 +522,12 @@ routeToPath route =
         Models ->
             "/models"
 
+        Configs ->
+            "/configs"
+
+        AdminConfigs ->
+            "/admin/configs"
+
         NotFound ->
             "/"
 
@@ -540,6 +548,8 @@ type alias Model =
     , signUpForm : SignUpForm
     , upload : UploadState
     , jobs : JobsState
+    , configs : ConfigsState
+    , adminConfigs : AdminConfigsState
     , currentTime : Time.Posix
     , pendingRetry : Maybe ApiRetryContext
     , pollingState : PollingState
@@ -602,6 +612,7 @@ type alias UploadState =
     , submitting : Bool
     , error : Maybe String
     , prompt : String
+    , selectedConfig : Maybe Configuration
     }
 
 
@@ -615,6 +626,120 @@ type alias JobsState =
     , expandedErrorIds : Set String
     }
 
+
+type alias ConfigsState =
+    { configurations : List Configuration
+    , loading : Bool
+    , error : Maybe String
+    , searchQuery : String
+    , filters : ConfigFilters
+    , selectedModel : Maybe PdfModel
+    , editingConfig : Maybe ConfigFormState
+    , showCreateForm : Bool
+    , deleteConfirmation : Maybe String
+    }
+
+
+type alias ConfigFormState =
+    { configId : Maybe String
+    , name : String
+    , description : String
+    , model : PdfModel
+    , prompt : String
+    , outputFormat : String
+    , customEnvVars : List ( String, String )
+    , cpu : String
+    , memoryMib : String
+    , gpuCount : String
+    , timeoutMinutes : String
+    , ephemeralStorageGib : String
+    , ebsVolumeSizeGb : String
+    , spotEnabled : Bool
+    , visibility : Visibility
+    , saving : Bool
+    , errors : List String
+    }
+
+
+initConfigFormState : PdfModel -> ConfigFormState
+initConfigFormState model =
+    { configId = Nothing
+    , name = ""
+    , description = ""
+    , model = model
+    , prompt = ""
+    , outputFormat = ""
+    , customEnvVars = []
+    , cpu = ""
+    , memoryMib = ""
+    , gpuCount = ""
+    , timeoutMinutes = ""
+    , ephemeralStorageGib = ""
+    , ebsVolumeSizeGb = ""
+    , spotEnabled = False
+    , visibility = Private
+    , saving = False
+    , errors = []
+    }
+
+
+configFormFromConfiguration : Configuration -> ConfigFormState
+configFormFromConfiguration config =
+    { configId = Just config.configId
+    , name = config.name
+    , description = Maybe.withDefault "" config.description
+    , model = config.model
+    , prompt = Maybe.withDefault "" config.inferenceParams.prompt
+    , outputFormat = Maybe.withDefault "" config.inferenceParams.outputFormat
+    , customEnvVars = config.inferenceParams.customEnvVars
+    , cpu = Maybe.map String.fromInt config.infraParams.cpu |> Maybe.withDefault ""
+    , memoryMib = Maybe.map String.fromInt config.infraParams.memoryMib |> Maybe.withDefault ""
+    , gpuCount = Maybe.map String.fromInt config.infraParams.gpuCount |> Maybe.withDefault ""
+    , timeoutMinutes = Maybe.map String.fromInt config.infraParams.timeoutMinutes |> Maybe.withDefault ""
+    , ephemeralStorageGib = Maybe.map String.fromInt config.infraParams.ephemeralStorageGib |> Maybe.withDefault ""
+    , ebsVolumeSizeGb = Maybe.map String.fromInt config.infraParams.ebsVolumeSizeGb |> Maybe.withDefault ""
+    , spotEnabled = Maybe.withDefault False config.infraParams.spotEnabled
+    , visibility = config.visibility
+    , saving = False
+    , errors = []
+    }
+
+
+initConfigsState : ConfigsState
+initConfigsState =
+    { configurations = []
+    , loading = False
+    , error = Nothing
+    , searchQuery = ""
+    , filters = emptyConfigFilters
+    , selectedModel = Nothing
+    , editingConfig = Nothing
+    , showCreateForm = False
+    , deleteConfirmation = Nothing
+    }
+
+
+type alias AdminConfigsState =
+    { pendingConfigs : List Configuration
+    , loading : Bool
+    , error : Maybe String
+    , approveConfirmation : Maybe String
+    , rejectingConfigId : Maybe String
+    , rejectionReason : String
+    , processing : Bool
+    }
+
+
+initAdminConfigsState : AdminConfigsState
+initAdminConfigsState =
+    { pendingConfigs = []
+    , loading = False
+    , error = Nothing
+    , approveConfirmation = Nothing
+    , rejectingConfigId = Nothing
+    , rejectionReason = ""
+    , processing = False
+    }
 
 type alias DownloadError =
     { jobId : String
@@ -727,6 +852,52 @@ type Msg
     | ToggleJobExpanded String
     | ToggleErrorExpanded String
     | TokenRefreshReceived String
+      -- Configurations
+    | FetchConfigs
+    | ConfigsFetched (Result Http.Error (List Configuration))
+    | ConfigSearchChanged String
+    | ToggleConfigApprovalFilter ApprovalStatus
+    | ToggleConfigVisibilityFilter Visibility
+    | ToggleConfigModelFilter PdfModel
+    | ClearConfigFilters
+    | ShowCreateConfigForm PdfModel
+    | HideConfigForm
+    | EditConfig Configuration
+    | ConfigFormNameChanged String
+    | ConfigFormDescriptionChanged String
+    | ConfigFormPromptChanged String
+    | ConfigFormOutputFormatChanged String
+    | ConfigFormCpuChanged String
+    | ConfigFormMemoryChanged String
+    | ConfigFormGpuChanged String
+    | ConfigFormTimeoutChanged String
+    | ConfigFormEphemeralStorageChanged String
+    | ConfigFormEbsVolumeChanged String
+    | ConfigFormSpotEnabledChanged Bool
+    | ConfigFormVisibilityChanged Visibility
+    | SaveConfig
+    | ConfigSaved (Result Http.Error Configuration)
+    | DeleteConfigClicked String
+    | ConfirmDeleteConfig String
+    | CancelDeleteConfig
+    | ConfigDeleted (Result Http.Error ())
+    | ForkConfigClicked String
+    | ConfigForked (Result Http.Error Configuration)
+    | SelectConfigForUpload (Maybe Configuration)
+      -- Admin Configurations
+    | FetchPendingConfigs
+    | PendingConfigsFetched (Result Http.Error (List Configuration))
+    | ShowApproveConfirmation String
+    | CancelApproveConfig
+    | ConfirmApproveConfig String
+    | ConfigApproved (Result Http.Error Configuration)
+    | ShowRejectModal String
+    | CancelRejectConfig
+    | RejectReasonChanged String
+    | ConfirmRejectConfig String String
+    | ConfigRejected (Result Http.Error Configuration)
+    | RevokeConfigClicked String
+    | ConfigRevoked (Result Http.Error Configuration)
 
 
 
@@ -761,6 +932,7 @@ initModel key route =
         , submitting = False
         , error = Nothing
         , prompt = ""
+        , selectedConfig = Nothing
         }
     , jobs =
         { jobs = []
@@ -771,6 +943,8 @@ initModel key route =
         , expandedJobIds = Set.empty
         , expandedErrorIds = Set.empty
         }
+    , configs = initConfigsState
+    , adminConfigs = initAdminConfigsState
     , currentTime = Time.millisToPosix 0
     , pendingRetry = Nothing
     , pollingState = initPollingState
@@ -790,6 +964,18 @@ isAuthenticated model =
     case model.auth of
         Authenticated _ ->
             True
+
+        _ ->
+            False
+
+
+isAdmin : Model -> Bool
+isAdmin model =
+    case model.auth of
+        Authenticated tokens ->
+            -- Check if the idToken contains the admin group
+            -- This is a simple check - the backend does proper JWT validation
+            String.contains "pdf-models-admins" tokens.idToken
 
         _ ->
             False
@@ -893,3 +1079,231 @@ filterBySearch query models =
 hasActiveFilters : ModelFilters -> Bool
 hasActiveFilters filters =
     not (List.isEmpty filters.categories && List.isEmpty filters.capabilities && List.isEmpty filters.computeTypes)
+
+
+
+-- CONFIGURATION TYPES
+
+
+type ApprovalStatus
+    = PendingApproval
+    | Approved
+    | Rejected
+
+
+approvalStatusToString : ApprovalStatus -> String
+approvalStatusToString status =
+    case status of
+        PendingApproval ->
+            "pending_approval"
+
+        Approved ->
+            "approved"
+
+        Rejected ->
+            "rejected"
+
+
+stringToApprovalStatus : String -> Maybe ApprovalStatus
+stringToApprovalStatus str =
+    case String.toLower str of
+        "pending_approval" ->
+            Just PendingApproval
+
+        "approved" ->
+            Just Approved
+
+        "rejected" ->
+            Just Rejected
+
+        _ ->
+            Nothing
+
+
+type Visibility
+    = Private
+    | Public
+
+
+visibilityToString : Visibility -> String
+visibilityToString visibility =
+    case visibility of
+        Private ->
+            "private"
+
+        Public ->
+            "public"
+
+
+stringToVisibility : String -> Maybe Visibility
+stringToVisibility str =
+    case String.toLower str of
+        "private" ->
+            Just Private
+
+        "public" ->
+            Just Public
+
+        _ ->
+            Nothing
+
+
+type alias InferenceParams =
+    { prompt : Maybe String
+    , outputFormat : Maybe String
+    , customEnvVars : List ( String, String )
+    }
+
+
+emptyInferenceParams : InferenceParams
+emptyInferenceParams =
+    { prompt = Nothing
+    , outputFormat = Nothing
+    , customEnvVars = []
+    }
+
+
+type alias InfraParams =
+    { cpu : Maybe Int
+    , memoryMib : Maybe Int
+    , gpuCount : Maybe Int
+    , timeoutMinutes : Maybe Int
+    , ephemeralStorageGib : Maybe Int
+    , ebsVolumeSizeGb : Maybe Int
+    , spotEnabled : Maybe Bool
+    }
+
+
+emptyInfraParams : InfraParams
+emptyInfraParams =
+    { cpu = Nothing
+    , memoryMib = Nothing
+    , gpuCount = Nothing
+    , timeoutMinutes = Nothing
+    , ephemeralStorageGib = Nothing
+    , ebsVolumeSizeGb = Nothing
+    , spotEnabled = Nothing
+    }
+
+
+type alias Configuration =
+    { configId : String
+    , userId : String
+    , model : PdfModel
+    , name : String
+    , description : Maybe String
+    , createdAt : Time.Posix
+    , updatedAt : Time.Posix
+    , inferenceParams : InferenceParams
+    , infraParams : InfraParams
+    , approvalStatus : ApprovalStatus
+    , approvedBy : Maybe String
+    , approvedAt : Maybe Time.Posix
+    , rejectionReason : Maybe String
+    , taskDefinitionArn : Maybe String
+    , taskDefinitionStatus : Maybe String
+    , visibility : Visibility
+    , usageCount : Int
+    , forkedFrom : Maybe String
+    }
+
+
+type alias ConfigFilters =
+    { approvalStatuses : List ApprovalStatus
+    , visibilities : List Visibility
+    , models : List PdfModel
+    }
+
+
+emptyConfigFilters : ConfigFilters
+emptyConfigFilters =
+    { approvalStatuses = []
+    , visibilities = []
+    , models = []
+    }
+
+
+hasActiveConfigFilters : ConfigFilters -> Bool
+hasActiveConfigFilters filters =
+    not (List.isEmpty filters.approvalStatuses && List.isEmpty filters.visibilities && List.isEmpty filters.models)
+
+
+filterConfigurations : ConfigFilters -> String -> List Configuration -> List Configuration
+filterConfigurations filters searchQuery configs =
+    configs
+        |> filterByApprovalStatus filters.approvalStatuses
+        |> filterByVisibility filters.visibilities
+        |> filterByConfigModel filters.models
+        |> filterConfigsBySearch searchQuery
+
+
+filterByApprovalStatus : List ApprovalStatus -> List Configuration -> List Configuration
+filterByApprovalStatus statuses configs =
+    if List.isEmpty statuses then
+        configs
+
+    else
+        List.filter (\config -> List.member config.approvalStatus statuses) configs
+
+
+filterByVisibility : List Visibility -> List Configuration -> List Configuration
+filterByVisibility visibilities configs =
+    if List.isEmpty visibilities then
+        configs
+
+    else
+        List.filter (\config -> List.member config.visibility visibilities) configs
+
+
+filterByConfigModel : List PdfModel -> List Configuration -> List Configuration
+filterByConfigModel models configs =
+    if List.isEmpty models then
+        configs
+
+    else
+        List.filter (\config -> List.member config.model models) configs
+
+
+filterConfigsBySearch : String -> List Configuration -> List Configuration
+filterConfigsBySearch query configs =
+    if String.isEmpty (String.trim query) then
+        configs
+
+    else
+        let
+            lowerQuery =
+                String.toLower query
+        in
+        List.filter
+            (\config ->
+                let
+                    searchableText =
+                        String.toLower
+                            (config.name
+                                ++ " "
+                                ++ Maybe.withDefault "" config.description
+                                ++ " "
+                                ++ pdfModelToDisplayName config.model
+                            )
+                in
+                String.contains lowerQuery searchableText
+            )
+            configs
+
+
+type alias CreateConfigRequest =
+    { name : String
+    , description : Maybe String
+    , inferenceParams : Maybe InferenceParams
+    , infraParams : Maybe InfraParams
+    , visibility : Maybe Visibility
+    }
+
+
+type alias UpdateConfigRequest =
+    { name : Maybe String
+    , description : Maybe String
+    , inferenceParams : Maybe InferenceParams
+    , infraParams : Maybe InfraParams
+    , visibility : Maybe Visibility
+    }

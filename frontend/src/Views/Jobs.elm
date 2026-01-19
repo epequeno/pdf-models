@@ -10,7 +10,7 @@ import Html.Styled.Events exposing (onClick)
 import Set exposing (Set)
 import Styles
 import Time
-import Types exposing (..)
+import Types exposing (Job, JobStatus(..), Model, Msg(..), PdfModel, Route(..), defaultPdfModel, pdfModelToDisplayName, routeToPath)
 
 
 view : Model -> Html Msg
@@ -85,6 +85,23 @@ viewHeader =
                     ]
                 ]
                 [ text "Models" ]
+            , a
+                [ href (routeToPath Configs)
+                , css
+                    [ padding2 Styles.spacing.sm Styles.spacing.base
+                    , border3 (px 1) solid Styles.colors.border
+                    , borderRadius Styles.radius.md
+                    , color Styles.colors.textSecondary
+                    , textDecoration none
+                    , Css.fontSize Styles.fontSize.body
+                    , Styles.transitions.base
+                    , hover
+                        [ backgroundColor Styles.colors.overlay
+                        , borderColor Styles.colors.borderStrong
+                        ]
+                    ]
+                ]
+                [ text "Configs" ]
             , a
                 [ href (routeToPath (Upload defaultPdfModel))
                 , css

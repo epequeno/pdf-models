@@ -10,7 +10,7 @@ import Html.Styled.Attributes as Attr exposing (css, for, href, id, placeholder,
 import Html.Styled.Events exposing (on, onClick, onInput, preventDefaultOn)
 import Json.Decode as Decode
 import Styles
-import Types exposing (..)
+import Types exposing (ApprovalStatus(..), Configuration, Model, Msg(..), PdfModel, Route(..), UploadState, Visibility(..), defaultPdfModel, defaultPromptForModel, modelSupportsPrompt, pdfModelToDisplayName, routeToPath)
 
 
 view : PdfModel -> Model -> Html Msg
@@ -120,7 +120,8 @@ view pdfModel model =
                     , padding Styles.spacing.xxl
                     ]
                 ]
-                [ viewPromptInput pdfModel model.upload
+                [ viewConfigSelector pdfModel model
+                , viewPromptInput pdfModel model.upload
                 , viewFileDropZone model.upload pdfModel
                 , case model.upload.error of
                     Just err ->
@@ -191,6 +192,23 @@ viewHeader =
                 ]
                 [ text "Models" ]
             , a
+                [ href (routeToPath Configs)
+                , css
+                    [ padding2 Styles.spacing.sm Styles.spacing.base
+                    , border3 (px 1) solid Styles.colors.border
+                    , borderRadius Styles.radius.md
+                    , color Styles.colors.textSecondary
+                    , textDecoration none
+                    , Css.fontSize Styles.fontSize.body
+                    , Styles.transitions.base
+                    , hover
+                        [ backgroundColor Styles.colors.overlay
+                        , borderColor Styles.colors.borderStrong
+                        ]
+                    ]
+                ]
+                [ text "Configs" ]
+            , a
                 [ href (routeToPath Jobs)
                 , css
                     [ padding2 Styles.spacing.sm Styles.spacing.base
@@ -209,6 +227,270 @@ viewHeader =
                 [ text "Dashboard" ]
             , Button.button Button.Ghost "Sign Out" SignOutClicked
             ]
+        ]
+
+
+viewConfigSelector : PdfModel -> Model -> Html Msg
+viewConfigSelector pdfModel model =
+    let
+        -- Filter configurations for the current model that are approved
+        approvedConfigs =
+            model.configs.configurations
+                |> List.filter (\c -> c.model == pdfModel && c.approvalStatus == Approved)
+
+        -- All configs for this model (for showing pending/rejected)
+        allModelConfigs =
+            model.configs.configurations
+                |> List.filter (\c -> c.model == pdfModel)
+    in
+    if List.isEmpty allModelConfigs then
+        -- No configs at all, show link to create one
+        div
+            [ css
+                [ marginBottom Styles.spacing.xl
+                ]
+            ]
+            [ label
+                [ css
+                    [ display block
+                    , Styles.textCaption
+                    , marginBottom Styles.spacing.sm
+                    ]
+                ]
+                [ text "CONFIGURATION (OPTIONAL)" ]
+            , a
+                [ href (routeToPath Configs)
+                , css
+                    [ display block
+                    , padding Styles.spacing.base
+                    , backgroundColor Styles.colors.surfaceRaised
+                    , border3 (px 1) solid Styles.colors.border
+                    , borderRadius Styles.radius.md
+                    , color Styles.colors.textTertiary
+                    , textDecoration none
+                    , Styles.transitions.base
+                    , hover
+                        [ borderColor Styles.colors.borderStrong
+                        , color Styles.colors.textSecondary
+                        ]
+                    ]
+                ]
+                [ text "Create a custom configuration →" ]
+            ]
+
+    else
+        div
+            [ css
+                [ marginBottom Styles.spacing.xl
+                ]
+            ]
+            [ label
+                [ css
+                    [ display block
+                    , Styles.textCaption
+                    , marginBottom Styles.spacing.sm
+                    ]
+                ]
+                [ text "CONFIGURATION (OPTIONAL)" ]
+            , div
+                [ css
+                    [ displayFlex
+                    , flexDirection column
+                    , Styles.gap Styles.spacing.sm
+                    ]
+                ]
+                ([ viewConfigOption Nothing model.upload.selectedConfig ]
+                    ++ List.map (\config -> viewConfigOption (Just config) model.upload.selectedConfig) allModelConfigs
+                )
+            , a
+                [ href (routeToPath Configs)
+                , css
+                    [ display block
+                    , marginTop Styles.spacing.sm
+                    , Css.fontSize Styles.fontSize.small
+                    , color Styles.colors.textTertiary
+                    , textDecoration none
+                    , Styles.transitions.fast
+                    , hover [ color Styles.colors.accent ]
+                    ]
+                ]
+                [ text "Manage configurations →" ]
+            ]
+
+
+viewConfigOption : Maybe Configuration -> Maybe Configuration -> Html Msg
+viewConfigOption maybeConfig selectedConfig =
+    let
+        isSelected =
+            case ( maybeConfig, selectedConfig ) of
+                ( Nothing, Nothing ) ->
+                    True
+
+                ( Just config, Just selected ) ->
+                    config.configId == selected.configId
+
+                _ ->
+                    False
+
+        ( label, isDisabled, statusIndicator ) =
+            case maybeConfig of
+                Nothing ->
+                    ( "Default (no custom configuration)", False, text "" )
+
+                Just config ->
+                    let
+                        statusBadge =
+                            case config.approvalStatus of
+                                PendingApproval ->
+                                    span
+                                        [ css
+                                            [ Css.fontSize Styles.fontSize.caption
+                                            , color Styles.colors.warning
+                                            , backgroundColor Styles.colors.warningMuted
+                                            , padding2 Styles.spacing.xs Styles.spacing.sm
+                                            , borderRadius Styles.radius.full
+                                            , marginLeft Styles.spacing.sm
+                                            ]
+                                        ]
+                                        [ text "Pending" ]
+
+                                Rejected ->
+                                    span
+                                        [ css
+                                            [ Css.fontSize Styles.fontSize.caption
+                                            , color Styles.colors.error
+                                            , backgroundColor Styles.colors.errorMuted
+                                            , padding2 Styles.spacing.xs Styles.spacing.sm
+                                            , borderRadius Styles.radius.full
+                                            , marginLeft Styles.spacing.sm
+                                            ]
+                                        ]
+                                        [ text "Rejected" ]
+
+                                Approved ->
+                                    span
+                                        [ css
+                                            [ Css.fontSize Styles.fontSize.caption
+                                            , color Styles.colors.success
+                                            , backgroundColor Styles.colors.successMuted
+                                            , padding2 Styles.spacing.xs Styles.spacing.sm
+                                            , borderRadius Styles.radius.full
+                                            , marginLeft Styles.spacing.sm
+                                            ]
+                                        ]
+                                        [ text "✓" ]
+                    in
+                    ( config.name
+                    , config.approvalStatus /= Approved
+                    , statusBadge
+                    )
+    in
+    div
+        [ css
+            ([ padding Styles.spacing.base
+             , backgroundColor
+                (if isSelected then
+                    Styles.colors.accentMuted
+
+                 else
+                    Styles.colors.surfaceRaised
+                )
+             , border3 (px 1) solid
+                (if isSelected then
+                    Styles.colors.accent
+
+                 else
+                    Styles.colors.border
+                )
+             , borderRadius Styles.radius.md
+             , Styles.transitions.base
+             , Styles.flexRow
+             , justifyContent spaceBetween
+             ]
+                ++ (if isDisabled then
+                        [ opacity (num 0.6)
+                        , cursor notAllowed
+                        ]
+
+                    else
+                        [ cursor pointer
+                        , hover
+                            [ borderColor
+                                (if isSelected then
+                                    Styles.colors.accent
+
+                                 else
+                                    Styles.colors.borderStrong
+                                )
+                            ]
+                        ]
+                   )
+            )
+        , if isDisabled then
+            Attr.attribute "aria-disabled" "true"
+
+          else
+            onClick (SelectConfigForUpload maybeConfig)
+        ]
+        [ div
+            [ css
+                [ Styles.flexRow
+                , Styles.gap Styles.spacing.sm
+                ]
+            ]
+            [ -- Radio indicator
+              div
+                [ css
+                    [ Css.width (px 16)
+                    , Css.height (px 16)
+                    , borderRadius (pct 50)
+                    , border3 (px 2) solid
+                        (if isSelected then
+                            Styles.colors.accent
+
+                         else
+                            Styles.colors.border
+                        )
+                    , displayFlex
+                    , alignItems center
+                    , justifyContent center
+                    ]
+                ]
+                [ if isSelected then
+                    div
+                        [ css
+                            [ Css.width (px 8)
+                            , Css.height (px 8)
+                            , borderRadius (pct 50)
+                            , backgroundColor Styles.colors.accent
+                            ]
+                        ]
+                        []
+
+                  else
+                    text ""
+                ]
+            , span
+                [ css
+                    [ color
+                        (if isSelected then
+                            Styles.colors.accent
+
+                         else
+                            Styles.colors.textPrimary
+                        )
+                    , fontWeight
+                        (if isSelected then
+                            Styles.fontWeights.medium
+
+                         else
+                            Styles.fontWeights.normal
+                        )
+                    ]
+                ]
+                [ text label ]
+            ]
+        , statusIndicator
         ]
 
 

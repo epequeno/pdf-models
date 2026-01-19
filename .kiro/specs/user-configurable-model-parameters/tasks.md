@@ -254,66 +254,66 @@ This implementation plan follows a phased approach:
     - **Property 16: ResolveTaskDef Uses Configuration**
     - **Validates: Requirements 6.5, 6.6**
 
-- [-] 11. Checkpoint - Backend complete
+- [x] 11. Checkpoint - Backend complete
   - Ensure all tests pass, ask the user if questions arise.
   - Commit and push all changes to CodeCommit
   - Run `make pipeline-start` to deploy all backend changes
   - Test end-to-end: create config → admin approve → submit job with config
 
-- [ ] 12. Implement frontend configuration types
-  - [ ] 12.1 Add Configuration types to Types.elm
+- [x] 12. Implement frontend configuration types
+  - [x] 12.1 Add Configuration types to Types.elm
     - Add Configuration record type
     - Add ApprovalStatus type (PendingApproval, Approved, Rejected)
     - Add InferenceParams and InfraParams record types
     - Add ConfigFilters type for filtering
     - _Requirements: 10.1, 10.2_
   
-  - [ ] 12.2 Add configuration API functions to Api.elm
+  - [x] 12.2 Add configuration API functions to Api.elm
     - createConfig, getConfigs, getConfig, updateConfig, deleteConfig
     - forkConfig, discoverConfigs
     - Add JSON encoders and decoders
     - _Requirements: 10.1, 10.2, 10.3_
 
-- [ ] 13. Implement frontend configuration management views
-  - [ ] 13.1 Create Views/Configs.elm for configuration list
+- [x] 13. Implement frontend configuration management views
+  - [x] 13.1 Create Views/Configs.elm for configuration list
     - Display user's configurations with name, model, approval status
     - Show visual indicator for pending/rejected configs
     - Add create, edit, delete actions
     - _Requirements: 10.1, 10.5_
   
-  - [ ] 13.2 Create configuration creation/edit form
+  - [x] 13.2 Create configuration creation/edit form
     - Fields for name, description
     - Inference params: prompt, output_format, custom_env_vars
     - Infra params: cpu, memory, gpu, timeout, storage
     - Display validation errors
     - _Requirements: 10.2, 10.3_
   
-  - [ ] 13.3 Integrate config selector into Upload view
+  - [x] 13.3 Integrate config selector into Upload view
     - Add dropdown to select approved configuration
     - Disable selection for pending/rejected configs
     - Pass config_id to job submission
     - _Requirements: 10.4, 10.5_
 
-- [ ] 14. Implement frontend admin panel
-  - [ ] 14.1 Add admin API functions to Api.elm
+- [x] 14. Implement frontend admin panel
+  - [x] 14.1 Add admin API functions to Api.elm
     - getPendingConfigs, approveConfig, rejectConfig, revokeConfig
     - Add JSON encoders and decoders
     - _Requirements: 11.1, 11.2, 11.3_
   
-  - [ ] 14.2 Create Views/AdminConfigs.elm for admin panel
+  - [x] 14.2 Create Views/AdminConfigs.elm for admin panel
     - Display pending configurations with user, model, parameters
     - Show resource implications (estimated cost)
     - Add approve/reject buttons with confirmation
     - Require rejection reason input
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5_
   
-  - [ ] 14.3 Add admin route and navigation
+  - [x] 14.3 Add admin route and navigation
     - Add AdminConfigs route to Types.elm
     - Add navigation link (visible only to admins)
     - Check admin status from JWT claims
     - _Requirements: 11.1_
 
-- [ ] 15. Final checkpoint - Feature complete
+- [-] 15. Final checkpoint - Feature complete
   - Ensure all tests pass, ask the user if questions arise.
   - Build frontend: `cd frontend && ./build.sh`
   - Commit and push all changes
