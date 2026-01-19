@@ -79,6 +79,9 @@ class ApiV2Stack(Stack):
         s3_bucket_arn = ssm.StringParameter.value_for_string_parameter(
             self, "/pdf-models/core/s3-bucket-arn"
         )
+        configurations_table_name = ssm.StringParameter.value_for_string_parameter(
+            self, CONFIG.SSM_CONFIGURATIONS_TABLE_NAME
+        )
 
         # Use the same hosted zone as FrontendStack (hardcoded ID)
         hosted_zone_id = "Z04774573K4OEWVFBEMS5"
@@ -94,6 +97,9 @@ class ApiV2Stack(Stack):
         )
         get_upload_url_version = ssm.StringParameter.value_for_string_parameter(
             self, "/pdf-models/lambda/get-upload-url-version"
+        )
+        config_crud_version = ssm.StringParameter.value_for_string_parameter(
+            self, "/pdf-models/lambda/config-crud-version"
         )
 
         # Create CloudWatch log groups for Lambdas
@@ -117,6 +123,14 @@ class ApiV2Stack(Stack):
             self,
             "GetUploadUrlLogGroup",
             log_group_name=f"/aws/lambda/{CONFIG.PROJECT_NAME}-get-upload-url",
+            retention=logs.RetentionDays.ONE_WEEK,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+
+        config_crud_log_group = logs.LogGroup(
+            self,
+            "ConfigCrudLogGroup",
+            log_group_name=f"/aws/lambda/{CONFIG.PROJECT_NAME}-config-crud",
             retention=logs.RetentionDays.ONE_WEEK,
             removal_policy=RemovalPolicy.DESTROY,
         )
@@ -233,6 +247,36 @@ class ApiV2Stack(Stack):
                 )
             )
 
+        # Create Lambda execution role for config-crud
+        config_crud_role = iam.Role(
+            self,
+            "ConfigCrudLambdaRole",
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name(
+                    "service-role/AWSLambdaBasicExecutionRole"
+                )
+            ],
+        )
+
+        # Grant DynamoDB permissions to config-crud role for configurations table
+        config_crud_role.add_to_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "dynamodb:PutItem",
+                    "dynamodb:GetItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:DeleteItem",
+                    "dynamodb:Query",
+                ],
+                resources=[
+                    f"arn:aws:dynamodb:{self.region}:{self.account}:table/{configurations_table_name}",
+                    f"arn:aws:dynamodb:{self.region}:{self.account}:table/{configurations_table_name}/index/*",
+                ],
+            )
+        )
+
         # Create submit-job Lambda function
         submit_job_function = lambda_.Function(
             self,
@@ -307,6 +351,30 @@ class ApiV2Stack(Stack):
             },
         )
 
+        # Create config-crud Lambda function
+        config_crud_function = lambda_.Function(
+            self,
+            "ConfigCrudFunction",
+            function_name=f"{CONFIG.PROJECT_NAME}-config-crud",
+            runtime=lambda_.Runtime.PROVIDED_AL2023,
+            handler="bootstrap",
+            code=lambda_.Code.from_bucket(
+                bucket=s3.Bucket.from_bucket_name(
+                    self, "LambdaArtifactsBucket4", s3_bucket_name
+                ),
+                key="lambda-artifacts/config-crud.zip",
+                object_version=config_crud_version,
+            ),
+            architecture=lambda_.Architecture.ARM_64,
+            role=config_crud_role,
+            timeout=Duration.seconds(30),
+            memory_size=256,
+            log_group=config_crud_log_group,
+            environment={
+                "CONFIGURATIONS_TABLE_NAME": configurations_table_name,
+            },
+        )
+
         # Create CloudWatch log group for API Gateway access logs
         api_access_log_group = logs.LogGroup(
             self,
@@ -327,6 +395,8 @@ class ApiV2Stack(Stack):
                 allow_methods=[
                     apigwv2.CorsHttpMethod.GET,
                     apigwv2.CorsHttpMethod.POST,
+                    apigwv2.CorsHttpMethod.PUT,
+                    apigwv2.CorsHttpMethod.DELETE,
                     apigwv2.CorsHttpMethod.OPTIONS,
                 ],
                 allow_headers=["Content-Type", "Authorization"],
@@ -421,6 +491,11 @@ class ApiV2Stack(Stack):
             get_upload_url_function,
         )
 
+        config_crud_integration = apigwv2_integrations.HttpLambdaIntegration(
+            "ConfigCrudIntegration",
+            config_crud_function,
+        )
+
         # Add routes with Cognito authorizer
         # POST /v1/models/{model}/upload-url - get pre-signed upload URL
         http_api.add_routes(
@@ -451,6 +526,66 @@ class ApiV2Stack(Stack):
             path="/v1/models/{model}/jobs/{job_id}",
             methods=[apigwv2.HttpMethod.GET],
             integration=get_job_integration,
+            authorizer=authorizer,
+        )
+
+        # ============================================
+        # Configuration CRUD Routes
+        # ============================================
+
+        # POST /v1/models/{model}/configs - create configuration
+        http_api.add_routes(
+            path="/v1/models/{model}/configs",
+            methods=[apigwv2.HttpMethod.POST],
+            integration=config_crud_integration,
+            authorizer=authorizer,
+        )
+
+        # GET /v1/models/{model}/configs - list user's configurations
+        http_api.add_routes(
+            path="/v1/models/{model}/configs",
+            methods=[apigwv2.HttpMethod.GET],
+            integration=config_crud_integration,
+            authorizer=authorizer,
+        )
+
+        # GET /v1/models/{model}/configs/{config_id} - get configuration
+        http_api.add_routes(
+            path="/v1/models/{model}/configs/{config_id}",
+            methods=[apigwv2.HttpMethod.GET],
+            integration=config_crud_integration,
+            authorizer=authorizer,
+        )
+
+        # PUT /v1/models/{model}/configs/{config_id} - update configuration
+        http_api.add_routes(
+            path="/v1/models/{model}/configs/{config_id}",
+            methods=[apigwv2.HttpMethod.PUT],
+            integration=config_crud_integration,
+            authorizer=authorizer,
+        )
+
+        # DELETE /v1/models/{model}/configs/{config_id} - delete configuration
+        http_api.add_routes(
+            path="/v1/models/{model}/configs/{config_id}",
+            methods=[apigwv2.HttpMethod.DELETE],
+            integration=config_crud_integration,
+            authorizer=authorizer,
+        )
+
+        # POST /v1/models/{model}/configs/{config_id}/fork - fork configuration
+        http_api.add_routes(
+            path="/v1/models/{model}/configs/{config_id}/fork",
+            methods=[apigwv2.HttpMethod.POST],
+            integration=config_crud_integration,
+            authorizer=authorizer,
+        )
+
+        # GET /v1/configs/discover - discover public configurations
+        http_api.add_routes(
+            path="/v1/configs/discover",
+            methods=[apigwv2.HttpMethod.GET],
+            integration=config_crud_integration,
             authorizer=authorizer,
         )
 

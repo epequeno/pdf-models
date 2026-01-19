@@ -104,19 +104,19 @@ This implementation plan follows a phased approach:
     - **Property 17: Discover Returns Public Approved Configurations**
     - **Validates: Requirements 7.1**
 
-- [-] 3. Checkpoint - Config CRUD Lambda complete
+- [x] 3. Checkpoint - Config CRUD Lambda complete
   - Ensure all tests pass, ask the user if questions arise.
   - Commit and push changes to CodeCommit
   - Trigger Lambda build: `AWS_PROFILE=arch aws codebuild start-build --project-name pdf-models-rust-lambda-build`
 
-- [ ] 4. Add config-crud API routes to ApiV2Stack
-  - [ ] 4.1 Create Lambda function resource for config-crud
+- [x] 4. Add config-crud API routes to ApiV2Stack
+  - [x] 4.1 Create Lambda function resource for config-crud
     - Add SSM parameter for Lambda version
     - Create IAM role with DynamoDB permissions for configurations table
     - Create Lambda function resource
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6_
   
-  - [ ] 4.2 Add API routes for config-crud
+  - [x] 4.2 Add API routes for config-crud
     - POST /v1/models/{model}/configs - create
     - GET /v1/models/{model}/configs - list
     - GET /v1/models/{model}/configs/{config_id} - get
