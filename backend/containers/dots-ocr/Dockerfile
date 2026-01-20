@@ -68,6 +68,7 @@ RUN pip3 install --no-cache-dir \
 
 # Install transformers and dependencies for dots.ocr (Qwen2.5-VL based)
 # qwen-vl-utils provides process_vision_info for image processing
+# Install dots.ocr from GitHub which includes custom model code
 RUN pip3 install --no-cache-dir \
     transformers \
     accelerate \
@@ -75,6 +76,9 @@ RUN pip3 install --no-cache-dir \
     pdf2image \
     pillow \
     boto3
+
+# Install dots.ocr package from GitHub (includes custom processor code)
+RUN pip3 install --no-cache-dir git+https://github.com/rednote-hilab/dots.ocr.git
 
 # Copy task script
 COPY task.py /app/task.py
@@ -88,11 +92,11 @@ ENV TRANSFORMERS_CACHE=/app/cache
 USER appuser
 
 # Pre-download dots.ocr model using huggingface_hub
-# Model is saved to /app/weights/dots-ocr
+# Model is saved to /app/weights/DotsOCR (no periods in directory name per their docs)
 RUN python3 -c "\
 from huggingface_hub import snapshot_download; \
 print('Downloading dots.ocr model...'); \
-snapshot_download(repo_id='rednote-hilab/dots.ocr', local_dir='/app/weights/dots-ocr'); \
+snapshot_download(repo_id='rednote-hilab/dots.ocr', local_dir='/app/weights/DotsOCR'); \
 print('Model pre-downloaded successfully')"
 
 # Force offline mode AFTER model is downloaded

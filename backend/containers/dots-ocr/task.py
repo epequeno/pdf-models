@@ -43,7 +43,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Model path (pre-downloaded during container build)
-MODEL_PATH = "/app/weights/dots-ocr"
+# Note: Directory name must not contain periods per dots.ocr docs
+MODEL_PATH = "/app/weights/DotsOCR"
 
 # Default prompt for layout detection + OCR
 DEFAULT_PROMPT = """Please output the layout information from the PDF image, including each layout element's bbox, its category, and the corresponding text content within the bbox.
