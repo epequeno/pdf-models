@@ -87,8 +87,8 @@ class ModelStack(Stack):
         # VPC and networking information from deployed NetworkingStack
         # These values are from the deployed NetworkingStack SSM parameters
         vpc_id = "vpc-0dde40d8bf398e14c"
-        isolated_subnet_ids = ["subnet-04a204ceff9880907", "subnet-0c304190e2352482f"]
-        ecs_security_group_id = "sg-0a8df0846d1a6fc96"
+        public_subnet_ids = ["subnet-037c39991710e65fe", "subnet-07f18d485a5b526f4"]
+        ecs_security_group_id = "sg-09bb04212e4eae721"
 
         # Import security group
         ecs_security_group = ec2.SecurityGroup.from_security_group_id(
@@ -101,7 +101,7 @@ class ModelStack(Stack):
             "ImportedVpc",
             vpc_id=vpc_id,
             availability_zones=["us-east-1a", "us-east-1b"],  # Must match subnet AZs
-            isolated_subnet_ids=isolated_subnet_ids,
+            public_subnet_ids=public_subnet_ids,
         )
 
         # Create ECS cluster using the shared VPC from NetworkingStack
@@ -199,7 +199,7 @@ class ModelStack(Stack):
                 auto_scaling_group_name=f"{CONFIG.PROJECT_NAME}-{model_name}-asg",
                 vpc=vpc,
                 vpc_subnets=ec2.SubnetSelection(
-                    subnet_type=ec2.SubnetType.PRIVATE_ISOLATED
+                    subnet_type=ec2.SubnetType.PUBLIC
                 ),
                 instance_type=ec2.InstanceType(model_config.instance_type),
                 machine_image=ecs.EcsOptimizedImage.amazon_linux2023(
@@ -210,6 +210,8 @@ class ModelStack(Stack):
                 security_group=ecs_security_group,
                 role=instance_role,
                 spot_price=str(0.25) if model_config.spot_enabled else None,  # ~25% above typical spot
+                # Public subnet instances need public IPs to access AWS services
+                associate_public_ip_address=True,
                 # Configure root volume size for large container images
                 block_devices=[
                     autoscaling.BlockDevice(
@@ -539,6 +541,7 @@ def handler(event, context):
         # that containers can parse to apply custom environment variables
         if model_config.use_gpu:
             # EC2 with GPU: Use CapacityProviderStrategy instead of LaunchType
+            # EC2 instances in public subnets get public IPs via ASG configuration
             run_task_params = {
                 "Cluster": cluster.cluster_arn,
                 "TaskDefinition.$": "$.task_definition_arn",
@@ -550,7 +553,7 @@ def handler(event, context):
                 ],
                 "NetworkConfiguration": {
                     "AwsvpcConfiguration": {
-                        "Subnets": isolated_subnet_ids,
+                        "Subnets": public_subnet_ids,
                         "SecurityGroups": [ecs_security_group_id],
                     }
                 },
@@ -573,7 +576,7 @@ def handler(event, context):
                 },
             }
         else:
-            # Fargate: Use LaunchType
+            # Fargate: Use LaunchType with public IP for AWS service access
             run_task_params = {
                 "Cluster": cluster.cluster_arn,
                 "TaskDefinition.$": "$.task_definition_arn",
@@ -581,9 +584,9 @@ def handler(event, context):
                 "PlatformVersion": "LATEST",
                 "NetworkConfiguration": {
                     "AwsvpcConfiguration": {
-                        "Subnets": isolated_subnet_ids,
+                        "Subnets": public_subnet_ids,
                         "SecurityGroups": [ecs_security_group_id],
-                        "AssignPublicIp": "DISABLED",
+                        "AssignPublicIp": "ENABLED",  # Required for public subnet access to AWS services
                     }
                 },
                 "Overrides": {
