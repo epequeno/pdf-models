@@ -416,7 +416,7 @@ configurationDecoder =
 
 configurationsListDecoder : Decoder (List Types.Configuration)
 configurationsListDecoder =
-    Decode.field "configs" (Decode.list configurationDecoder)
+    Decode.field "configurations" (Decode.list configurationDecoder)
 
 
 approvalStatusDecoder : Decoder Types.ApprovalStatus
