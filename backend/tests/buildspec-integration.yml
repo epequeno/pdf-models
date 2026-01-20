@@ -22,9 +22,11 @@ phases:
   build:
     commands:
       # Note: pre_build already did 'cd backend', so we're already in the backend dir
+      # Convert hyphens to underscores in MODEL name for test file matching
       - |
         if [ -n "$MODEL" ]; then
-          uv run pytest tests/integration/test_${MODEL}_e2e.py -v -s --tb=short --junitxml=test-results/integration-results.xml
+          MODEL_FILE=$(echo "$MODEL" | tr '-' '_')
+          uv run pytest tests/integration/test_${MODEL_FILE}_e2e.py -v -s --tb=short --junitxml=test-results/integration-results.xml
         else
           uv run pytest tests/integration/ -v -s --tb=short --junitxml=test-results/integration-results.xml
         fi
