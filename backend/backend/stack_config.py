@@ -146,6 +146,22 @@ MODELS: dict[str, ModelConfig] = {
         max_capacity=2,
         ebs_volume_size_gb=80,  # 1.7B model + transformers
     ),
+    "lightonocr": ModelConfig(
+        name="lightonocr",
+        cpu=4096,  # 4 vCPU on g4dn.xlarge
+        memory_mib=15360,  # 15GB (leave headroom from 16GB instance)
+        container_path="lightonocr",
+        output_formats=("markdown",),  # Clean text output
+        timeout_minutes=30,  # Very fast inference
+        supports_prompt=False,  # OCR-focused, no custom prompts
+        use_gpu=True,
+        gpu_count=1,
+        instance_type="g4dn.xlarge",  # 1 T4 GPU, 4 vCPU, 16GB RAM
+        spot_enabled=True,
+        min_capacity=0,  # Scale to zero when idle
+        max_capacity=2,
+        ebs_volume_size_gb=60,  # ~2GB model + container overhead
+    ),
 }
 
 
