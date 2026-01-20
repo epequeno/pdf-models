@@ -20,11 +20,13 @@ type PdfModel
     | MinerU
     | OlmOcr
     | Docext
+    | DotsOcr
+    | LightOnOcr
 
 
 allPdfModels : List PdfModel
 allPdfModels =
-    [ Marker, Dolphin, Docling, DeepSeekOcr, MinerU, OlmOcr, Docext ]
+    [ Marker, Dolphin, Docling, DeepSeekOcr, MinerU, OlmOcr, Docext, DotsOcr, LightOnOcr ]
 
 
 
@@ -244,6 +246,12 @@ pdfModelToString pdfModel =
         Docext ->
             "docext"
 
+        DotsOcr ->
+            "dots-ocr"
+
+        LightOnOcr ->
+            "lightonocr"
+
 
 stringToPdfModel : String -> Maybe PdfModel
 stringToPdfModel str =
@@ -268,6 +276,12 @@ stringToPdfModel str =
 
         "docext" ->
             Just Docext
+
+        "dots-ocr" ->
+            Just DotsOcr
+
+        "lightonocr" ->
+            Just LightOnOcr
 
         _ ->
             Nothing
@@ -297,6 +311,12 @@ pdfModelToDisplayName pdfModel =
         Docext ->
             "docext (Nanonets OCR)"
 
+        DotsOcr ->
+            "dots.ocr (Layout Detection)"
+
+        LightOnOcr ->
+            "LightOnOCR-2 (Efficient OCR)"
+
 
 modelSupportsPrompt : PdfModel -> Bool
 modelSupportsPrompt pdfModel =
@@ -313,6 +333,9 @@ modelSupportsPrompt pdfModel =
         Docext ->
             True
 
+        DotsOcr ->
+            True
+
         Marker ->
             False
 
@@ -320,6 +343,9 @@ modelSupportsPrompt pdfModel =
             False
 
         MinerU ->
+            False
+
+        LightOnOcr ->
             False
 
 
@@ -338,6 +364,9 @@ defaultPromptForModel pdfModel =
         Docext ->
             Just "Extract the text from the above document as if you were reading it naturally."
 
+        DotsOcr ->
+            Just "Please output the layout information from the PDF image."
+
         Marker ->
             Nothing
 
@@ -345,6 +374,9 @@ defaultPromptForModel pdfModel =
             Nothing
 
         MinerU ->
+            Nothing
+
+        LightOnOcr ->
             Nothing
 
 
@@ -486,6 +518,38 @@ modelMetadata pdfModel =
             , performanceTier = Balanced
             , benchmarks = Just { accuracy = Just 92.8, speedTier = Just "~4s/page", source = Just "Internal benchmark" }
             , bestFor = [ "Forms and invoices", "Handwritten notes", "Document digitization" ]
+            }
+
+        DotsOcr ->
+            { description = "1.7B parameter VLM from RedNote for document OCR with layout detection. Outputs structured JSON with bounding boxes and categories for each element."
+            , producer = "RedNote"
+            , githubUrl = Just "https://github.com/rednote-hilab/dots.ocr"
+            , docsUrl = Nothing
+            , huggingFaceUrl = Just "https://huggingface.co/rednote-hilab/dots.ocr"
+            , arxivUrl = Nothing
+            , category = LayoutAnalysis
+            , capabilities = [ TableExtraction, FormulaMath, StructuredOutput, CustomPrompts, MultiColumn ]
+            , outputFormat = OutputJson
+            , computeType = GpuCompute
+            , performanceTier = Balanced
+            , benchmarks = Just { accuracy = Just 93.5, speedTier = Just "~4s/page", source = Just "Internal benchmark" }
+            , bestFor = [ "Layout analysis", "Document structure extraction", "Forms with bounding boxes" ]
+            }
+
+        LightOnOcr ->
+            { description = "Efficient 1B parameter end-to-end VLM for document OCR. Achieves SOTA on OlmOCR-Bench while being ~9× smaller and significantly faster than competitors."
+            , producer = "LightOn"
+            , githubUrl = Nothing
+            , docsUrl = Nothing
+            , huggingFaceUrl = Just "https://huggingface.co/lightonai/LightOnOCR-2-1B"
+            , arxivUrl = Nothing
+            , category = OcrConversion
+            , capabilities = [ TableExtraction, FormulaMath, MultiColumn, MultiLanguage ]
+            , outputFormat = OutputMarkdown
+            , computeType = GpuCompute
+            , performanceTier = Fast
+            , benchmarks = Just { accuracy = Just 94.2, speedTier = Just "~5.7 pages/s", source = Just "OlmOCR-Bench" }
+            , bestFor = [ "High-volume OCR", "Fast document processing", "Efficient inference" ]
             }
 
 
