@@ -313,7 +313,7 @@ This implementation plan follows a phased approach:
     - Check admin status from JWT claims
     - _Requirements: 11.1_
 
-- [-] 15. Final checkpoint - Feature complete
+- [x] 15. Final checkpoint - Feature complete
   - Ensure all tests pass, ask the user if questions arise.
   - Build frontend: `cd frontend && ./build.sh`
   - Commit and push all changes

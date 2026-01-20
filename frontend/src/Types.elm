@@ -860,6 +860,7 @@ type Msg
     | ToggleConfigVisibilityFilter Visibility
     | ToggleConfigModelFilter PdfModel
     | ClearConfigFilters
+    | ShowModelSelector
     | ShowCreateConfigForm PdfModel
     | HideConfigForm
     | EditConfig Configuration

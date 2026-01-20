@@ -232,7 +232,7 @@ viewConfigList model =
                     ]
                 ]
                 [ Button.button Button.Secondary "Refresh" FetchConfigs
-                , Button.button Button.Primary "+ New Config" (ShowCreateConfigForm defaultPdfModel)
+                , Button.button Button.Primary "+ New Config" ShowModelSelector
                 ]
             ]
         , viewFilters model.configs
@@ -656,7 +656,7 @@ viewEmptyState =
                 ]
             ]
             [ text "Create a custom configuration to customize how models process your documents" ]
-        , Button.button Button.Primary "Create Configuration" (ShowCreateConfigForm defaultPdfModel)
+        , Button.button Button.Primary "Create Configuration" ShowModelSelector
         ]
 
 

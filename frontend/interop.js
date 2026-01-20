@@ -18,9 +18,10 @@ function isDevMode() {
 }
 
 // Mock tokens for dev mode (never expire - set to year 2099)
+// idToken includes pdf-models-admins group for admin panel access
 const DEV_MOCK_TOKENS = {
     accessToken: 'dev-mock-access-token',
-    idToken: 'dev-mock-id-token',
+    idToken: 'dev-mock-id-token-pdf-models-admins',
     refreshToken: 'dev-mock-refresh-token',
     expiresAt: 4102444800000  // Year 2099
 };

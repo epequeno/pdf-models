@@ -1417,6 +1417,19 @@ update msg model =
             in
             ( { model | configs = newConfigs }, Cmd.none )
 
+        ShowModelSelector ->
+            let
+                oldConfigs =
+                    model.configs
+
+                newConfigs =
+                    { oldConfigs
+                        | showCreateForm = True
+                        , editingConfig = Nothing
+                    }
+            in
+            ( { model | configs = newConfigs }, Cmd.none )
+
         ShowCreateConfigForm pdfModel ->
             let
                 oldConfigs =
