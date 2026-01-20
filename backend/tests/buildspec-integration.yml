@@ -16,7 +16,7 @@ phases:
   pre_build:
     commands:
       - cd backend
-      - uv sync
+      - uv sync --all-extras
       - uv run python tests/integration/setup_test_user.py "$TEST_USER_EMAIL" "$TEST_USER_PASSWORD"
 
   build:
