@@ -209,7 +209,7 @@ class ModelStack(Stack):
                 max_capacity=model_config.max_capacity,
                 security_group=ecs_security_group,
                 role=instance_role,
-                spot_price=str(0.20) if model_config.spot_enabled else None,  # ~25% above typical spot
+                spot_price=str(0.25) if model_config.spot_enabled else None,  # ~25% above typical spot
                 # Configure root volume size for large container images
                 block_devices=[
                     autoscaling.BlockDevice(
