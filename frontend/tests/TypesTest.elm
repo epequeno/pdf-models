@@ -120,12 +120,12 @@ modelFilterTests =
                 \_ ->
                     filterByCategory [ OcrConversion ] allPdfModels
                         |> List.map pdfModelToString
-                        |> Expect.equal [ "marker", "deepseek-ocr", "olmocr", "docext" ]
+                        |> Expect.equal [ "marker", "deepseek-ocr", "olmocr", "docext", "lightonocr" ]
             , test "filters to LayoutAnalysis models" <|
                 \_ ->
                     filterByCategory [ LayoutAnalysis ] allPdfModels
                         |> List.map pdfModelToString
-                        |> Expect.equal [ "dolphin" ]
+                        |> Expect.equal [ "dolphin", "dots-ocr" ]
             , test "filters to DocumentUnderstanding models" <|
                 \_ ->
                     filterByCategory [ DocumentUnderstanding ] allPdfModels
@@ -135,7 +135,7 @@ modelFilterTests =
                 \_ ->
                     filterByCategory [ OcrConversion, LayoutAnalysis ] allPdfModels
                         |> List.length
-                        |> Expect.equal 5
+                        |> Expect.equal 7
             ]
         , describe "filterByCapabilities"
             [ test "returns all models when no capabilities specified" <|
@@ -151,7 +151,7 @@ modelFilterTests =
                 \_ ->
                     filterByCapabilities [ CustomPrompts ] allPdfModels
                         |> List.map pdfModelToString
-                        |> Expect.equal [ "dolphin", "deepseek-ocr", "olmocr", "docext" ]
+                        |> Expect.equal [ "dolphin", "deepseek-ocr", "olmocr", "docext", "dots-ocr" ]
             ]
         , describe "filterByComputeType"
             [ test "returns all models when no compute types specified" <|
@@ -167,7 +167,7 @@ modelFilterTests =
                 \_ ->
                     filterByComputeType [ GpuCompute ] allPdfModels
                         |> List.map pdfModelToString
-                        |> Expect.equal [ "dolphin", "deepseek-ocr", "olmocr", "docext" ]
+                        |> Expect.equal [ "dolphin", "deepseek-ocr", "olmocr", "docext", "dots-ocr", "lightonocr" ]
             ]
         , describe "filterBySearch"
             [ test "returns all models when search query is empty" <|
