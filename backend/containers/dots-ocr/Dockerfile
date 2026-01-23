@@ -30,6 +30,9 @@ RUN pip3 install --no-cache-dir \
 RUN pip3 install --no-cache-dir packaging wheel
 RUN pip3 install flash-attn --no-build-isolation
 
+# Install dots.ocr package from GitHub (requires CUDA dev tools for compilation)
+RUN pip3 install --no-cache-dir git+https://github.com/rednote-hilab/dots.ocr.git
+
 # Runtime stage - smaller image without build tools
 FROM nvcr.io/nvidia/cuda:12.1.0-runtime-ubuntu22.04
 
@@ -68,7 +71,6 @@ RUN pip3 install --no-cache-dir \
 
 # Install transformers and dependencies for dots.ocr (Qwen2.5-VL based)
 # qwen-vl-utils provides process_vision_info for image processing
-# Install dots.ocr from GitHub which includes custom model code
 RUN pip3 install --no-cache-dir \
     transformers \
     accelerate \
@@ -76,9 +78,6 @@ RUN pip3 install --no-cache-dir \
     pdf2image \
     pillow \
     boto3
-
-# Install dots.ocr package from GitHub (includes custom processor code)
-RUN pip3 install --no-cache-dir git+https://github.com/rednote-hilab/dots.ocr.git
 
 # Copy task script
 COPY task.py /app/task.py
