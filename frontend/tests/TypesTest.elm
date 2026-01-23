@@ -51,6 +51,18 @@ pdfModelConversionTests =
                 \_ ->
                     pdfModelToString Docext
                         |> Expect.equal "docext"
+            , test "converts DotsOcr to 'dots-ocr'" <|
+                \_ ->
+                    pdfModelToString DotsOcr
+                        |> Expect.equal "dots-ocr"
+            , test "converts LightOnOcr to 'lightonocr'" <|
+                \_ ->
+                    pdfModelToString LightOnOcr
+                        |> Expect.equal "lightonocr"
+            , test "converts PaddleOcr to 'paddleocr'" <|
+                \_ ->
+                    pdfModelToString PaddleOcr
+                        |> Expect.equal "paddleocr"
             ]
         , describe "stringToPdfModel"
             [ test "parses 'marker' to Marker" <|
@@ -81,6 +93,18 @@ pdfModelConversionTests =
                 \_ ->
                     stringToPdfModel "docext"
                         |> Expect.equal (Just Docext)
+            , test "parses 'dots-ocr' to DotsOcr" <|
+                \_ ->
+                    stringToPdfModel "dots-ocr"
+                        |> Expect.equal (Just DotsOcr)
+            , test "parses 'lightonocr' to LightOnOcr" <|
+                \_ ->
+                    stringToPdfModel "lightonocr"
+                        |> Expect.equal (Just LightOnOcr)
+            , test "parses 'paddleocr' to PaddleOcr" <|
+                \_ ->
+                    stringToPdfModel "paddleocr"
+                        |> Expect.equal (Just PaddleOcr)
             , test "returns Nothing for unknown model" <|
                 \_ ->
                     stringToPdfModel "unknown"

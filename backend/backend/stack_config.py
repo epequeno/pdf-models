@@ -162,6 +162,22 @@ MODELS: dict[str, ModelConfig] = {
         max_capacity=2,
         ebs_volume_size_gb=60,  # ~2GB model + container overhead
     ),
+    "paddleocr": ModelConfig(
+        name="paddleocr",
+        cpu=4096,  # 4 vCPU
+        memory_mib=15360,  # 15GB (leave headroom from 16GB instance)
+        container_path="paddleocr",
+        output_formats=("markdown", "json"),  # Text + structured layout with bboxes
+        timeout_minutes=30,
+        supports_prompt=False,  # OCR-focused, no custom prompts
+        use_gpu=True,  # PaddleOCR benefits from GPU acceleration
+        gpu_count=1,
+        instance_type="g4dn.xlarge",
+        spot_enabled=True,
+        min_capacity=0,  # Scale to zero when idle
+        max_capacity=2,
+        ebs_volume_size_gb=60,  # Models + container overhead
+    ),
 }
 
 

@@ -22,11 +22,12 @@ type PdfModel
     | Docext
     | DotsOcr
     | LightOnOcr
+    | PaddleOcr
 
 
 allPdfModels : List PdfModel
 allPdfModels =
-    [ Marker, Dolphin, Docling, DeepSeekOcr, MinerU, OlmOcr, Docext, DotsOcr, LightOnOcr ]
+    [ Marker, Dolphin, Docling, DeepSeekOcr, MinerU, OlmOcr, Docext, DotsOcr, LightOnOcr, PaddleOcr ]
 
 
 
@@ -252,6 +253,9 @@ pdfModelToString pdfModel =
         LightOnOcr ->
             "lightonocr"
 
+        PaddleOcr ->
+            "paddleocr"
+
 
 stringToPdfModel : String -> Maybe PdfModel
 stringToPdfModel str =
@@ -282,6 +286,9 @@ stringToPdfModel str =
 
         "lightonocr" ->
             Just LightOnOcr
+
+        "paddleocr" ->
+            Just PaddleOcr
 
         _ ->
             Nothing
@@ -317,6 +324,9 @@ pdfModelToDisplayName pdfModel =
         LightOnOcr ->
             "LightOnOCR-2 (Efficient OCR)"
 
+        PaddleOcr ->
+            "PaddleOCR (Multilingual OCR)"
+
 
 modelSupportsPrompt : PdfModel -> Bool
 modelSupportsPrompt pdfModel =
@@ -348,6 +358,9 @@ modelSupportsPrompt pdfModel =
         LightOnOcr ->
             False
 
+        PaddleOcr ->
+            False
+
 
 defaultPromptForModel : PdfModel -> Maybe String
 defaultPromptForModel pdfModel =
@@ -377,6 +390,9 @@ defaultPromptForModel pdfModel =
             Nothing
 
         LightOnOcr ->
+            Nothing
+
+        PaddleOcr ->
             Nothing
 
 
@@ -550,6 +566,22 @@ modelMetadata pdfModel =
             , performanceTier = Fast
             , benchmarks = Just { accuracy = Just 94.2, speedTier = Just "~5.7 pages/s", source = Just "OlmOCR-Bench" }
             , bestFor = [ "High-volume OCR", "Fast document processing", "Efficient inference" ]
+            }
+
+        PaddleOcr ->
+            { description = "Practical ultra-lightweight OCR system from PaddlePaddle. Provides high-accuracy text detection and recognition for 80+ languages with efficient inference speeds and structured layout output."
+            , producer = "PaddlePaddle"
+            , githubUrl = Just "https://github.com/PaddlePaddle/PaddleOCR"
+            , docsUrl = Just "https://paddlepaddle.github.io/PaddleOCR/"
+            , huggingFaceUrl = Nothing
+            , arxivUrl = Nothing
+            , category = OcrConversion
+            , capabilities = [ MultiLanguage, StructuredOutput, MultiColumn ]
+            , outputFormat = OutputMarkdown
+            , computeType = GpuCompute
+            , performanceTier = Fast
+            , benchmarks = Just { accuracy = Just 92.0, speedTier = Just "~3s/page", source = Just "Internal benchmark" }
+            , bestFor = [ "Multilingual OCR", "Fast text extraction", "Rotated documents" ]
             }
 
 
