@@ -3,9 +3,10 @@ module Views.Upload exposing (view)
 {-| Upload page with sidebar layout matching Pencil design (r1Bae)
 
 Layout structure:
-- AppLayout wrapper with sidebar (280px)
-- Header: Breadcrumb + Title + Actions (search, notification)
-- Content split: Left (main form) + Right panel (360px - recent jobs)
+
+  - AppLayout wrapper with sidebar (280px)
+  - Header: Breadcrumb + Title + Actions (search, notification)
+  - Content split: Left (main form) + Right panel (360px - recent jobs)
 
 -}
 
@@ -615,7 +616,7 @@ recentJobItem totalJobs index job =
                 , flexShrink (int 0)
                 ]
             ]
-            [ Icon.icon iconName (Icon.Small) iconColor ]
+            [ Icon.icon iconName Icon.Small iconColor ]
 
         -- Job info
         , div

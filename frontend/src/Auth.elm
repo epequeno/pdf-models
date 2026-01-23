@@ -21,8 +21,9 @@ port module Auth exposing
     )
 
 import Json.Decode as Decode exposing (Decoder)
-import Json.Decode.Pipeline exposing (required, optional)
+import Json.Decode.Pipeline exposing (optional, required)
 import Json.Encode as Encode
+
 
 
 -- PORTS

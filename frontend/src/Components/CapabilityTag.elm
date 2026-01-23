@@ -1,4 +1,4 @@
-module Components.CapabilityTag exposing (capabilityTag, capabilityTagWithLabel, capabilityIcon)
+module Components.CapabilityTag exposing (capabilityIcon, capabilityTag, capabilityTagWithLabel)
 
 import Css exposing (..)
 import Html.Styled exposing (..)

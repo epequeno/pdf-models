@@ -5,6 +5,10 @@ cd "$(dirname "$0")"
 
 echo "Building PDF Models frontend..."
 
+# Format Elm code
+echo "Formatting Elm code..."
+elm-format src/ --yes
+
 # Clean and create dst directory
 rm -rf dst
 mkdir -p dst

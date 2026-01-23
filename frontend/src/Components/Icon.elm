@@ -1,16 +1,16 @@
 module Components.Icon exposing
     ( Icon(..)
-    , icon
     , Size(..)
+    , icon
     )
 
 {-| Icon component using Lucide icons
 
-This module provides a wrapper for Lucide icons (https://lucide.dev/)
+This module provides a wrapper for Lucide icons (<https://lucide.dev/>)
 Icons are rendered using the lucide icon font which should be included in index.html
 
 Usage:
-    import Components.Icon as Icon
+import Components.Icon as Icon
 
     Icon.icon Icon.Upload Icon.Medium colors.primary
 

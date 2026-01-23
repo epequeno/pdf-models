@@ -1,4 +1,4 @@
-module Components.PerformanceIndicator exposing (performanceIndicator, performanceIndicatorCompact, benchmarkDisplay)
+module Components.PerformanceIndicator exposing (benchmarkDisplay, performanceIndicator, performanceIndicatorCompact)
 
 import Css exposing (..)
 import Html.Styled exposing (..)

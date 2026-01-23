@@ -1,4 +1,4 @@
-module Components.Sidebar exposing (sidebar, SidebarConfig)
+module Components.Sidebar exposing (SidebarConfig, sidebar)
 
 {-| Sidebar component matching Pencil design (zemze)
 

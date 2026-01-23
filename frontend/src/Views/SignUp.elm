@@ -446,7 +446,7 @@ formActions model =
             ]
         ]
         [ -- Create account button
-          (if model.auth == Authenticating then
+          if model.auth == Authenticating then
             styled Html.Styled.button
                 [ width (pct 100)
                 , displayFlex
@@ -467,7 +467,7 @@ formActions model =
                 ]
                 [ text "Creating account..." ]
 
-           else
+          else
             styled Html.Styled.button
                 [ width (pct 100)
                 , displayFlex
@@ -490,7 +490,6 @@ formActions model =
                 , Attr.type_ "submit"
                 ]
                 [ text "Create account" ]
-          )
 
         -- Divider with "or"
         , div

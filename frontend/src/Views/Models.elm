@@ -388,10 +388,12 @@ viewStat value label isSuccess =
                 , fontWeight (int 500)
                 , color
                     (if isSuccess then
-                        hex "4ADE80" -- $--success
+                        hex "4ADE80"
+                        -- $--success
 
                      else
-                        hex "FAF8F5" -- $--foreground
+                        hex "FAF8F5"
+                     -- $--foreground
                     )
                 ]
             ]
@@ -408,6 +410,7 @@ viewStat value label isSuccess =
             ]
             [ text label ]
         ]
+
 
 
 -- HELPER FUNCTIONS

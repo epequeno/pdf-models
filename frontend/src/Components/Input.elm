@@ -1,7 +1,7 @@
 module Components.Input exposing
     ( InputConfig
-    , TextareaConfig
     , PasswordConfig
+    , TextareaConfig
     , input
     , password
     , textarea

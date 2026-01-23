@@ -237,7 +237,8 @@ viewPendingItem model config =
             , cursor pointer
             , Styles.transitions.base
             , if isSelected then
-                backgroundColor (rgba 201 169 98 0.063) -- $--active-bg
+                backgroundColor (rgba 201 169 98 0.063)
+                -- $--active-bg
 
               else
                 backgroundColor transparent
@@ -665,6 +666,7 @@ viewInfoField label value =
         ]
 
 
+
 -- HELPER FUNCTIONS
 
 
@@ -714,7 +716,16 @@ visibilityToString visibility =
 
 configToJsonPreview : Configuration -> String
 configToJsonPreview config =
-    "{\n  \"model\": \"" ++ pdfModelShortName config.model ++ "\",\n  \"visibility\": \"" ++ visibilityToString config.visibility ++ "\",\n  \"prompt\": " ++ (case config.inferenceParams.prompt of
-        Just p -> "\"" ++ String.left 40 p ++ "...\""
-        Nothing -> "null"
-    ) ++ "\n  ...\n}"
+    "{\n  \"model\": \""
+        ++ pdfModelShortName config.model
+        ++ "\",\n  \"visibility\": \""
+        ++ visibilityToString config.visibility
+        ++ "\",\n  \"prompt\": "
+        ++ (case config.inferenceParams.prompt of
+                Just p ->
+                    "\"" ++ String.left 40 p ++ "...\""
+
+                Nothing ->
+                    "null"
+           )
+        ++ "\n  ...\n}"

@@ -1,4 +1,4 @@
-module Components.SearchInput exposing (searchInput, Config)
+module Components.SearchInput exposing (Config, searchInput)
 
 {-| SearchInput component matching Pencil design (dTmHX)
 

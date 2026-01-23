@@ -1,9 +1,9 @@
 module Components.Button exposing
     ( ButtonStyle(..)
     , button
+    , buttonDisabled
     , buttonWithIcon
     , iconButton
-    , buttonDisabled
     )
 
 {-| Button component matching Pencil design specifications

@@ -1,21 +1,22 @@
-module Components.AppLayout exposing (view, Config)
+module Components.AppLayout exposing (Config, view)
 
 {-| AppLayout - Main application layout with sidebar navigation
 
 This component provides the standard authenticated page layout structure:
-- Sidebar navigation (280px fixed width)
-- Main content area (flexible width)
+
+  - Sidebar navigation (280px fixed width)
+  - Main content area (flexible width)
 
 Based on Pencil design node: Upload (r1Bae) and other authenticated pages
 
 -}
 
+import Components.Icon as Icon
+import Components.NavItem as NavItem
+import Components.Sidebar as Sidebar
 import Css exposing (..)
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (css)
-import Components.Sidebar as Sidebar
-import Components.NavItem as NavItem
-import Components.Icon as Icon
 import Types exposing (Route(..))
 
 

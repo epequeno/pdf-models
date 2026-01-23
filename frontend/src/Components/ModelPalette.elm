@@ -117,7 +117,8 @@ paletteItem config =
                      else
                         rgba 0 0 0 0
                     )
-                , borderLeft3 (px 2) solid
+                , borderLeft3 (px 2)
+                    solid
                     (if config.isSelected then
                         Styles.colors.accent
 

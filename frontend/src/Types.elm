@@ -10,6 +10,7 @@ import Time
 import Url
 
 
+
 -- PDF MODELS
 
 
@@ -843,6 +844,7 @@ initAdminConfigsState =
     , processing = False
     }
 
+
 type alias DownloadError =
     { jobId : String
     , message : String
@@ -1094,6 +1096,7 @@ isAdmin model =
 
         _ ->
             False
+
 
 
 -- Model filtering helpers

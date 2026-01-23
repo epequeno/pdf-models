@@ -1,10 +1,10 @@
 module Components.Table exposing
-    ( table
-    , headerRow
-    , headerCell
-    , row
+    ( Column
     , cell
-    , Column
+    , headerCell
+    , headerRow
+    , row
+    , table
     , tableFromColumns
     )
 

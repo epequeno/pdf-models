@@ -418,7 +418,7 @@ formActions model =
             ]
         ]
         [ -- Sign in button
-          (if model.auth == Authenticating then
+          if model.auth == Authenticating then
             styled Html.Styled.button
                 [ width (pct 100)
                 , displayFlex
@@ -439,7 +439,7 @@ formActions model =
                 ]
                 [ text "Signing in..." ]
 
-           else
+          else
             styled Html.Styled.button
                 [ width (pct 100)
                 , displayFlex
@@ -462,7 +462,6 @@ formActions model =
                 , Attr.type_ "submit"
                 ]
                 [ text "Sign in" ]
-          )
 
         -- Divider with "or"
         , div

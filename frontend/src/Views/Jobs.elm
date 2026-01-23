@@ -48,6 +48,7 @@ viewJobsContent model =
         -- Jobs table or empty state
         , if List.isEmpty model.jobs.jobs && not model.jobs.loading then
             viewEmptyState
+
           else
             viewJobsTable model
 
@@ -227,6 +228,7 @@ viewJobsTable model =
         , div []
             (if model.jobs.loading then
                 [ viewLoadingRow ]
+
              else
                 List.map (viewJobRow model.currentTime) model.jobs.jobs
             )
@@ -246,6 +248,7 @@ tableHeaderCell label width =
             , color (hex "C9A962") -- $--primary
             , if width > 0 then
                 Css.width (px (toFloat width))
+
               else
                 flex (int 1)
             ]
@@ -268,13 +271,13 @@ viewJobRow currentTime job =
             ]
         ]
         [ -- Job ID (truncated)
-          tableCell (truncateJobId job.id) 120 ["JetBrains Mono", "monospace"] 12 (hex "FAF8F5")
+          tableCell (truncateJobId job.id) 120 [ "JetBrains Mono", "monospace" ] 12 (hex "FAF8F5")
 
         -- Filename
-        , tableCell (displayJobName job) 0 ["Manrope", "sans-serif"] 13 (hex "FAF8F5")
+        , tableCell (displayJobName job) 0 [ "Manrope", "sans-serif" ] 13 (hex "FAF8F5")
 
         -- Model
-        , tableCell (pdfModelShortName job.pdfModel) 140 ["Manrope", "sans-serif"] 13 (hex "888888")
+        , tableCell (pdfModelShortName job.pdfModel) 140 [ "Manrope", "sans-serif" ] 13 (hex "888888")
 
         -- Status badge
         , div
@@ -288,7 +291,7 @@ viewJobRow currentTime job =
             [ viewStatusBadge job.status ]
 
         -- Submitted date
-        , tableCell (formatRelativeTime currentTime job.submittedAt) 150 ["Manrope", "sans-serif"] 12 (hex "888888")
+        , tableCell (formatRelativeTime currentTime job.submittedAt) 150 [ "Manrope", "sans-serif" ] 12 (hex "888888")
 
         -- Actions
         , div
@@ -360,6 +363,7 @@ tableCell content width fontStack fontSize textColor =
             , color textColor
             , if width > 0 then
                 Css.width (px (toFloat width))
+
               else
                 flex (int 1)
             ]
@@ -510,6 +514,7 @@ viewFooter model =
                 [ Icon.icon Icon.ChevronRight Icon.Small (hex "666666") ]
             ]
         ]
+
 
 
 -- HELPER FUNCTIONS

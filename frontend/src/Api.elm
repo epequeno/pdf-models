@@ -28,6 +28,7 @@ import Time
 import Types exposing (..)
 
 
+
 -- CONFIGURATION
 
 
@@ -105,6 +106,7 @@ getJob accessToken pdfModel jobId toMsg =
         , timeout = Nothing
         , tracker = Nothing
         }
+
 
 
 -- GET JOBS

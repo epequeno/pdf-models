@@ -58,6 +58,7 @@ viewConfigsContent model =
         -- Configurations table or empty state
         , if List.isEmpty model.configs.configurations && not model.configs.loading then
             viewEmptyState
+
           else
             viewConfigsTable model
         ]
@@ -230,6 +231,7 @@ viewConfigsTable model =
         , div []
             (if model.configs.loading then
                 [ viewLoadingRow ]
+
              else
                 List.map viewConfigRow model.configs.configurations
             )
@@ -249,6 +251,7 @@ tableHeaderCell label width =
             , color (hex "C9A962") -- $--primary
             , if width > 0 then
                 Css.width (px (toFloat width))
+
               else
                 flex (int 1)
             ]
@@ -309,7 +312,7 @@ viewConfigRow config =
             ]
 
         -- Model
-        , tableCell (pdfModelShortName config.model) 140 ["Manrope", "sans-serif"] 13 (hex "888888")
+        , tableCell (pdfModelShortName config.model) 140 [ "Manrope", "sans-serif" ] 13 (hex "888888")
 
         -- Visibility badge
         , div
@@ -334,7 +337,7 @@ viewConfigRow config =
             [ viewStatusBadge config.approvalStatus ]
 
         -- Usage count
-        , tableCell "0" 80 ["JetBrains Mono", "monospace"] 13 (hex "FAF8F5")
+        , tableCell "0" 80 [ "JetBrains Mono", "monospace" ] 13 (hex "FAF8F5")
 
         -- Actions
         , div
@@ -413,6 +416,7 @@ tableCell content width fontStack fontSize textColor =
             , color textColor
             , if width > 0 then
                 Css.width (px (toFloat width))
+
               else
                 flex (int 1)
             ]
@@ -529,6 +533,7 @@ viewEmptyState =
             , text "Create Configuration"
             ]
         ]
+
 
 
 -- HELPER FUNCTIONS

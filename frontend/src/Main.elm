@@ -1,15 +1,15 @@
 module Main exposing (main)
 
+import Api
+import Auth
 import Browser
 import Browser.Events
 import Browser.Navigation as Nav
 import Components.ModelPalette exposing (modelPalette)
 import Css.Global
+import File
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (..)
-import Api
-import Auth
-import File
 import Http
 import Json.Decode as Decode
 import S3
@@ -20,13 +20,13 @@ import Time
 import Types exposing (..)
 import Url
 import Url.Parser as Parser exposing ((</>), Parser)
+import Views.AdminConfigs
+import Views.Configs
 import Views.Jobs
 import Views.Login
 import Views.Models
 import Views.SignUp
 import Views.Upload
-import Views.Configs
-import Views.AdminConfigs
 
 
 main : Program Flags Model Msg
@@ -2147,7 +2147,7 @@ subscriptions model =
 
                         else
                             Sub.none
-                            -- Stop polling after max attempts
+                        -- Stop polling after max attempts
 
                     else
                         Sub.none
@@ -2156,6 +2156,7 @@ subscriptions model =
         timeUpdateSub =
             if model.route == Jobs then
                 Time.every (30 * 1000) CurrentTimeReceived
+
             else
                 Sub.none
 

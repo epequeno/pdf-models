@@ -14,8 +14,8 @@ import Types
         , ComputeType(..)
         , ModelMetadata
         , PdfModel
-        , categoryToString
         , capabilityToString
+        , categoryToString
         , computeTypeToString
         , modelMetadata
         , outputFormatToString
@@ -130,7 +130,8 @@ modelCardCompact config =
         cardStyle =
             batch
                 [ backgroundColor Styles.colors.surface
-                , border3 (px 1) solid
+                , border3 (px 1)
+                    solid
                     (if config.isSelected then
                         Styles.colors.accent
 
@@ -201,7 +202,8 @@ modelCardExpanded config =
     div
         [ css
             [ backgroundColor Styles.colors.surface
-            , border3 (px 1) solid
+            , border3 (px 1)
+                solid
                 (if config.isSelected then
                     Styles.colors.accent
 
@@ -486,7 +488,8 @@ comparisonCheckbox isChecked onToggle model =
                  else
                     Styles.colors.surface
                 )
-            , border3 (px 1) solid
+            , border3 (px 1)
+                solid
                 (if isChecked then
                     Styles.colors.accent
 
