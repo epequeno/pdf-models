@@ -4,8 +4,16 @@
 A serverless platform for hosting open-source document processing models as API services. Users submit documents, get structured results back. No infrastructure management required.
 
 ## Documentation
+
+**Backend:**
 - **[Architecture Documentation](backend/docs/architecture.md)** - Detailed technical design, patterns, and implementation guide
 - **[AI Agent Guide (AGENTS.md)](AGENTS.md)** - Critical requirements for AI agents (AWS_PROFILE, uv usage, common pitfalls)
+
+**Frontend:**
+- **[Design Brief (DESIGN_BRIEF.md)](DESIGN_BRIEF.md)** - Visual design system and component specifications
+- **[Implementation Plan (frontend/IMPLEMENTATION_PLAN.md)](frontend/IMPLEMENTATION_PLAN.md)** - Complete frontend redesign implementation status
+- **[Browser Testing (frontend/docs/BROWSER_TESTING.md)](frontend/docs/BROWSER_TESTING.md)** - Using agent-browser for UI testing
+- **[Deployment (frontend/docs/DEPLOYMENT.md)](frontend/docs/DEPLOYMENT.md)** - S3/CloudFront deployment guide
 
 ## Key Concepts
 
