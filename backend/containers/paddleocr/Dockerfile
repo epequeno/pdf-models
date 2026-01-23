@@ -46,10 +46,8 @@ ENV HOME=/app
 
 USER appuser
 
-# Pre-download PaddleOCR models during build (detection, recognition, angle classification)
-# This downloads models to avoid runtime downloads
-RUN python3 -c "from paddleocr import PaddleOCR; PaddleOCR(use_angle_cls=True, lang='en')" && \
-    echo "PaddleOCR models pre-downloaded successfully"
+# Note: PaddleOCR models will be downloaded on first run due to version incompatibility
+# with pre-download during build. Models are cached in /app/.paddleocr directory.
 
 # Set NVIDIA environment variables for GPU
 ENV NVIDIA_VISIBLE_DEVICES=all
