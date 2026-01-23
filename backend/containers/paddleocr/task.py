@@ -99,7 +99,6 @@ def load_paddleocr_model():
     ocr = PaddleOCR(
         use_angle_cls=True,  # Enable angle classification for rotated text
         lang='en',  # English language models
-        use_gpu=True,  # Enable GPU acceleration
         show_log=False  # Reduce log verbosity
     )
 

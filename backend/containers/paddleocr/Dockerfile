@@ -48,7 +48,7 @@ USER appuser
 
 # Pre-download PaddleOCR models during build (detection, recognition, angle classification)
 # This downloads models to avoid runtime downloads
-RUN python3 -c "from paddleocr import PaddleOCR; PaddleOCR(use_angle_cls=True, lang='en', use_gpu=True)" && \
+RUN python3 -c "from paddleocr import PaddleOCR; PaddleOCR(use_angle_cls=True, lang='en')" && \
     echo "PaddleOCR models pre-downloaded successfully"
 
 # Set NVIDIA environment variables for GPU
