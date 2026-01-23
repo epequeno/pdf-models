@@ -61,6 +61,8 @@ def _load_config() -> Dict[str, Optional[str]]:
         "dynamodb_table": os.getenv("DYNAMODB_TABLE") or _get_ssm_parameter("/pdf-models/core/dynamodb-table-name", region),
         "test_email": os.getenv("TEST_USER_EMAIL"),
         "test_password": os.getenv("TEST_USER_PASSWORD"),
+        "admin_email": os.getenv("ADMIN_USER_EMAIL"),
+        "admin_password": os.getenv("ADMIN_USER_PASSWORD"),
     }
 
     return config
@@ -126,6 +128,43 @@ def auth_tokens(config, cognito_client):
         pytest.fail(f"User {config['test_email']} not found. Run setup script to create test user.")
     except Exception as e:
         pytest.fail(f"Unexpected error during authentication: {e}")
+
+
+@pytest.fixture(scope="session")
+def admin_auth_tokens(config, cognito_client):
+    """
+    Authenticate admin user with Cognito and return tokens.
+
+    This fixture requires ADMIN_USER_EMAIL and ADMIN_USER_PASSWORD environment variables.
+    The admin user must be in the 'pdf-models-admins' Cognito group.
+
+    Returns the same structure as auth_tokens but for an admin user.
+    """
+    if not config.get("admin_email") or not config.get("admin_password"):
+        pytest.skip("ADMIN_USER_EMAIL and ADMIN_USER_PASSWORD environment variables not set")
+
+    try:
+        response = cognito_client.initiate_auth(
+            ClientId=config["client_id"],
+            AuthFlow="USER_PASSWORD_AUTH",
+            AuthParameters={
+                "USERNAME": config["admin_email"],
+                "PASSWORD": config["admin_password"],
+            },
+        )
+
+        tokens = response["AuthenticationResult"]
+        return {
+            "access_token": tokens["AccessToken"],
+            "id_token": tokens["IdToken"],
+            "refresh_token": tokens["RefreshToken"],
+        }
+    except cognito_client.exceptions.NotAuthorizedException:
+        pytest.fail(f"Admin authentication failed for user {config['admin_email']}. Check credentials.")
+    except cognito_client.exceptions.UserNotFoundException:
+        pytest.fail(f"Admin user {config['admin_email']} not found. Create admin user and add to pdf-models-admins group.")
+    except Exception as e:
+        pytest.fail(f"Unexpected error during admin authentication: {e}")
 
 
 @pytest.fixture(scope="session")

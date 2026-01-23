@@ -34,6 +34,7 @@ class APIClient:
         s3_input_key: str,
         start_processing: bool = True,
         prompt: Optional[str] = None,
+        config_id: Optional[str] = None,
     ) -> Dict:
         """
         Submit a new processing job with existing S3 key.
@@ -44,6 +45,7 @@ class APIClient:
             start_processing: Whether to start processing immediately (default: True)
             prompt: Optional custom prompt for VLM models (dolphin, deepseek-ocr).
                    If not provided, the model uses its default prompt.
+            config_id: Optional configuration ID for custom model parameters
 
         Returns:
             Job details including job_id
@@ -60,6 +62,10 @@ class APIClient:
         # Add prompt if provided (for VLM models)
         if prompt is not None:
             payload["prompt"] = prompt
+
+        # Add config_id if provided
+        if config_id is not None:
+            payload["config_id"] = config_id
 
         response = self.session.post(url, json=payload)
         response.raise_for_status()
@@ -124,6 +130,167 @@ class APIClient:
         url = f"{self.base_url}/models/{model}/jobs"
 
         response = self.session.get(url)
+        response.raise_for_status()
+
+        return response.json()
+
+    # Configuration API methods
+
+    def create_config(
+        self,
+        model: str,
+        name: str,
+        description: Optional[str] = None,
+        inference_params: Optional[Dict] = None,
+        infra_params: Optional[Dict] = None,
+        visibility: str = "private",
+    ) -> Dict:
+        """
+        Create a new configuration.
+
+        Args:
+            model: Model name (e.g., "marker")
+            name: Configuration name
+            description: Optional description
+            inference_params: Optional inference parameters (prompt, output_format, custom_env_vars)
+            infra_params: Optional infrastructure parameters (cpu, memory_mib, etc.)
+            visibility: "private" or "public" (default: "private")
+
+        Returns:
+            Created configuration details
+
+        Raises:
+            requests.HTTPError: If the request fails
+        """
+        url = f"{self.base_url}/models/{model}/configs"
+        payload = {"name": name, "visibility": visibility}
+
+        if description:
+            payload["description"] = description
+        if inference_params:
+            payload["inference_params"] = inference_params
+        if infra_params:
+            payload["infra_params"] = infra_params
+
+        response = self.session.post(url, json=payload)
+        response.raise_for_status()
+
+        return response.json()
+
+    def list_configs(self, model: str) -> Dict:
+        """
+        List all configurations for the authenticated user.
+
+        Args:
+            model: Model name (e.g., "marker")
+
+        Returns:
+            Dictionary with "configurations" key containing list of configs
+
+        Raises:
+            requests.HTTPError: If the request fails
+        """
+        url = f"{self.base_url}/models/{model}/configs"
+
+        response = self.session.get(url)
+        response.raise_for_status()
+
+        return response.json()
+
+    def get_config(self, model: str, config_id: str) -> Dict:
+        """
+        Get configuration details.
+
+        Args:
+            model: Model name (e.g., "marker")
+            config_id: Configuration UUID
+
+        Returns:
+            Configuration details
+
+        Raises:
+            requests.HTTPError: If the request fails
+        """
+        url = f"{self.base_url}/models/{model}/configs/{config_id}"
+
+        response = self.session.get(url)
+        response.raise_for_status()
+
+        return response.json()
+
+    def delete_config(self, model: str, config_id: str) -> None:
+        """
+        Delete a configuration.
+
+        Args:
+            model: Model name (e.g., "marker")
+            config_id: Configuration UUID
+
+        Raises:
+            requests.HTTPError: If the request fails
+        """
+        url = f"{self.base_url}/models/{model}/configs/{config_id}"
+
+        response = self.session.delete(url)
+        response.raise_for_status()
+
+    # Admin API methods
+
+    def list_pending_configs(self) -> Dict:
+        """
+        List all pending configurations (admin only).
+
+        Returns:
+            Dictionary with "configurations" key containing list of pending configs
+
+        Raises:
+            requests.HTTPError: If the request fails
+        """
+        url = f"{self.base_url}/admin/configs/pending"
+
+        response = self.session.get(url)
+        response.raise_for_status()
+
+        return response.json()
+
+    def approve_config(self, config_id: str) -> Dict:
+        """
+        Approve a configuration (admin only).
+
+        Args:
+            config_id: Configuration UUID
+
+        Returns:
+            Updated configuration details
+
+        Raises:
+            requests.HTTPError: If the request fails
+        """
+        url = f"{self.base_url}/admin/configs/{config_id}/approve"
+
+        response = self.session.post(url)
+        response.raise_for_status()
+
+        return response.json()
+
+    def reject_config(self, config_id: str, reason: str) -> Dict:
+        """
+        Reject a configuration (admin only).
+
+        Args:
+            config_id: Configuration UUID
+            reason: Rejection reason
+
+        Returns:
+            Updated configuration details
+
+        Raises:
+            requests.HTTPError: If the request fails
+        """
+        url = f"{self.base_url}/admin/configs/{config_id}/reject"
+        payload = {"reason": reason}
+
+        response = self.session.post(url, json=payload)
         response.raise_for_status()
 
         return response.json()
