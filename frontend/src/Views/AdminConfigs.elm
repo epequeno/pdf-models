@@ -1,26 +1,61 @@
 module Views.AdminConfigs exposing (view)
 
+import Components.AppLayout as AppLayout
+import Components.Badge as Badge
 import Components.Button as Button
+import Components.Icon as Icon
+import Components.Input as Input
+import Components.Tabs as Tabs
 import Css exposing (..)
 import Html.Styled exposing (..)
-import Html.Styled.Attributes as Attr exposing (css, href, placeholder, type_, value)
+import Html.Styled.Attributes exposing (css, href, placeholder, value)
 import Html.Styled.Events exposing (onClick, onInput)
 import Styles
-import Time
-import Types exposing (AdminConfigsState, ApprovalStatus(..), Configuration, Model, Msg(..), PdfModel, Route(..), Visibility(..), defaultPdfModel, pdfModelToDisplayName, routeToPath)
+import Types
+    exposing
+        ( ApprovalStatus(..)
+        , Configuration
+        , Model
+        , Msg(..)
+        , Route(..)
+        , Visibility(..)
+        , pdfModelToDisplayName
+        )
 
 
 view : Model -> Html Msg
 view model =
+    AppLayout.view
+        { currentRoute = AdminConfigs
+        , userName = "Admin User"
+        , userEmail = "admin@example.com"
+        , showUpgradeCard = False
+        , isAdmin = True
+        , onSignOut = SignOutClicked
+        }
+        [ viewAdminConfigsContent model
+        ]
+
+
+viewAdminConfigsContent : Model -> Html Msg
+viewAdminConfigsContent model =
     div
         [ css
-            [ Styles.containerStyle
-            , paddingTop Styles.spacing.xxxl
-            , minHeight (vh 100)
+            [ displayFlex
+            , flexDirection column
+            , property "gap" "24px"
+            , height (pct 100)
+            , width (pct 100)
             ]
         ]
-        [ viewHeader
-        , viewContent model
+        [ -- Header section
+          viewHeader
+
+        -- Tabs
+        , viewTabs
+
+        -- Content area (pending list + detail panel)
+        , viewContentArea model
         ]
 
 
@@ -28,782 +63,658 @@ viewHeader : Html Msg
 viewHeader =
     div
         [ css
-            [ Styles.flexBetween
-            , marginBottom Styles.spacing.xxl
+            [ displayFlex
+            , flexDirection column
+            , property "gap" "8px"
+            , width (pct 100)
             ]
         ]
-        [ div []
-            [ a
-                [ href (routeToPath (Upload defaultPdfModel))
-                , css
-                    [ Styles.textH1
-                    , color Styles.colors.textPrimary
-                    , textDecoration none
-                    , hover [ color Styles.colors.accent ]
-                    ]
+        [ -- Breadcrumb
+          div
+            [ css
+                [ fontFamilies Styles.fontStack
+                , fontSize (px 12)
+                , fontWeight normal
+                , color (hex "666666") -- $--foreground-subtle
                 ]
-                [ text "PDF Models" ]
-            , p
-                [ css
-                    [ Styles.textSecondary
-                    , margin zero
-                    , marginTop Styles.spacing.xs
-                    ]
-                ]
-                [ text "Admin Panel - Review and approve configurations" ]
             ]
+            [ text "Dashboard / Admin / Configurations" ]
+
+        -- Title section
         , div
             [ css
-                [ Styles.flexRow
-                , Styles.gap Styles.spacing.md
+                [ displayFlex
+                , alignItems center
+                , justifyContent spaceBetween
+                , width (pct 100)
                 ]
             ]
-            [ a
-                [ href (routeToPath Configs)
-                , css
-                    [ padding2 Styles.spacing.sm Styles.spacing.base
-                    , border3 (px 1) solid Styles.colors.border
-                    , borderRadius Styles.radius.md
-                    , color Styles.colors.textSecondary
-                    , textDecoration none
-                    , Css.fontSize Styles.fontSize.body
-                    , Styles.transitions.base
-                    , hover
-                        [ backgroundColor Styles.colors.overlay
-                        , borderColor Styles.colors.borderStrong
-                        ]
-                    ]
-                ]
-                [ text "My Configs" ]
-            , a
-                [ href (routeToPath Jobs)
-                , css
-                    [ padding2 Styles.spacing.sm Styles.spacing.base
-                    , border3 (px 1) solid Styles.colors.border
-                    , borderRadius Styles.radius.md
-                    , color Styles.colors.textSecondary
-                    , textDecoration none
-                    , Css.fontSize Styles.fontSize.body
-                    , Styles.transitions.base
-                    , hover
-                        [ backgroundColor Styles.colors.overlay
-                        , borderColor Styles.colors.borderStrong
-                        ]
-                    ]
-                ]
-                [ text "Dashboard" ]
-            , Button.button Button.Ghost "Sign Out" SignOutClicked
-            ]
-        ]
-
-
-viewContent : Model -> Html Msg
-viewContent model =
-    div []
-        [ div
-            [ css
-                [ Styles.flexBetween
-                , marginBottom Styles.spacing.lg
-                ]
-            ]
-            [ h2
+            [ div
                 [ css
-                    [ Styles.textH1
-                    , margin zero
+                    [ displayFlex
+                    , flexDirection column
+                    , property "gap" "4px"
                     ]
                 ]
-                [ text "Pending Configurations" ]
-            , Button.button Button.Secondary "Refresh" FetchPendingConfigs
+                [ -- Title
+                  div
+                    [ css
+                        [ fontFamilies [ "Playfair Display", .value serif ]
+                        , fontSize (px 32)
+                        , fontWeight (int 500)
+                        , color (hex "FAF8F5") -- $--foreground
+                        ]
+                    ]
+                    [ text "Admin Configurations" ]
+
+                -- Subtitle
+                , div
+                    [ css
+                        [ fontFamilies Styles.fontStack
+                        , fontSize (px 14)
+                        , fontWeight normal
+                        , color (hex "888888") -- $--foreground-muted
+                        ]
+                    ]
+                    [ text "Review and approve public configuration submissions" ]
+                ]
             ]
-        , case model.adminConfigs.error of
-            Just err ->
-                viewAlert Styles.colors.error Styles.colors.errorMuted err
-
-            Nothing ->
-                if model.adminConfigs.loading then
-                    viewLoadingState
-
-                else if List.isEmpty model.adminConfigs.pendingConfigs then
-                    viewEmptyState
-
-                else
-                    viewPendingConfigCards model
-        , viewApproveConfirmation model.adminConfigs.approveConfirmation
-        , viewRejectModal model.adminConfigs
         ]
 
 
+viewTabs : Html Msg
+viewTabs =
+    Tabs.tabs
+        [ { label = "Pending Review"
+          , value = "pending"
+          , isActive = True
+          , onSelect = NoOp
+          }
+        , { label = "Approved"
+          , value = "approved"
+          , isActive = False
+          , onSelect = NoOp
+          }
+        , { label = "Rejected"
+          , value = "rejected"
+          , isActive = False
+          , onSelect = NoOp
+          }
+        ]
 
-viewPendingConfigCards : Model -> Html Msg
-viewPendingConfigCards model =
+
+viewContentArea : Model -> Html Msg
+viewContentArea model =
+    div
+        [ css
+            [ displayFlex
+            , property "gap" "24px"
+            , width (pct 100)
+            , height (pct 100)
+            , flex (int 1)
+            ]
+        ]
+        [ -- Left: Pending list
+          viewPendingList model
+
+        -- Right: Detail panel
+        , viewDetailPanel model
+        ]
+
+
+viewPendingList : Model -> Html Msg
+viewPendingList model =
+    let
+        pendingConfigs =
+            List.filter (\c -> c.approvalStatus == PendingApproval) model.adminConfigs.pendingConfigs
+    in
     div
         [ css
             [ displayFlex
             , flexDirection column
-            , Styles.gap Styles.spacing.md
+            , width (px 400)
+            , height (pct 100)
+            , border3 (px 1) solid (hex "1F1F1F") -- $--border
+            , borderRadius (px 8)
+            , backgroundColor (hex "0A0A0A") -- $--card (using sidebar bg as card)
+            , overflow hidden
             ]
         ]
-        (List.map (viewPendingConfigCard model.currentTime) model.adminConfigs.pendingConfigs)
+        [ -- List header
+          div
+            [ css
+                [ displayFlex
+                , alignItems center
+                , justifyContent spaceBetween
+                , padding (px 16)
+                , borderBottom3 (px 1) solid (hex "1F1F1F") -- $--border
+                ]
+            ]
+            [ div
+                [ css
+                    [ fontFamilies Styles.fontStack
+                    , fontSize (px 14)
+                    , fontWeight (int 600)
+                    , color (hex "FAF8F5") -- $--foreground
+                    ]
+                ]
+                [ text "Pending Queue" ]
+            , Badge.badge Badge.Warning (String.fromInt (List.length pendingConfigs))
+            ]
+
+        -- List items
+        , div
+            [ css
+                [ displayFlex
+                , flexDirection column
+                , height (pct 100)
+                , overflowY auto
+                ]
+            ]
+            (if List.isEmpty pendingConfigs then
+                [ viewEmptyPendingList ]
+
+             else
+                List.map (viewPendingItem model) pendingConfigs
+            )
+        ]
 
 
-viewPendingConfigCard : Time.Posix -> Configuration -> Html Msg
-viewPendingConfigCard currentTime config =
+viewPendingItem : Model -> Configuration -> Html Msg
+viewPendingItem model config =
+    let
+        isSelected =
+            model.adminConfigs.approveConfirmation == Just config.configId
+    in
+    div
+        [ onClick (ShowApproveConfirmation config.configId)
+        , css
+            [ displayFlex
+            , flexDirection column
+            , property "gap" "8px"
+            , padding (px 16)
+            , borderBottom3 (px 1) solid (hex "1F1F1F") -- $--border
+            , cursor pointer
+            , Styles.transitions.base
+            , if isSelected then
+                backgroundColor (rgba 201 169 98 0.063) -- $--active-bg
+
+              else
+                backgroundColor transparent
+            , hover
+                [ backgroundColor (rgba 201 169 98 0.063) -- $--active-bg
+                ]
+            ]
+        ]
+        [ -- Name and badge row
+          div
+            [ css
+                [ displayFlex
+                , alignItems center
+                , justifyContent spaceBetween
+                , width (pct 100)
+                ]
+            ]
+            [ div
+                [ css
+                    [ fontFamilies Styles.fontStack
+                    , fontSize (px 14)
+                    , fontWeight (int 500)
+                    , color (hex "FAF8F5") -- $--foreground
+                    ]
+                ]
+                [ text config.name ]
+            , Badge.badge Badge.Warning "Pending"
+            ]
+
+        -- Meta information
+        , div
+            [ css
+                [ displayFlex
+                , property "gap" "12px"
+                ]
+            ]
+            [ div
+                [ css
+                    [ fontFamilies Styles.fontStack
+                    , fontSize (px 12)
+                    , fontWeight normal
+                    , color (hex "888888") -- $--foreground-muted
+                    ]
+                ]
+                [ text ("Model: " ++ pdfModelShortName config.model) ]
+            , div
+                [ css
+                    [ fontFamilies Styles.fontStack
+                    , fontSize (px 12)
+                    , fontWeight normal
+                    , color (hex "888888") -- $--foreground-muted
+                    ]
+                ]
+                [ text ("By: " ++ config.userId) ]
+            ]
+
+        -- Submitted date
+        , div
+            [ css
+                [ fontFamilies Styles.fontStack
+                , fontSize (px 11)
+                , fontWeight normal
+                , color (hex "666666") -- $--foreground-subtle
+                ]
+            ]
+            [ text "Submitted: Jan 20, 2026" ]
+        ]
+
+
+viewEmptyPendingList : Html Msg
+viewEmptyPendingList =
     div
         [ css
-            [ backgroundColor Styles.colors.surface
-            , border3 (px 1) solid Styles.colors.border
-            , borderRadius Styles.radius.lg
-            , overflow Css.hidden
-            , Styles.transitions.base
-            , hover [ borderColor Styles.colors.borderStrong ]
+            [ displayFlex
+            , flexDirection column
+            , alignItems center
+            , justifyContent center
+            , padding (px 40)
+            , textAlign center
             ]
         ]
-        [ -- Header with name and model
+        [ div
+            [ css
+                [ fontSize (px 48)
+                , marginBottom (px 16)
+                , opacity (num 0.3)
+                ]
+            ]
+            [ text "✅" ]
+        , div
+            [ css
+                [ fontFamilies Styles.fontStack
+                , fontSize (px 14)
+                , color (hex "888888")
+                ]
+            ]
+            [ text "No pending configurations" ]
+        ]
+
+
+viewDetailPanel : Model -> Html Msg
+viewDetailPanel model =
+    let
+        selectedConfig =
+            case model.adminConfigs.approveConfirmation of
+                Just configId ->
+                    List.filter (\c -> c.configId == configId) model.adminConfigs.pendingConfigs
+                        |> List.head
+
+                Nothing ->
+                    Nothing
+    in
+    case selectedConfig of
+        Just config ->
+            viewConfigDetails model config
+
+        Nothing ->
+            viewEmptyDetailPanel
+
+
+viewEmptyDetailPanel : Html Msg
+viewEmptyDetailPanel =
+    div
+        [ css
+            [ displayFlex
+            , flexDirection column
+            , alignItems center
+            , justifyContent center
+            , flex (int 1)
+            , height (pct 100)
+            , border3 (px 1) solid (hex "1F1F1F") -- $--border
+            , borderRadius (px 8)
+            , backgroundColor (hex "0A0A0A") -- $--card
+            ]
+        ]
+        [ div
+            [ css
+                [ fontSize (px 48)
+                , marginBottom (px 16)
+                , opacity (num 0.3)
+                ]
+            ]
+            [ text "📋" ]
+        , div
+            [ css
+                [ fontFamilies Styles.fontStack
+                , fontSize (px 14)
+                , color (hex "888888")
+                ]
+            ]
+            [ text "Select a configuration to review" ]
+        ]
+
+
+viewConfigDetails : Model -> Configuration -> Html Msg
+viewConfigDetails model config =
+    div
+        [ css
+            [ displayFlex
+            , flexDirection column
+            , flex (int 1)
+            , height (pct 100)
+            , border3 (px 1) solid (hex "1F1F1F") -- $--border
+            , borderRadius (px 8)
+            , backgroundColor (hex "0A0A0A") -- $--card
+            , overflow hidden
+            ]
+        ]
+        [ -- Detail header
           div
             [ css
-                [ padding Styles.spacing.lg
-                , Styles.flexBetween
-                , borderBottom3 (px 1) solid Styles.colors.border
+                [ displayFlex
+                , alignItems center
+                , justifyContent spaceBetween
+                , padding (px 20)
+                , borderBottom3 (px 1) solid (hex "1F1F1F") -- $--border
                 ]
             ]
             [ div
                 [ css
-                    [ Styles.flexRow
-                    , Styles.gap Styles.spacing.base
+                    [ fontFamilies Styles.fontStack
+                    , fontSize (px 16)
+                    , fontWeight (int 600)
+                    , color (hex "FAF8F5") -- $--foreground
                     ]
                 ]
-                [ span
-                    [ css
-                        [ fontWeight Styles.fontWeights.medium
-                        , color Styles.colors.textPrimary
-                        , Css.fontSize Styles.fontSize.h2
+                [ text "Configuration Details" ]
+            , button
+                [ onClick CancelApproveConfig
+                , css
+                    [ backgroundColor transparent
+                    , border zero
+                    , padding (px 8)
+                    , cursor pointer
+                    , borderRadius (px 6)
+                    , Styles.transitions.base
+                    , hover
+                        [ backgroundColor (hex "1F1F1F")
                         ]
                     ]
-                    [ text config.name ]
-                , span
-                    [ css
-                        [ Css.fontSize Styles.fontSize.caption
-                        , fontWeight Styles.fontWeights.medium
-                        , color Styles.colors.accent
-                        , backgroundColor Styles.colors.accentMuted
-                        , padding2 Styles.spacing.xs Styles.spacing.sm
-                        , borderRadius Styles.radius.full
-                        ]
-                    ]
-                    [ text (pdfModelToDisplayName config.model) ]
-                , viewVisibilityBadge config.visibility
                 ]
-            , div
-                [ css
-                    [ Styles.flexRow
-                    , Styles.gap Styles.spacing.sm
-                    ]
-                ]
-                [ Button.button Button.Primary "Approve" (ShowApproveConfirmation config.configId)
-                , Button.button Button.Danger "Reject" (ShowRejectModal config.configId)
-                ]
+                [ Icon.icon Icon.X Icon.Medium (hex "666666") ]
             ]
-        , -- User info
-          div
+
+        -- Detail content
+        , div
             [ css
-                [ padding Styles.spacing.lg
-                , backgroundColor Styles.colors.surfaceRaised
+                [ displayFlex
+                , flexDirection column
+                , property "gap" "24px"
+                , padding (px 24)
+                , height (pct 100)
+                , overflowY auto
                 ]
             ]
-            [ div
+            [ -- Config info
+              div
                 [ css
-                    [ Styles.textCaption
-                    , marginBottom Styles.spacing.sm
+                    [ displayFlex
+                    , flexDirection column
+                    , property "gap" "16px"
                     ]
                 ]
-                [ text "SUBMITTED BY" ]
-            , div
-                [ css
-                    [ Styles.textSmall
-                    , color Styles.colors.textSecondary
-                ]
-                ]
-                [ text ("User ID: " ++ config.userId) ]
-            ]
-        , -- Description
-          case config.description of
-            Just desc ->
-                div
+                [ -- Configuration name
+                  div
                     [ css
-                        [ padding Styles.spacing.lg
-                        , borderBottom3 (px 1) solid Styles.colors.border
+                        [ displayFlex
+                        , flexDirection column
+                        , property "gap" "4px"
                         ]
                     ]
                     [ div
                         [ css
-                            [ Styles.textCaption
-                            , marginBottom Styles.spacing.sm
+                            [ fontFamilies Styles.fontStack
+                            , fontSize (px 11)
+                            , fontWeight (int 500)
+                            , letterSpacing (px 0.5)
+                            , color (hex "666666") -- $--foreground-subtle
                             ]
                         ]
-                        [ text "DESCRIPTION" ]
+                        [ text "CONFIGURATION NAME" ]
                     , div
                         [ css
-                            [ Styles.textSmall
-                            , color Styles.colors.textSecondary
+                            [ fontFamilies Styles.fontStack
+                            , fontSize (px 18)
+                            , fontWeight (int 600)
+                            , color (hex "FAF8F5") -- $--foreground
                             ]
                         ]
-                        [ text desc ]
+                        [ text config.name ]
                     ]
 
-            Nothing ->
-                text ""
-        , -- Parameters section
-          div
-            [ css
-                [ padding Styles.spacing.lg
-                ]
-            ]
-            [ div
-                [ css
-                    [ Styles.textCaption
-                    , marginBottom Styles.spacing.md
+                -- Info row (model, visibility, created by)
+                , div
+                    [ css
+                        [ displayFlex
+                        , property "gap" "32px"
+                        , width (pct 100)
+                        ]
+                    ]
+                    [ viewInfoField "Model" (pdfModelShortName config.model)
+                    , viewInfoField "Visibility" (visibilityToString config.visibility)
+                    , viewInfoField "Created By" config.userId
+                    ]
+
+                -- Description
+                , case config.description of
+                    Just desc ->
+                        div
+                            [ css
+                                [ displayFlex
+                                , flexDirection column
+                                , property "gap" "4px"
+                                ]
+                            ]
+                            [ div
+                                [ css
+                                    [ fontFamilies Styles.fontStack
+                                    , fontSize (px 11)
+                                    , fontWeight (int 500)
+                                    , letterSpacing (px 0.5)
+                                    , color (hex "666666") -- $--foreground-subtle
+                                    ]
+                                ]
+                                [ text "DESCRIPTION" ]
+                            , div
+                                [ css
+                                    [ fontFamilies Styles.fontStack
+                                    , fontSize (px 14)
+                                    , fontWeight normal
+                                    , lineHeight (num 1.5)
+                                    , color (hex "FAF8F5") -- $--foreground
+                                    ]
+                                ]
+                                [ text desc ]
+                            ]
+
+                    Nothing ->
+                        text ""
+
+                -- Parameters section
+                , div
+                    [ css
+                        [ displayFlex
+                        , flexDirection column
+                        , property "gap" "8px"
+                        ]
+                    ]
+                    [ div
+                        [ css
+                            [ fontFamilies Styles.fontStack
+                            , fontSize (px 11)
+                            , fontWeight (int 500)
+                            , letterSpacing (px 0.5)
+                            , color (hex "666666") -- $--foreground-subtle
+                            ]
+                        ]
+                        [ text "PARAMETERS" ]
+                    , div
+                        [ css
+                            [ padding (px 16)
+                            , backgroundColor (hex "0F0F0F")
+                            , border3 (px 1) solid (hex "1F1F1F")
+                            , borderRadius (px 6)
+                            , fontFamilies [ "JetBrains Mono", .value monospace ]
+                            , fontSize (px 12)
+                            , color (hex "888888")
+                            , overflowX auto
+                            ]
+                        ]
+                        [ text (configToJsonPreview config) ]
                     ]
                 ]
-                [ text "CONFIGURATION PARAMETERS" ]
+
+            -- Divider
             , div
                 [ css
-                    [ property "display" "grid"
-                    , property "grid-template-columns" "repeat(auto-fill, minmax(200px, 1fr))"
-                    , Styles.gap Styles.spacing.md
+                    [ width (pct 100)
+                    , height (px 1)
+                    , backgroundColor (hex "1F1F1F") -- $--border
                     ]
                 ]
-                [ viewParamCard "Inference Parameters" (viewInferenceParams config)
-                , viewParamCard "Infrastructure Parameters" (viewInfraParams config)
-                , viewParamCard "Resource Estimate" (viewResourceEstimate config)
+                []
+
+            -- Review section
+            , div
+                [ css
+                    [ displayFlex
+                    , flexDirection column
+                    , property "gap" "16px"
+                    ]
+                ]
+                [ div
+                    [ css
+                        [ fontFamilies Styles.fontStack
+                        , fontSize (px 14)
+                        , fontWeight (int 600)
+                        , color (hex "FAF8F5") -- $--foreground
+                        ]
+                    ]
+                    [ text "Review Decision" ]
+
+                -- Review notes textarea
+                , Input.textarea
+                    { label = "Review Notes (optional)"
+                    , value = model.adminConfigs.rejectionReason
+                    , placeholder = "Add notes about your decision..."
+                    , onInput = RejectReasonChanged
+                    , hasError = False
+                    }
+
+                -- Action buttons
+                , div
+                    [ css
+                        [ displayFlex
+                        , justifyContent flexEnd
+                        , property "gap" "12px"
+                        , width (pct 100)
+                        ]
+                    ]
+                    [ Button.buttonWithIcon
+                        Button.Danger
+                        Icon.X
+                        "Reject"
+                        (Types.ConfirmApproveConfig config.configId)
+                    , Button.buttonWithIcon
+                        Button.Primary
+                        Icon.Check
+                        "Approve"
+                        (Types.ConfirmApproveConfig config.configId)
+                    ]
                 ]
             ]
-        , -- Footer with timestamp
-          div
-            [ css
-                [ padding Styles.spacing.base
-                , backgroundColor Styles.colors.surfaceRaised
-                , borderTop3 (px 1) solid Styles.colors.border
-                , Styles.textSmall
-                , color Styles.colors.textTertiary
-                ]
-            ]
-            [ text ("Submitted " ++ formatRelativeTime currentTime config.createdAt) ]
         ]
 
 
-viewParamCard : String -> Html msg -> Html msg
-viewParamCard title content =
+viewInfoField : String -> String -> Html Msg
+viewInfoField label value =
     div
         [ css
-            [ backgroundColor Styles.colors.surfaceRaised
-            , border3 (px 1) solid Styles.colors.border
-            , borderRadius Styles.radius.md
-            , padding Styles.spacing.base
+            [ displayFlex
+            , flexDirection column
+            , property "gap" "4px"
             ]
         ]
         [ div
             [ css
-                [ Styles.textCaption
-                , marginBottom Styles.spacing.sm
-                , color Styles.colors.textTertiary
+                [ fontFamilies Styles.fontStack
+                , fontSize (px 11)
+                , fontWeight (int 500)
+                , letterSpacing (px 0.5)
+                , color (hex "666666") -- $--foreground-subtle
                 ]
             ]
-            [ text title ]
-        , content
-        ]
-
-
-viewInferenceParams : Configuration -> Html msg
-viewInferenceParams config =
-    div
-        [ css
-            [ Styles.textSmall
-            , color Styles.colors.textSecondary
-            ]
-        ]
-        [ case config.inferenceParams.prompt of
-            Just prompt ->
-                div [ css [ marginBottom Styles.spacing.xs ] ]
-                    [ span [ css [ fontWeight Styles.fontWeights.medium ] ] [ text "Prompt: " ]
-                    , text (truncateText 50 prompt)
-                    ]
-
-            Nothing ->
-                text ""
-        , case config.inferenceParams.outputFormat of
-            Just format ->
-                div [ css [ marginBottom Styles.spacing.xs ] ]
-                    [ span [ css [ fontWeight Styles.fontWeights.medium ] ] [ text "Format: " ]
-                    , text format
-                    ]
-
-            Nothing ->
-                text ""
-        , if List.isEmpty config.inferenceParams.customEnvVars then
-            text ""
-
-          else
-            div []
-                [ span [ css [ fontWeight Styles.fontWeights.medium ] ] [ text "Custom Vars: " ]
-                , text (String.fromInt (List.length config.inferenceParams.customEnvVars))
-                ]
-        , if config.inferenceParams.prompt == Nothing && config.inferenceParams.outputFormat == Nothing && List.isEmpty config.inferenceParams.customEnvVars then
-            span [ css [ color Styles.colors.textTertiary, fontStyle italic ] ] [ text "Default" ]
-
-          else
-            text ""
-        ]
-
-
-viewInfraParams : Configuration -> Html msg
-viewInfraParams config =
-    let
-        params =
-            config.infraParams
-    in
-    div
-        [ css
-            [ Styles.textSmall
-            , color Styles.colors.textSecondary
-            ]
-        ]
-        [ case params.cpu of
-            Just cpu ->
-                div [ css [ marginBottom Styles.spacing.xs ] ]
-                    [ span [ css [ fontWeight Styles.fontWeights.medium ] ] [ text "CPU: " ]
-                    , text (String.fromInt cpu ++ " units")
-                    ]
-
-            Nothing ->
-                text ""
-        , case params.memoryMib of
-            Just mem ->
-                div [ css [ marginBottom Styles.spacing.xs ] ]
-                    [ span [ css [ fontWeight Styles.fontWeights.medium ] ] [ text "Memory: " ]
-                    , text (String.fromInt mem ++ " MiB")
-                    ]
-
-            Nothing ->
-                text ""
-        , case params.gpuCount of
-            Just gpu ->
-                div [ css [ marginBottom Styles.spacing.xs ] ]
-                    [ span [ css [ fontWeight Styles.fontWeights.medium ] ] [ text "GPU: " ]
-                    , text (String.fromInt gpu)
-                    ]
-
-            Nothing ->
-                text ""
-        , case params.timeoutMinutes of
-            Just timeout ->
-                div [ css [ marginBottom Styles.spacing.xs ] ]
-                    [ span [ css [ fontWeight Styles.fontWeights.medium ] ] [ text "Timeout: " ]
-                    , text (String.fromInt timeout ++ " min")
-                    ]
-
-            Nothing ->
-                text ""
-        , case params.ephemeralStorageGib of
-            Just storage ->
-                div [ css [ marginBottom Styles.spacing.xs ] ]
-                    [ span [ css [ fontWeight Styles.fontWeights.medium ] ] [ text "Storage: " ]
-                    , text (String.fromInt storage ++ " GiB")
-                    ]
-
-            Nothing ->
-                text ""
-        , case params.spotEnabled of
-            Just True ->
-                div [ css [ marginBottom Styles.spacing.xs ] ]
-                    [ span [ css [ fontWeight Styles.fontWeights.medium ] ] [ text "Spot: " ]
-                    , text "Enabled"
-                    ]
-
-            _ ->
-                text ""
-        , if params.cpu == Nothing && params.memoryMib == Nothing && params.gpuCount == Nothing then
-            span [ css [ color Styles.colors.textTertiary, fontStyle italic ] ] [ text "Default" ]
-
-          else
-            text ""
-        ]
-
-
-viewResourceEstimate : Configuration -> Html msg
-viewResourceEstimate config =
-    let
-        params =
-            config.infraParams
-
-        -- Simple cost estimation (rough approximation)
-        cpuCost =
-            Maybe.withDefault 256 params.cpu |> toFloat |> (\c -> c / 1024 * 0.04)
-
-        memoryCost =
-            Maybe.withDefault 512 params.memoryMib |> toFloat |> (\m -> m / 1024 * 0.004)
-
-        gpuCost =
-            Maybe.withDefault 0 params.gpuCount |> toFloat |> (\g -> g * 0.50)
-
-        hourlyEstimate =
-            cpuCost + memoryCost + gpuCost
-
-        hasGpu =
-            Maybe.withDefault 0 params.gpuCount > 0
-    in
-    div
-        [ css
-            [ Styles.textSmall
-            , color Styles.colors.textSecondary
-            ]
-        ]
-        [ div [ css [ marginBottom Styles.spacing.xs ] ]
-            [ span [ css [ fontWeight Styles.fontWeights.medium ] ] [ text "Est. Cost: " ]
-            , text ("~$" ++ String.left 5 (String.fromFloat hourlyEstimate) ++ "/hr")
-            ]
-        , div [ css [ marginBottom Styles.spacing.xs ] ]
-            [ span [ css [ fontWeight Styles.fontWeights.medium ] ] [ text "Compute: " ]
-            , text
-                (if hasGpu then
-                    "GPU Instance"
-
-                 else
-                    "Fargate"
-                )
-            ]
+            [ text label ]
         , div
             [ css
-                [ marginTop Styles.spacing.sm
-                , padding Styles.spacing.xs
-                , backgroundColor
-                    (if hasGpu then
-                        Styles.colors.warningMuted
-
-                     else
-                        Styles.colors.successMuted
-                    )
-                , borderRadius Styles.radius.sm
-                , Css.fontSize Styles.fontSize.caption
-                , color
-                    (if hasGpu then
-                        Styles.colors.warning
-
-                     else
-                        Styles.colors.success
-                    )
+                [ fontFamilies Styles.fontStack
+                , fontSize (px 14)
+                , fontWeight normal
+                , color (hex "FAF8F5") -- $--foreground
                 ]
             ]
-            [ text
-                (if hasGpu then
-                    "⚠️ GPU resources"
-
-                 else
-                    "✓ Standard resources"
-                )
-            ]
+            [ text value ]
         ]
 
 
-viewVisibilityBadge : Visibility -> Html msg
-viewVisibilityBadge visibility =
-    let
-        ( icon, label ) =
-            case visibility of
-                Private ->
-                    ( "🔒", "Private" )
-
-                Public ->
-                    ( "🌐", "Public" )
-    in
-    span
-        [ css
-            [ Css.fontSize Styles.fontSize.caption
-            , color Styles.colors.textTertiary
-            , Styles.flexRow
-            , Styles.gap Styles.spacing.xs
-            ]
-        ]
-        [ text icon
-        , text label
-        ]
+-- HELPER FUNCTIONS
 
 
-viewAlert : Color -> Color -> String -> Html msg
-viewAlert textColor bgColor message =
-    div
-        [ css
-            [ backgroundColor bgColor
-            , border3 (px 1) solid textColor
-            , borderRadius Styles.radius.md
-            , padding Styles.spacing.base
-            , marginBottom Styles.spacing.lg
-            ]
-        ]
-        [ span
-            [ css [ color textColor, Css.fontSize Styles.fontSize.body ] ]
-            [ text message ]
-        ]
+pdfModelShortName : Types.PdfModel -> String
+pdfModelShortName model =
+    case model of
+        Types.Marker ->
+            "Marker"
+
+        Types.Dolphin ->
+            "Dolphin"
+
+        Types.Docling ->
+            "Docling"
+
+        Types.DeepSeekOcr ->
+            "DeepSeek OCR"
+
+        Types.MinerU ->
+            "MinerU"
+
+        Types.OlmOcr ->
+            "olmocr"
+
+        Types.Docext ->
+            "docext"
+
+        Types.DotsOcr ->
+            "dots.ocr"
+
+        Types.LightOnOcr ->
+            "LightOnOCR-2"
+
+        Types.PaddleOcr ->
+            "PaddleOCR"
 
 
-viewLoadingState : Html msg
-viewLoadingState =
-    div
-        [ css
-            [ backgroundColor Styles.colors.surface
-            , border3 (px 1) solid Styles.colors.border
-            , borderRadius Styles.radius.lg
-            , padding Styles.spacing.massive
-            , textAlign center
-            ]
-        ]
-        [ div
-            [ css
-                [ Css.fontSize (px 48)
-                , marginBottom Styles.spacing.lg
-                , opacity (num 0.3)
-                ]
-            ]
-            [ text "..." ]
-        , h3
-            [ css
-                [ Styles.textH2
-                , marginBottom Styles.spacing.sm
-                ]
-            ]
-            [ text "Loading pending configurations..." ]
-        ]
+visibilityToString : Visibility -> String
+visibilityToString visibility =
+    case visibility of
+        Private ->
+            "Private"
+
+        Public ->
+            "Public"
 
 
-viewEmptyState : Html msg
-viewEmptyState =
-    div
-        [ css
-            [ backgroundColor Styles.colors.surface
-            , border3 (px 1) solid Styles.colors.border
-            , borderRadius Styles.radius.lg
-            , padding Styles.spacing.massive
-            , textAlign center
-            ]
-        ]
-        [ div
-            [ css
-                [ Css.fontSize (px 48)
-                , marginBottom Styles.spacing.lg
-                , opacity (num 0.3)
-                ]
-            ]
-            [ text "✓" ]
-        , h3
-            [ css
-                [ Styles.textH2
-                , marginBottom Styles.spacing.sm
-                ]
-            ]
-            [ text "No pending configurations" ]
-        , p
-            [ css
-                [ Styles.textSecondary
-                , margin zero
-                ]
-            ]
-            [ text "All configurations have been reviewed" ]
-        ]
-
-
-viewApproveConfirmation : Maybe String -> Html Msg
-viewApproveConfirmation maybeConfigId =
-    case maybeConfigId of
-        Just configId ->
-            div
-                [ css
-                    [ position fixed
-                    , top zero
-                    , left zero
-                    , right zero
-                    , bottom zero
-                    , backgroundColor (rgba 0 0 0 0.7)
-                    , displayFlex
-                    , alignItems center
-                    , justifyContent center
-                    , property "z-index" "1000"
-                    , property "backdrop-filter" "blur(4px)"
-                    ]
-                ]
-                [ div
-                    [ css
-                        [ backgroundColor Styles.colors.surfaceRaised
-                        , border3 (px 1) solid Styles.colors.border
-                        , borderRadius Styles.radius.xl
-                        , padding Styles.spacing.xxl
-                        , maxWidth (px 400)
-                        , Css.width (pct 90)
-                        ]
-                    ]
-                    [ h3
-                        [ css
-                            [ Styles.textH2
-                            , marginBottom Styles.spacing.md
-                            ]
-                        ]
-                        [ text "Approve Configuration?" ]
-                    , p
-                        [ css
-                            [ Styles.textSecondary
-                            , marginBottom Styles.spacing.xl
-                            ]
-                        ]
-                        [ text "This will register a new ECS task definition and allow the user to submit jobs with this configuration." ]
-                    , div
-                        [ css
-                            [ Styles.flexRow
-                            , justifyContent flexEnd
-                            , Styles.gap Styles.spacing.md
-                            ]
-                        ]
-                        [ Button.button Button.Secondary "Cancel" CancelApproveConfig
-                        , Button.button Button.Primary "Approve" (ConfirmApproveConfig configId)
-                        ]
-                    ]
-                ]
-
-        Nothing ->
-            text ""
-
-
-viewRejectModal : AdminConfigsState -> Html Msg
-viewRejectModal adminState =
-    case adminState.rejectingConfigId of
-        Just configId ->
-            div
-                [ css
-                    [ position fixed
-                    , top zero
-                    , left zero
-                    , right zero
-                    , bottom zero
-                    , backgroundColor (rgba 0 0 0 0.7)
-                    , displayFlex
-                    , alignItems center
-                    , justifyContent center
-                    , property "z-index" "1000"
-                    , property "backdrop-filter" "blur(4px)"
-                    ]
-                ]
-                [ div
-                    [ css
-                        [ backgroundColor Styles.colors.surfaceRaised
-                        , border3 (px 1) solid Styles.colors.border
-                        , borderRadius Styles.radius.xl
-                        , padding Styles.spacing.xxl
-                        , maxWidth (px 500)
-                        , Css.width (pct 90)
-                        ]
-                    ]
-                    [ h3
-                        [ css
-                            [ Styles.textH2
-                            , marginBottom Styles.spacing.md
-                            ]
-                        ]
-                        [ text "Reject Configuration" ]
-                    , p
-                        [ css
-                            [ Styles.textSecondary
-                            , marginBottom Styles.spacing.lg
-                            ]
-                        ]
-                        [ text "Please provide a reason for rejection. This will be shown to the user." ]
-                    , textarea
-                        [ value adminState.rejectionReason
-                        , onInput RejectReasonChanged
-                        , placeholder "Enter rejection reason..."
-                        , Attr.rows 4
-                        , css
-                            [ Css.width (pct 100)
-                            , padding Styles.spacing.base
-                            , backgroundColor Styles.colors.surfaceRaised
-                            , border3 (px 1) solid Styles.colors.border
-                            , borderRadius Styles.radius.md
-                            , color Styles.colors.textPrimary
-                            , fontFamilies Styles.fontStack
-                            , Css.fontSize Styles.fontSize.body
-                            , marginBottom Styles.spacing.lg
-                            , resize vertical
-                            , Styles.transitions.base
-                            , hover [ borderColor Styles.colors.borderStrong ]
-                            , focus [ borderColor Styles.colors.borderFocus, Styles.focusRing ]
-                            ]
-                        ]
-                        []
-                    , div
-                        [ css
-                            [ Styles.flexRow
-                            , justifyContent flexEnd
-                            , Styles.gap Styles.spacing.md
-                            ]
-                        ]
-                        [ Button.button Button.Secondary "Cancel" CancelRejectConfig
-                        , if String.isEmpty (String.trim adminState.rejectionReason) then
-                            Button.buttonDisabled Button.Danger "Reject"
-
-                          else
-                            Button.button Button.Danger "Reject" (ConfirmRejectConfig configId adminState.rejectionReason)
-                        ]
-                    ]
-                ]
-
-        Nothing ->
-            text ""
-
-
-
--- HELPERS
-
-
-truncateText : Int -> String -> String
-truncateText maxLen text =
-    if String.length text > maxLen then
-        String.left maxLen text ++ "..."
-
-    else
-        text
-
-
-formatRelativeTime : Time.Posix -> Time.Posix -> String
-formatRelativeTime now then_ =
-    let
-        diffMs =
-            Time.posixToMillis now - Time.posixToMillis then_
-
-        diffSeconds =
-            diffMs // 1000
-
-        diffMinutes =
-            diffSeconds // 60
-
-        diffHours =
-            diffMinutes // 60
-
-        diffDays =
-            diffHours // 24
-    in
-    if diffDays > 0 then
-        String.fromInt diffDays ++ " day" ++ pluralize diffDays ++ " ago"
-
-    else if diffHours > 0 then
-        String.fromInt diffHours ++ " hour" ++ pluralize diffHours ++ " ago"
-
-    else if diffMinutes > 0 then
-        String.fromInt diffMinutes ++ " minute" ++ pluralize diffMinutes ++ " ago"
-
-    else
-        "just now"
-
-
-pluralize : Int -> String
-pluralize n =
-    if n == 1 then
-        ""
-
-    else
-        "s"
+configToJsonPreview : Configuration -> String
+configToJsonPreview config =
+    "{\n  \"model\": \"" ++ pdfModelShortName config.model ++ "\",\n  \"visibility\": \"" ++ visibilityToString config.visibility ++ "\",\n  \"prompt\": " ++ (case config.inferenceParams.prompt of
+        Just p -> "\"" ++ String.left 40 p ++ "...\""
+        Nothing -> "null"
+    ) ++ "\n  ...\n}"

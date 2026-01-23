@@ -1,118 +1,63 @@
 module Views.Models exposing (view)
 
+import Components.AppLayout as AppLayout
+import Components.Badge as Badge
 import Components.Button as Button
-import Components.ModelCard exposing (modelCardExpanded)
+import Components.Icon as Icon
+import Components.SearchInput as SearchInput
 import Css exposing (..)
 import Html.Styled exposing (..)
-import Html.Styled.Attributes exposing (css, href, type_)
+import Html.Styled.Attributes exposing (css, href)
 import Html.Styled.Events exposing (onClick)
 import Styles
 import Types
     exposing
         ( Capability
-        , ComputeType
         , Model
-        , ModelCategory
-        , ModelFilters
         , Msg(..)
         , PdfModel
         , Route(..)
-        , allCapabilities
-        , allCategories
-        , allComputeTypes
         , allPdfModels
         , capabilityToString
         , categoryToString
-        , computeTypeToString
-        , defaultPdfModel
-        , filterModels
-        , hasActiveFilters
+        , modelMetadata
         , routeToPath
         )
 
 
 view : Model -> Html Msg
 view model =
+    AppLayout.view
+        { currentRoute = Models
+        , userName = "John Doe"
+        , userEmail = "john@example.com"
+        , showUpgradeCard = True
+        , isAdmin = False
+        , onSignOut = SignOutClicked
+        }
+        [ viewModelsContent model
+        ]
+
+
+viewModelsContent : Model -> Html Msg
+viewModelsContent model =
     div
         [ css
-            [ Styles.containerStyle
-            , paddingTop Styles.spacing.xxxl
-            , minHeight (vh 100)
+            [ displayFlex
+            , flexDirection column
+            , property "gap" "32px"
+            , height (pct 100)
+            , width (pct 100)
             ]
         ]
-        [ viewHeader
-        , div
-            [ css
-                [ marginTop Styles.spacing.xxl
-                ]
-            ]
-            [ -- Page header
-              div
-                [ css
-                    [ marginBottom Styles.spacing.xxl
-                    ]
-                ]
-                [ div
-                    [ css
-                        [ Styles.flexBetween
-                        , marginBottom Styles.spacing.sm
-                        ]
-                    ]
-                    [ h1
-                        [ css [ Styles.textDisplay ] ]
-                        [ text "Model Catalog" ]
-                    , button
-                        [ onClick OpenModelPalette
-                        , css
-                            [ backgroundColor Styles.colors.surface
-                            , border3 (px 1) solid Styles.colors.border
-                            , borderRadius Styles.radius.md
-                            , padding2 Styles.spacing.sm Styles.spacing.base
-                            , color Styles.colors.textSecondary
-                            , cursor pointer
-                            , Css.fontSize Styles.fontSize.small
-                            , fontFamilies Styles.fontStack
-                            , Styles.transitions.fast
-                            , hover
-                                [ borderColor Styles.colors.borderStrong
-                                , color Styles.colors.textPrimary
-                                ]
-                            ]
-                        ]
-                        [ text "⌘K Search" ]
-                    ]
-                , p
-                    [ css
-                        [ Styles.textSecondary
-                        , maxWidth (px 600)
-                        , margin zero
-                        ]
-                    ]
-                    [ text "Discover and compare document processing models. Each model has unique strengths for different document types and use cases." ]
-                ]
+        [ -- Header section
+          viewHeader
 
-            -- Main content area
-            , div
-                [ css
-                    [ property "display" "grid"
-                    , property "grid-template-columns" "240px 1fr"
-                    , Styles.gap Styles.spacing.xxl
-                    ]
-                ]
-                [ -- Sidebar with filters
-                  viewSidebar model.modelFilters
+        -- Filter bar
+        , viewFilterBar model
 
-                -- Model cards
-                , viewModelList model
-                ]
-            ]
-
-        -- Comparison bar (if models selected)
-        , if not (List.isEmpty model.comparisonModels) then
-            viewComparisonBar model.comparisonModels
-
-          else
-            text ""
+        -- Models grid
+        , viewModelsGrid model
         ]
 
 
@@ -120,410 +65,383 @@ viewHeader : Html Msg
 viewHeader =
     div
         [ css
-            [ Styles.flexBetween
-            , marginBottom Styles.spacing.xxl
+            [ displayFlex
+            , alignItems center
+            , justifyContent spaceBetween
+            , width (pct 100)
             ]
         ]
-        [ div []
-            [ a
-                [ href (routeToPath (Upload defaultPdfModel))
-                , css
-                    [ Styles.textH1
-                    , color Styles.colors.textPrimary
-                    , textDecoration none
-                    , hover [ color Styles.colors.accent ]
+        [ -- Left side: Breadcrumb, title, subtitle
+          div
+            [ css
+                [ displayFlex
+                , flexDirection column
+                , property "gap" "4px"
+                , flex (int 1)
+                ]
+            ]
+            [ -- Breadcrumb
+              div
+                [ css
+                    [ fontFamilies Styles.fontStack
+                    , fontSize (px 11)
+                    , fontWeight (int 500)
+                    , letterSpacing (px 0.5)
+                    , color (hex "666666") -- $--foreground-subtle
                     ]
                 ]
-                [ text "PDF Models" ]
+                [ text "Dashboard / Models" ]
+
+            -- Title
+            , div
+                [ css
+                    [ fontFamilies [ "Playfair Display", .value serif ]
+                    , fontSize (px 36)
+                    , fontWeight normal
+                    , color (hex "FAF8F5") -- $--foreground
+                    , marginTop (px 4)
+                    ]
+                ]
+                [ text "Available Models" ]
+
+            -- Subtitle
+            , div
+                [ css
+                    [ fontFamilies Styles.fontStack
+                    , fontSize (px 14)
+                    , fontWeight normal
+                    , color (hex "888888") -- $--foreground-muted
+                    ]
+                ]
+                [ text "Explore and compare document processing models" ]
             ]
+
+        -- Right side: Compare button
         , div
             [ css
-                [ Styles.flexRow
-                , Styles.gap Styles.spacing.md
+                [ alignItems center
+                , property "gap" "12px"
                 ]
             ]
-            [ a
-                [ href (routeToPath (Upload defaultPdfModel))
-                , css
-                    [ Styles.flexRow
-                    , Styles.gap Styles.spacing.sm
-                    , padding2 Styles.spacing.sm Styles.spacing.base
-                    , backgroundColor Styles.colors.accent
-                    , borderRadius Styles.radius.md
-                    , color Styles.colors.textInverse
-                    , textDecoration none
-                    , Css.fontSize Styles.fontSize.body
-                    , fontWeight Styles.fontWeights.medium
-                    , Styles.transitions.base
-                    , hover
-                        [ backgroundColor Styles.colors.accentHover
-                        , color Styles.colors.textInverse
-                        ]
-                    ]
-                ]
-                [ span [] [ text "+" ]
-                , text "New Job"
-                ]
-            , a
-                [ href (routeToPath Jobs)
-                , css
-                    [ padding2 Styles.spacing.sm Styles.spacing.base
-                    , border3 (px 1) solid Styles.colors.border
-                    , borderRadius Styles.radius.md
-                    , color Styles.colors.textSecondary
-                    , textDecoration none
-                    , Css.fontSize Styles.fontSize.body
-                    , Styles.transitions.base
-                    , hover
-                        [ backgroundColor Styles.colors.overlay
-                        , borderColor Styles.colors.borderStrong
-                        ]
-                    ]
-                ]
-                [ text "Dashboard" ]
-            , Button.button Button.Ghost "Sign Out" SignOutClicked
+            [ Button.buttonDisabled Button.Secondary "Compare (0)"
             ]
         ]
 
 
-viewSidebar : ModelFilters -> Html Msg
-viewSidebar filters =
+viewFilterBar : Model -> Html Msg
+viewFilterBar model =
     div
         [ css
-            [ position sticky
-            , top Styles.spacing.xxl
+            [ displayFlex
+            , alignItems center
+            , property "gap" "12px"
+            , width (pct 100)
             ]
         ]
-        [ -- Categories filter
-          div
-            [ css [ marginBottom Styles.spacing.xl ] ]
-            [ h3
-                [ css
-                    [ Styles.textCaption
-                    , marginBottom Styles.spacing.md
-                    , marginTop zero
-                    ]
-                ]
-                [ text "CATEGORIES" ]
-            , div
-                [ css [ Styles.flexColumn, Styles.gap Styles.spacing.sm ] ]
-                (List.map (viewCategoryFilter filters.categories) allCategories)
-            ]
+        [ -- Search input
+          SearchInput.searchInput
+            { placeholder = "Search models..."
+            , value = model.modelSearchQuery
+            , onInput = ModelSearchChanged
+            }
+            [ width (px 300) ]
 
-        -- Compute type filter
-        , div
-            [ css [ marginBottom Styles.spacing.xl ] ]
-            [ h3
-                [ css
-                    [ Styles.textCaption
-                    , marginBottom Styles.spacing.md
-                    , marginTop zero
-                    ]
-                ]
-                [ text "COMPUTE TYPE" ]
-            , div
-                [ css [ Styles.flexColumn, Styles.gap Styles.spacing.sm ] ]
-                (List.map (viewComputeTypeFilter filters.computeTypes) allComputeTypes)
-            ]
+        -- Spacer
+        , div [ css [ flex (int 1) ] ] []
 
-        -- Capabilities filter
-        , div
-            [ css [ marginBottom Styles.spacing.xl ] ]
-            [ h3
-                [ css
-                    [ Styles.textCaption
-                    , marginBottom Styles.spacing.md
-                    , marginTop zero
-                    ]
-                ]
-                [ text "CAPABILITIES" ]
-            , div
-                [ css [ Styles.flexColumn, Styles.gap Styles.spacing.sm ] ]
-                (List.map (viewCapabilityFilter filters.capabilities) allCapabilities)
-            ]
+        -- Category filter button
+        , Button.buttonWithIcon
+            Button.Secondary
+            Icon.Folder
+            "Category: All"
+            NoOp
 
-        -- Clear filters
-        , if hasActiveFilters filters then
-            button
-                [ onClick ClearModelFilters
-                , css
-                    [ backgroundColor transparent
-                    , border zero
-                    , color Styles.colors.accent
-                    , cursor pointer
-                    , Css.fontSize Styles.fontSize.small
-                    , padding zero
-                    , Styles.transitions.fast
-                    , hover [ textDecoration underline ]
-                    ]
-                ]
-                [ text "Clear all filters" ]
+        -- Capabilities filter button
+        , Button.buttonWithIcon
+            Button.Secondary
+            Icon.Zap
+            "Capabilities"
+            NoOp
 
-          else
-            text ""
+        -- Compute filter button
+        , Button.buttonWithIcon
+            Button.Secondary
+            Icon.Cpu
+            "Compute: All"
+            NoOp
         ]
 
 
-viewCategoryFilter : List ModelCategory -> ModelCategory -> Html Msg
-viewCategoryFilter activeCategories category =
+viewModelsGrid : Model -> Html Msg
+viewModelsGrid model =
     let
-        isActive =
-            List.member category activeCategories
+        -- For now, just use all models. Filtering can be added later.
+        models =
+            allPdfModels
     in
-    label
+    div
         [ css
-            [ Styles.flexRow
-            , Styles.gap Styles.spacing.sm
-            , cursor pointer
-            , color
-                (if isActive then
-                    Styles.colors.textPrimary
-
-                 else
-                    Styles.colors.textSecondary
-                )
-            , Styles.transitions.fast
-            , hover [ color Styles.colors.textPrimary ]
+            [ displayFlex
+            , flexWrap wrap
+            , property "gap" "24px"
+            , width (pct 100)
             ]
         ]
-        [ input
-            [ type_ "checkbox"
-            , onClick (ToggleCategoryFilter category)
-            , css
-                [ cursor pointer
-                , property "accent-color" Styles.colors.accent.value
-                ]
-            ]
-            []
-        , text (categoryToString category)
-        ]
+        (List.map viewModelCard models)
 
 
-viewCapabilityFilter : List Capability -> Capability -> Html Msg
-viewCapabilityFilter activeCapabilities capability =
+viewModelCard : PdfModel -> Html Msg
+viewModelCard pdfModel =
     let
-        isActive =
-            List.member capability activeCapabilities
+        metadata =
+            modelMetadata pdfModel
+
+        -- Get first 3 capabilities as tags
+        capabilityTags =
+            List.take 3 metadata.capabilities
     in
-    label
+    div
         [ css
-            [ Styles.flexRow
-            , Styles.gap Styles.spacing.sm
-            , cursor pointer
-            , Css.fontSize Styles.fontSize.small
-            , color
-                (if isActive then
-                    Styles.colors.textPrimary
-
-                 else
-                    Styles.colors.textSecondary
-                )
-            , Styles.transitions.fast
-            , hover [ color Styles.colors.textPrimary ]
-            ]
-        ]
-        [ input
-            [ type_ "checkbox"
-            , onClick (ToggleCapabilityFilter capability)
-            , css
-                [ cursor pointer
-                , property "accent-color" Styles.colors.accent.value
+            [ displayFlex
+            , flexDirection column
+            , width (px 340)
+            , border3 (px 1) solid (hex "1F1F1F") -- $--border
+            , borderRadius (px 8)
+            , overflow hidden
+            , Styles.transitions.base
+            , hover
+                [ borderColor (hex "333333") -- Lighter border on hover
                 ]
             ]
-            []
-        , text (capabilityToString capability)
         ]
-
-
-viewComputeTypeFilter : List ComputeType -> ComputeType -> Html Msg
-viewComputeTypeFilter activeComputeTypes computeType =
-    let
-        isActive =
-            List.member computeType activeComputeTypes
-
-        icon =
-            case computeType of
-                Types.CpuCompute ->
-                    "⚙"
-
-                Types.GpuCompute ->
-                    "⚡"
-    in
-    label
-        [ css
-            [ Styles.flexRow
-            , Styles.gap Styles.spacing.sm
-            , cursor pointer
-            , color
-                (if isActive then
-                    Styles.colors.textPrimary
-
-                 else
-                    Styles.colors.textSecondary
-                )
-            , Styles.transitions.fast
-            , hover [ color Styles.colors.textPrimary ]
-            ]
-        ]
-        [ input
-            [ type_ "checkbox"
-            , onClick (ToggleComputeTypeFilter computeType)
-            , css
-                [ cursor pointer
-                , property "accent-color" Styles.colors.accent.value
-                ]
-            ]
-            []
-        , span [] [ text icon ]
-        , text (computeTypeToString computeType)
-        ]
-
-
-viewModelList : Model -> Html Msg
-viewModelList model =
-    let
-        filteredModels =
-            filterModels model.modelFilters model.modelSearchQuery allPdfModels
-    in
-    div []
-        [ -- Results count
+        [ -- Card header
           div
             [ css
-                [ Css.fontSize Styles.fontSize.small
-                , color Styles.colors.textTertiary
-                , marginBottom Styles.spacing.lg
+                [ displayFlex
+                , flexDirection column
+                , property "gap" "12px"
+                , padding (px 20)
+                , width (pct 100)
                 ]
             ]
-            [ text
-                (String.fromInt (List.length filteredModels)
-                    ++ " model"
-                    ++ (if List.length filteredModels /= 1 then
-                            "s"
-
-                        else
-                            ""
-                       )
-                    ++ (if hasActiveFilters model.modelFilters then
-                            " matching filters"
-
-                        else
-                            " available"
-                       )
-                )
-            ]
-
-        -- Model cards
-        , div
-            [ css [ Styles.flexColumn, Styles.gap Styles.spacing.lg ] ]
-            (List.map (viewModelCard model) filteredModels)
-
-        -- Empty state
-        , if List.isEmpty filteredModels then
-            div
+            [ -- Top row: Model info and category badge
+              div
                 [ css
-                    [ textAlign center
-                    , padding Styles.spacing.huge
-                    , color Styles.colors.textTertiary
+                    [ displayFlex
+                    , justifyContent spaceBetween
+                    , alignItems flexStart
+                    , width (pct 100)
                     ]
                 ]
-                [ div
-                    [ css [ Css.fontSize (px 48), marginBottom Styles.spacing.md, opacity (num 0.5) ] ]
-                    [ text "🔍" ]
-                , text "No models match your filters"
-                , div [ css [ marginTop Styles.spacing.md ] ]
-                    [ button
-                        [ onClick ClearModelFilters
-                        , css
-                            [ backgroundColor transparent
-                            , border zero
-                            , color Styles.colors.accent
-                            , cursor pointer
-                            , Css.fontSize Styles.fontSize.body
-                            , padding zero
-                            , hover [ textDecoration underline ]
+                [ -- Model name and producer
+                  div
+                    [ css
+                        [ displayFlex
+                        , flexDirection column
+                        , property "gap" "4px"
+                        ]
+                    ]
+                    [ -- Model name
+                      div
+                        [ css
+                            [ fontFamilies [ "Playfair Display", .value serif ]
+                            , fontSize (px 20)
+                            , fontWeight normal
+                            , color (hex "FAF8F5") -- $--foreground
                             ]
                         ]
-                        [ text "Clear filters" ]
+                        [ text (pdfModelDisplayName pdfModel) ]
+
+                    -- Producer
+                    , div
+                        [ css
+                            [ fontFamilies Styles.fontStack
+                            , fontSize (px 12)
+                            , fontWeight normal
+                            , color (hex "666666") -- $--foreground-subtle
+                            ]
+                        ]
+                        [ text metadata.producer ]
                     ]
+
+                -- Category badge
+                , Badge.badge Badge.Default (categoryToString metadata.category)
                 ]
 
-          else
-            text ""
+            -- Description
+            , div
+                [ css
+                    [ fontFamilies Styles.fontStack
+                    , fontSize (px 13)
+                    , fontWeight normal
+                    , lineHeight (num 1.5)
+                    , color (hex "888888") -- $--foreground-muted
+                    , width (pct 100)
+                    ]
+                ]
+                [ text (String.left 130 metadata.description ++ "...") ]
+
+            -- Capability tags
+            , div
+                [ css
+                    [ displayFlex
+                    , property "gap" "6px"
+                    , width (pct 100)
+                    , flexWrap wrap
+                    ]
+                ]
+                (List.map
+                    (\cap -> Badge.badge Badge.Default (capabilityToString cap))
+                    capabilityTags
+                )
+            ]
+
+        -- Card footer
+        , div
+            [ css
+                [ displayFlex
+                , justifyContent spaceBetween
+                , alignItems center
+                , padding (px 20)
+                , borderTop3 (px 1) solid (hex "151515") -- $--border-subtle
+                , width (pct 100)
+                ]
+            ]
+            [ -- Stats
+              div
+                [ css
+                    [ displayFlex
+                    , property "gap" "16px"
+                    ]
+                ]
+                [ -- Accuracy stat
+                  case metadata.benchmarks of
+                    Just benchmarks ->
+                        case benchmarks.accuracy of
+                            Just accuracy ->
+                                viewStat (String.fromFloat accuracy ++ "%") "Accuracy" True
+
+                            Nothing ->
+                                text ""
+
+                    Nothing ->
+                        text ""
+
+                -- Speed stat
+                , case metadata.benchmarks of
+                    Just benchmarks ->
+                        case benchmarks.speedTier of
+                            Just speed ->
+                                viewStat speed "Speed" False
+
+                            Nothing ->
+                                text ""
+
+                    Nothing ->
+                        text ""
+                ]
+
+            -- Try it button
+            , a
+                [ href (routeToPath (Upload pdfModel))
+                , css
+                    [ displayFlex
+                    , alignItems center
+                    , property "gap" "8px"
+                    , padding2 (px 8) (px 16)
+                    , backgroundColor (hex "C9A962") -- $--primary
+                    , color (hex "0F0F0F") -- Dark text on gold background
+                    , borderRadius (px 6)
+                    , textDecoration none
+                    , fontFamilies Styles.fontStack
+                    , fontSize (px 12)
+                    , fontWeight (int 500)
+                    , border zero
+                    , cursor pointer
+                    , Styles.transitions.base
+                    , hover
+                        [ backgroundColor (hex "D4B76E") -- Slightly lighter on hover
+                        ]
+                    ]
+                ]
+                [ text "Try it"
+                , Icon.icon Icon.ArrowRightIcon Icon.Small (hex "0F0F0F")
+                ]
+            ]
         ]
 
 
-viewModelCard : Model -> PdfModel -> Html Msg
-viewModelCard model pdfModel =
-    let
-        -- Get the selected model from the route
-        selectedModel =
-            case model.route of
-                Upload selected ->
-                    selected
-
-                _ ->
-                    defaultPdfModel
-    in
-    modelCardExpanded
-        { model = pdfModel
-        , isSelected = pdfModel == selectedModel
-        , isExpanded = model.expandedModelCard == Just pdfModel
-        , onSelect = \m -> ModelSelected m
-        , onToggleExpand = ToggleModelCardExpanded
-        , onToggleComparison = ToggleModelComparison
-        , isInComparison = List.member pdfModel model.comparisonModels
-        }
-
-
-viewComparisonBar : List PdfModel -> Html Msg
-viewComparisonBar models =
+viewStat : String -> String -> Bool -> Html Msg
+viewStat value label isSuccess =
     div
         [ css
-            [ position fixed
-            , bottom zero
-            , left zero
-            , right zero
-            , backgroundColor Styles.colors.surfaceRaised
-            , borderTop3 (px 1) solid Styles.colors.border
-            , padding2 Styles.spacing.base Styles.spacing.xxl
-            , Styles.flexBetween
-            , Styles.shadows.lg
-            , property "z-index" "100"
+            [ displayFlex
+            , flexDirection column
+            , property "gap" "2px"
             ]
         ]
-        [ div
-            [ css [ Styles.flexRow, Styles.gap Styles.spacing.md ] ]
-            [ span
-                [ css
-                    [ color Styles.colors.textSecondary
-                    , Css.fontSize Styles.fontSize.small
-                    ]
-                ]
-                [ text
-                    (String.fromInt (List.length models)
-                        ++ " model"
-                        ++ (if List.length models /= 1 then
-                                "s"
+        [ -- Value
+          div
+            [ css
+                [ fontFamilies [ "JetBrains Mono", .value monospace ]
+                , fontSize (px 14)
+                , fontWeight (int 500)
+                , color
+                    (if isSuccess then
+                        hex "4ADE80" -- $--success
 
-                            else
-                                ""
-                           )
-                        ++ " selected for comparison"
+                     else
+                        hex "FAF8F5" -- $--foreground
                     )
                 ]
-            , button
-                [ onClick ClearComparison
-                , css
-                    [ backgroundColor transparent
-                    , border zero
-                    , color Styles.colors.textTertiary
-                    , cursor pointer
-                    , Css.fontSize Styles.fontSize.small
-                    , Styles.transitions.fast
-                    , hover [ color Styles.colors.textSecondary ]
-                    ]
-                ]
-                [ text "Clear" ]
             ]
-        , Button.button Button.Primary "Compare Models" ClearComparison
+            [ text value ]
+
+        -- Label
+        , div
+            [ css
+                [ fontFamilies Styles.fontStack
+                , fontSize (px 10)
+                , fontWeight normal
+                , color (hex "666666") -- $--foreground-subtle
+                ]
+            ]
+            [ text label ]
         ]
+
+
+-- HELPER FUNCTIONS
+
+
+pdfModelDisplayName : PdfModel -> String
+pdfModelDisplayName pdfModel =
+    case pdfModel of
+        Types.Marker ->
+            "Marker"
+
+        Types.Dolphin ->
+            "Dolphin"
+
+        Types.Docling ->
+            "Docling"
+
+        Types.DeepSeekOcr ->
+            "DeepSeek OCR"
+
+        Types.MinerU ->
+            "MinerU"
+
+        Types.OlmOcr ->
+            "olmocr"
+
+        Types.Docext ->
+            "docext"
+
+        Types.DotsOcr ->
+            "dots.ocr"
+
+        Types.LightOnOcr ->
+            "LightOnOCR-2"
+
+        Types.PaddleOcr ->
+            "PaddleOCR"

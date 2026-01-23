@@ -4,6 +4,7 @@ import Browser
 import Browser.Navigation as Nav
 import File exposing (File)
 import Http
+import Json.Decode as Decode
 import Set exposing (Set)
 import Time
 import Url
@@ -685,6 +686,8 @@ type alias LoginForm =
     { email : String
     , password : String
     , error : Maybe String
+    , showPassword : Bool
+    , rememberMe : Bool
     }
 
 
@@ -697,6 +700,9 @@ type alias SignUpForm =
     , success : Bool
     , needsConfirmation : Bool
     , confirming : Bool
+    , showPassword : Bool
+    , showConfirmPassword : Bool
+    , termsAccepted : Bool
     }
 
 
@@ -894,12 +900,15 @@ type JobStatus
 
 
 type Msg
-    = UrlChanged Url.Url
+    = NoOp
+    | UrlChanged Url.Url
     | LinkClicked Browser.UrlRequest
     | SessionRestored String
       -- Auth - Login
     | EmailChanged String
     | PasswordChanged String
+    | TogglePasswordVisibility
+    | RememberMeChanged Bool
     | SignInClicked
     | AuthResponseReceived String
     | SignInCompleted (Result Http.Error AuthTokens)
@@ -908,6 +917,9 @@ type Msg
     | SignUpEmailChanged String
     | SignUpPasswordChanged String
     | SignUpConfirmPasswordChanged String
+    | ToggleSignUpPasswordVisibility
+    | ToggleSignUpConfirmPasswordVisibility
+    | TermsAcceptedChanged Bool
     | SignUpClicked
     | SignUpResponseReceived String
     | ConfirmationCodeChanged String
@@ -916,6 +928,7 @@ type Msg
       -- Upload
     | ModelSelected PdfModel
     | FileSelected File
+    | FileSelectedFromValue Decode.Value
     | UploadToS3
     | UploadProgress Float
     | UploadResponseReceived String
@@ -1010,6 +1023,8 @@ initModel key route =
         { email = ""
         , password = ""
         , error = Nothing
+        , showPassword = False
+        , rememberMe = False
         }
     , signUpForm =
         { email = ""
@@ -1020,6 +1035,9 @@ initModel key route =
         , success = False
         , needsConfirmation = False
         , confirming = False
+        , showPassword = False
+        , showConfirmPassword = False
+        , termsAccepted = False
         }
     , upload =
         { selectedFile = Nothing

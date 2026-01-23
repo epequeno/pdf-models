@@ -100,6 +100,9 @@ parseUrl url =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        NoOp ->
+            ( model, Cmd.none )
+
         SessionRestored jsonString ->
             case Decode.decodeString Auth.authResponseDecoder jsonString of
                 Ok response ->
@@ -247,6 +250,26 @@ update msg model =
 
                 newForm =
                     { oldForm | password = password }
+            in
+            ( { model | loginForm = newForm }, Cmd.none )
+
+        TogglePasswordVisibility ->
+            let
+                oldForm =
+                    model.loginForm
+
+                newForm =
+                    { oldForm | showPassword = not oldForm.showPassword }
+            in
+            ( { model | loginForm = newForm }, Cmd.none )
+
+        RememberMeChanged checked ->
+            let
+                oldForm =
+                    model.loginForm
+
+                newForm =
+                    { oldForm | rememberMe = checked }
             in
             ( { model | loginForm = newForm }, Cmd.none )
 
@@ -411,6 +434,36 @@ update msg model =
 
                 newForm =
                     { oldForm | confirmPassword = confirmPassword }
+            in
+            ( { model | signUpForm = newForm }, Cmd.none )
+
+        ToggleSignUpPasswordVisibility ->
+            let
+                oldForm =
+                    model.signUpForm
+
+                newForm =
+                    { oldForm | showPassword = not oldForm.showPassword }
+            in
+            ( { model | signUpForm = newForm }, Cmd.none )
+
+        ToggleSignUpConfirmPasswordVisibility ->
+            let
+                oldForm =
+                    model.signUpForm
+
+                newForm =
+                    { oldForm | showConfirmPassword = not oldForm.showConfirmPassword }
+            in
+            ( { model | signUpForm = newForm }, Cmd.none )
+
+        TermsAcceptedChanged accepted ->
+            let
+                oldForm =
+                    model.signUpForm
+
+                newForm =
+                    { oldForm | termsAccepted = accepted }
             in
             ( { model | signUpForm = newForm }, Cmd.none )
 
@@ -592,6 +645,15 @@ update msg model =
             ( { model | upload = newUpload, modelPaletteOpen = False, hoveredModel = Nothing }
             , Nav.pushUrl model.key (routeToPath (Upload newPdfModel))
             )
+
+        FileSelectedFromValue value ->
+            -- Decode the file from the event value
+            case Decode.decodeValue fileDecoder value of
+                Ok file ->
+                    update (FileSelected file) model
+
+                Err _ ->
+                    ( model, Cmd.none )
 
         FileSelected file ->
             -- Automatically upload to S3 when file is selected
@@ -2348,3 +2410,10 @@ getNextInList current list =
 getPrevInList : a -> List a -> Maybe a
 getPrevInList current list =
     getNextInList current (List.reverse list)
+
+
+{-| Decode a File from a file input change event
+-}
+fileDecoder : Decode.Decoder File.File
+fileDecoder =
+    Decode.at [ "target", "files", "0" ] File.decoder

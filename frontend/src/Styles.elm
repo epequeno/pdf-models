@@ -3,9 +3,9 @@ module Styles exposing (..)
 import Css exposing (..)
 import Css.Global
 -- =============================================================================
--- DESIGN SYSTEM: NEXUS
--- Premium dark theme with electric cyan accents
--- Inspired by Linear/Stripe design language
+-- DESIGN SYSTEM: FROM PENCIL DESIGN
+-- Premium dark theme with warm gold/bronze accents
+-- Matches /Users/steven/Documents/pdf-models design
 -- =============================================================================
 
 
@@ -13,48 +13,61 @@ import Css.Global
 
 
 colors =
-    { -- Backgrounds (layered for depth)
-      background = hex "0a0a0b"
-    , surface = hex "141415"
+    { -- Backgrounds
+      background = hex "0F0F0F"
+    , backgroundSidebar = hex "0A0A0A"
+    , surface = hex "0F0F0F"
     , surfaceRaised = hex "1c1c1e"
     , overlay = hex "252528"
+    , card = hex "0F0F0F"
 
-    -- Text (proper hierarchy)
-    , textPrimary = hex "f4f4f5"
-    , textSecondary = hex "a1a1aa"
-    , textTertiary = hex "71717a"
-    , textInverse = hex "09090b"
+    -- Text (foreground)
+    , textPrimary = hex "FAF8F5"
+    , foreground = hex "FAF8F5"
+    , foregroundMuted = hex "888888"
+    , foregroundSubtle = hex "666666"
+    , textSecondary = hex "888888"
+    , textTertiary = hex "666666"
+    , textInverse = hex "0A0A0A"
 
-    -- Accent - Electric Cyan (refined)
-    , accent = hex "22d3ee"
-    , accentHover = hex "06b6d4"
-    , accentPressed = hex "0891b2"
-    , accentMuted = rgba 34 211 238 0.1
-    , accentSubtle = rgba 34 211 238 0.2
+    -- Primary - Warm Gold/Bronze
+    , primary = hex "C9A962"
+    , primaryForeground = hex "0A0A0A"
+    , accent = hex "C9A962"
+    , accentHover = hex "D4B976"
+    , accentPressed = hex "B89954"
+    , accentMuted = rgba 201 169 98 0.1
+    , accentSubtle = rgba 201 169 98 0.2
 
-    -- Semantic
-    , success = hex "4ade80"
-    , successMuted = rgba 74 222 128 0.15
-    , warning = hex "fbbf24"
-    , warningMuted = rgba 251 191 36 0.15
-    , error = hex "f87171"
-    , errorMuted = rgba 248 113 113 0.15
-    , info = hex "60a5fa"
-    , infoMuted = rgba 96 165 250 0.15
+    -- Active state background
+    , activeBg = rgba 201 169 98 0.063
 
-    -- Borders
-    , border = hex "27272a"
-    , borderStrong = hex "3f3f46"
-    , borderFocus = hex "22d3ee"
+    -- Semantic colors
+    , success = hex "4ADE80"
+    , successMuted = rgba 74 222 128 0.25
+    , warning = hex "FBBF24"
+    , warningMuted = rgba 251 191 36 0.25
+    , error = hex "EF4444"
+    , errorMuted = rgba 239 68 68 0.25
+    , info = hex "60A5FA"
+    , infoMuted = rgba 96 165 250 0.25
+
+    -- Borders (gold tinted with varying opacity)
+    , border = rgba 201 169 98 0.125
+    , borderButton = rgba 201 169 98 0.145
+    , borderEmphasis = rgba 201 169 98 0.188
+    , borderSubtle = rgba 201 169 98 0.082
+    , borderStrong = rgba 201 169 98 0.188
+    , borderFocus = hex "C9A962"
 
     -- Legacy aliases (for gradual migration)
     , hover = hex "252528"
-    , active = hex "3f3f46"
-    , focus = hex "22d3ee"
-    , accentPrimary = hex "22d3ee"
-    , accentSuccess = hex "4ade80"
-    , accentWarning = hex "fbbf24"
-    , accentError = hex "f87171"
+    , active = rgba 201 169 98 0.188
+    , focus = hex "C9A962"
+    , accentPrimary = hex "C9A962"
+    , accentSuccess = hex "4ADE80"
+    , accentWarning = hex "FBBF24"
+    , accentError = hex "EF4444"
     }
 
 
@@ -64,7 +77,7 @@ colors =
 
 fontStack : List String
 fontStack =
-    [ "Inter"
+    [ "Manrope"
     , "-apple-system"
     , "BlinkMacSystemFont"
     , "Segoe UI"
@@ -72,6 +85,15 @@ fontStack =
     , "Helvetica Neue"
     , "Arial"
     , "sans-serif"
+    ]
+
+
+displayFontStack : List String
+displayFontStack =
+    [ "Playfair Display"
+    , "Georgia"
+    , "Times New Roman"
+    , "serif"
     ]
 
 
@@ -282,7 +304,8 @@ textDisplay : Style
 textDisplay =
     batch
         [ Css.fontSize fontSize.display
-        , fontWeight fontWeights.semibold
+        , fontFamilies displayFontStack
+        , fontWeight fontWeights.normal
         , lineHeight lineHeights.tight
         , color colors.textPrimary
         , letterSpacing (px -0.5)

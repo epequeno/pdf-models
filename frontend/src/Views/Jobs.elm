@@ -1,36 +1,58 @@
 module Views.Jobs exposing (view)
 
+import Components.AppLayout as AppLayout
+import Components.Badge as Badge
 import Components.Button as Button
-import Components.StatusBadge as StatusBadge
-import Components.Timeline as Timeline
+import Components.Icon as Icon
+import Components.SearchInput as SearchInput
 import Css exposing (..)
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (css, href)
 import Html.Styled.Events exposing (onClick)
-import Set exposing (Set)
 import Styles
 import Time
-import Types exposing (Job, JobStatus(..), Model, Msg(..), PdfModel, Route(..), defaultPdfModel, pdfModelToDisplayName, routeToPath)
+import Types exposing (Job, JobStatus(..), Model, Msg(..), PdfModel, Route(..), pdfModelToDisplayName, routeToPath)
 
 
 view : Model -> Html Msg
 view model =
+    AppLayout.view
+        { currentRoute = Jobs
+        , userName = "John Doe"
+        , userEmail = "john@example.com"
+        , showUpgradeCard = True
+        , isAdmin = False
+        , onSignOut = SignOutClicked
+        }
+        [ viewJobsContent model
+        ]
+
+
+viewJobsContent : Model -> Html Msg
+viewJobsContent model =
     div
         [ css
-            [ Styles.containerStyle
-            , paddingTop Styles.spacing.xxxl
-            , minHeight (vh 100)
+            [ displayFlex
+            , flexDirection column
+            , property "gap" "32px"
+            , height (pct 100)
+            , width (pct 100)
             ]
         ]
-        [ viewHeader
-        , viewStatsBar model
-        , div
-            [ css
-                [ marginTop Styles.spacing.xxl
-                ]
-            ]
-            [ viewJobsSection model
-            ]
+        [ -- Header section
+          viewHeader
+
+        -- Filter bar
+        , viewFilterBar
+
+        -- Jobs table or empty state
+        , if List.isEmpty model.jobs.jobs && not model.jobs.loading then
+            viewEmptyState
+          else
+            viewJobsTable model
+
+        -- Footer with pagination
+        , viewFooter model
         ]
 
 
@@ -38,616 +60,459 @@ viewHeader : Html Msg
 viewHeader =
     div
         [ css
-            [ Styles.flexBetween
-            , marginBottom Styles.spacing.xxl
+            [ displayFlex
+            , flexDirection column
+            , property "gap" "4px"
+            , width (pct 100)
+            , justifyContent spaceBetween
+            , alignItems flexStart
             ]
         ]
-        [ div []
-            [ a
-                [ href (routeToPath (Upload defaultPdfModel))
-                , css
-                    [ Styles.textH1
-                    , color Styles.colors.textPrimary
-                    , textDecoration none
-                    , hover [ color Styles.colors.accent ]
-                    ]
+        [ -- Left side: Breadcrumb, title, subtitle
+          div
+            [ css
+                [ displayFlex
+                , flexDirection column
+                , property "gap" "4px"
+                , flex (int 1)
                 ]
-                [ text "PDF Models" ]
-            , p
-                [ css
-                    [ Styles.textSecondary
-                    , margin zero
-                    , marginTop Styles.spacing.xs
-                    ]
-                ]
-                [ text "Monitor your PDF processing jobs" ]
             ]
+            [ -- Breadcrumb
+              div
+                [ css
+                    [ fontFamilies Styles.fontStack
+                    , fontSize (px 11)
+                    , fontWeight (int 500)
+                    , letterSpacing (px 0.5)
+                    , color (hex "666666") -- $--foreground-subtle
+                    ]
+                ]
+                [ text "Dashboard / Jobs" ]
+
+            -- Title
+            , div
+                [ css
+                    [ fontFamilies [ "Playfair Display", .value serif ]
+                    , fontSize (px 36)
+                    , fontWeight normal
+                    , color (hex "FAF8F5") -- $--foreground
+                    , marginTop (px 4)
+                    ]
+                ]
+                [ text "Processing Jobs" ]
+
+            -- Subtitle
+            , div
+                [ css
+                    [ fontFamilies Styles.fontStack
+                    , fontSize (px 14)
+                    , fontWeight normal
+                    , color (hex "888888") -- $--foreground-muted
+                    ]
+                ]
+                [ text "View and manage your document processing jobs" ]
+            ]
+
+        -- Right side: Action buttons (moved to separate row below header)
+        ]
+
+
+viewFilterBar : Html Msg
+viewFilterBar =
+    div
+        [ css
+            [ displayFlex
+            , alignItems center
+            , property "gap" "12px"
+            , width (pct 100)
+            , marginTop (px 8)
+            ]
+        ]
+        [ -- Search input
+          SearchInput.searchInput
+            { placeholder = "Search by filename or job ID..."
+            , value = ""
+            , onInput = \_ -> NoOp -- TODO: Add search handling
+            }
+            [ width (px 300) ]
+
+        -- Spacer
+        , div [ css [ flex (int 1) ] ] []
+
+        -- Status filter button
+        , Button.buttonWithIcon
+            Button.Secondary
+            Icon.Sliders
+            "Status: All"
+            NoOp
+
+        -- Model filter button
+        , Button.buttonWithIcon
+            Button.Secondary
+            Icon.Layers
+            "Model: All"
+            NoOp
+
+        -- Date filter button
+        , Button.buttonWithIcon
+            Button.Secondary
+            Icon.Calendar
+            "Last 7 days"
+            NoOp
+
+        -- Refresh button
+        , Button.buttonWithIcon
+            Button.Secondary
+            Icon.RefreshCw
+            "Refresh"
+            RefreshClicked
+
+        -- New Job button
+        , a
+            [ href (routeToPath (Upload Types.Docling))
+            , css
+                [ displayFlex
+                , alignItems center
+                , property "gap" "8px"
+                , padding2 (px 10) (px 16)
+                , backgroundColor (hex "C9A962") -- $--primary
+                , color (hex "0F0F0F") -- Dark text on gold background
+                , borderRadius (px 8)
+                , textDecoration none
+                , fontFamilies Styles.fontStack
+                , fontSize (px 14)
+                , fontWeight (int 500)
+                , border zero
+                , cursor pointer
+                , Styles.transitions.base
+                , hover
+                    [ backgroundColor (hex "D4B76E") -- Slightly lighter on hover
+                    ]
+                ]
+            ]
+            [ Icon.icon Icon.Plus Icon.Medium (hex "0F0F0F")
+            , text "New Job"
+            ]
+        ]
+
+
+viewJobsTable : Model -> Html Msg
+viewJobsTable model =
+    div
+        [ css
+            [ width (pct 100)
+            , border3 (px 1) solid (hex "1F1F1F") -- $--border
+            , borderRadius (px 8)
+            , overflow hidden
+            ]
+        ]
+        [ -- Table header
+          div
+            [ css
+                [ displayFlex
+                , alignItems center
+                , width (pct 100)
+                , borderBottom3 (px 1) solid (hex "333333") -- $--border-emphasis
+                ]
+            ]
+            [ tableHeaderCell "JOB ID" 120
+            , tableHeaderCell "FILENAME" 0 -- flex: 1
+            , tableHeaderCell "MODEL" 140
+            , tableHeaderCell "STATUS" 120
+            , tableHeaderCell "SUBMITTED" 150
+            , tableHeaderCell "ACTIONS" 100
+            ]
+
+        -- Table rows
+        , div []
+            (if model.jobs.loading then
+                [ viewLoadingRow ]
+             else
+                List.map (viewJobRow model.currentTime) model.jobs.jobs
+            )
+        ]
+
+
+tableHeaderCell : String -> Int -> Html Msg
+tableHeaderCell label width =
+    div
+        [ css
+            [ displayFlex
+            , alignItems center
+            , padding2 (px 14) (px 20)
+            , fontFamilies Styles.fontStack
+            , fontSize (px 11)
+            , fontWeight (int 600)
+            , color (hex "C9A962") -- $--primary
+            , if width > 0 then
+                Css.width (px (toFloat width))
+              else
+                flex (int 1)
+            ]
+        ]
+        [ text label ]
+
+
+viewJobRow : Time.Posix -> Job -> Html Msg
+viewJobRow currentTime job =
+    div
+        [ css
+            [ displayFlex
+            , alignItems center
+            , width (pct 100)
+            , borderBottom3 (px 1) solid (hex "151515") -- $--border-subtle
+            , Styles.transitions.base
+            , hover
+                [ backgroundColor (rgba 201 169 98 0.063) -- $--active-bg
+                ]
+            ]
+        ]
+        [ -- Job ID (truncated)
+          tableCell (truncateJobId job.id) 120 ["JetBrains Mono", "monospace"] 12 (hex "FAF8F5")
+
+        -- Filename
+        , tableCell (displayJobName job) 0 ["Manrope", "sans-serif"] 13 (hex "FAF8F5")
+
+        -- Model
+        , tableCell (pdfModelShortName job.pdfModel) 140 ["Manrope", "sans-serif"] 13 (hex "888888")
+
+        -- Status badge
         , div
             [ css
-                [ Styles.flexRow
-                , Styles.gap Styles.spacing.md
+                [ displayFlex
+                , alignItems center
+                , padding2 (px 16) (px 20)
+                , Css.width (px 120)
                 ]
             ]
-            [ a
-                [ href (routeToPath Models)
+            [ viewStatusBadge job.status ]
+
+        -- Submitted date
+        , tableCell (formatRelativeTime currentTime job.submittedAt) 150 ["Manrope", "sans-serif"] 12 (hex "888888")
+
+        -- Actions
+        , div
+            [ css
+                [ displayFlex
+                , alignItems center
+                , property "gap" "8px"
+                , padding2 (px 16) (px 20)
+                , Css.width (px 100)
+                ]
+            ]
+            [ -- Download action (only for completed jobs)
+              case job.status of
+                Complete ->
+                    case job.s3OutputKey of
+                        Just _ ->
+                            button
+                                [ onClick (DownloadResult job.id)
+                                , css
+                                    [ backgroundColor transparent
+                                    , border zero
+                                    , padding zero
+                                    , cursor pointer
+                                    , display inlineBlock
+                                    , Styles.transitions.base
+                                    , hover
+                                        [ property "transform" "scale(1.1)"
+                                        ]
+                                    ]
+                                ]
+                                [ Icon.icon Icon.Download Icon.Medium (hex "666666") ]
+
+                        Nothing ->
+                            text ""
+
+                _ ->
+                    text ""
+
+            -- View details action (could be implemented)
+            , button
+                [ onClick (ToggleJobExpanded job.id)
                 , css
-                    [ padding2 Styles.spacing.sm Styles.spacing.base
-                    , border3 (px 1) solid Styles.colors.border
-                    , borderRadius Styles.radius.md
-                    , color Styles.colors.textSecondary
-                    , textDecoration none
-                    , Css.fontSize Styles.fontSize.body
+                    [ backgroundColor transparent
+                    , border zero
+                    , padding zero
+                    , cursor pointer
+                    , display inlineBlock
                     , Styles.transitions.base
                     , hover
-                        [ backgroundColor Styles.colors.overlay
-                        , borderColor Styles.colors.borderStrong
+                        [ property "transform" "scale(1.1)"
                         ]
                     ]
                 ]
-                [ text "Models" ]
-            , a
-                [ href (routeToPath Configs)
-                , css
-                    [ padding2 Styles.spacing.sm Styles.spacing.base
-                    , border3 (px 1) solid Styles.colors.border
-                    , borderRadius Styles.radius.md
-                    , color Styles.colors.textSecondary
-                    , textDecoration none
-                    , Css.fontSize Styles.fontSize.body
-                    , Styles.transitions.base
-                    , hover
-                        [ backgroundColor Styles.colors.overlay
-                        , borderColor Styles.colors.borderStrong
-                        ]
-                    ]
-                ]
-                [ text "Configs" ]
-            , a
-                [ href (routeToPath (Upload defaultPdfModel))
-                , css
-                    [ Styles.flexRow
-                    , Styles.gap Styles.spacing.sm
-                    , padding2 Styles.spacing.sm Styles.spacing.base
-                    , backgroundColor Styles.colors.accent
-                    , color Styles.colors.textInverse
-                    , borderRadius Styles.radius.md
-                    , textDecoration none
-                    , fontWeight Styles.fontWeights.medium
-                    , Css.fontSize Styles.fontSize.body
-                    , Styles.transitions.base
-                    , hover
-                        [ backgroundColor Styles.colors.accentHover
-                        , color Styles.colors.textInverse
-                        ]
-                    ]
-                ]
-                [ span [] [ text "+" ]
-                , text "New Job"
-                ]
-            , Button.button Button.Ghost "Sign Out" SignOutClicked
+                [ Icon.icon Icon.Eye Icon.Medium (hex "666666") ]
             ]
         ]
 
 
-viewStatsBar : Model -> Html Msg
-viewStatsBar model =
+tableCell : String -> Int -> List String -> Float -> Color -> Html Msg
+tableCell content width fontStack fontSize textColor =
+    div
+        [ css
+            [ displayFlex
+            , alignItems center
+            , padding2 (px 16) (px 20)
+            , fontFamilies (List.map (\f -> qt f) fontStack)
+            , Css.fontSize (px fontSize)
+            , fontWeight normal
+            , color textColor
+            , if width > 0 then
+                Css.width (px (toFloat width))
+              else
+                flex (int 1)
+            ]
+        ]
+        [ text content ]
+
+
+viewStatusBadge : JobStatus -> Html Msg
+viewStatusBadge status =
+    case status of
+        Pending ->
+            Badge.badge Badge.Info "Pending"
+
+        Processing ->
+            Badge.badge Badge.Warning "Processing"
+
+        Complete ->
+            Badge.badge Badge.Success "Complete"
+
+        Failed ->
+            Badge.badge Badge.Error "Failed"
+
+
+viewLoadingRow : Html Msg
+viewLoadingRow =
+    div
+        [ css
+            [ displayFlex
+            , alignItems center
+            , justifyContent center
+            , padding (px 40)
+            , fontFamilies Styles.fontStack
+            , fontSize (px 14)
+            , color (hex "888888")
+            ]
+        ]
+        [ text "Loading jobs..." ]
+
+
+viewEmptyState : Html Msg
+viewEmptyState =
+    div
+        [ css
+            [ displayFlex
+            , flexDirection column
+            , alignItems center
+            , justifyContent center
+            , padding (px 60)
+            , backgroundColor (hex "0A0A0A") -- $--background-sidebar
+            , border3 (px 1) solid (hex "1F1F1F") -- $--border
+            , borderRadius (px 8)
+            ]
+        ]
+        [ div
+            [ css
+                [ fontSize (px 48)
+                , marginBottom (px 16)
+                , opacity (num 0.3)
+                ]
+            ]
+            [ text "📄" ]
+        , h3
+            [ css
+                [ fontFamilies [ "Playfair Display", .value serif ]
+                , fontSize (px 24)
+                , fontWeight normal
+                , color (hex "FAF8F5")
+                , margin zero
+                , marginBottom (px 8)
+                ]
+            ]
+            [ text "No jobs yet" ]
+        , p
+            [ css
+                [ fontFamilies Styles.fontStack
+                , fontSize (px 14)
+                , color (hex "888888")
+                , margin zero
+                ]
+            ]
+            [ text "Upload a document to get started with processing" ]
+        ]
+
+
+viewFooter : Model -> Html Msg
+viewFooter model =
     let
-        jobs =
-            model.jobs.jobs
-
         totalJobs =
-            List.length jobs
+            List.length model.jobs.jobs
 
-        processingJobs =
-            List.length (List.filter (\j -> j.status == Processing) jobs)
-
-        completedJobs =
-            List.length (List.filter (\j -> j.status == Complete) jobs)
-
-        failedJobs =
-            List.length (List.filter (\j -> j.status == Failed) jobs)
+        -- For now, show all jobs (pagination not implemented yet)
+        showingCount =
+            totalJobs
     in
     div
         [ css
             [ displayFlex
-            , Styles.gap Styles.spacing.base
-            , flexWrap wrap
+            , alignItems center
+            , justifyContent spaceBetween
+            , width (pct 100)
+            , marginTop (px 8)
             ]
         ]
-        [ statCard "Total Jobs" (String.fromInt totalJobs) Nothing
-        , statCard "Processing" (String.fromInt processingJobs) (Just Styles.colors.accent)
-        , statCard "Completed" (String.fromInt completedJobs) (Just Styles.colors.success)
-        , statCard "Failed" (String.fromInt failedJobs) (Just Styles.colors.error)
-        ]
-
-
-statCard : String -> String -> Maybe Color -> Html msg
-statCard label value accentColor =
-    div
-        [ css
-            [ backgroundColor Styles.colors.surface
-            , border3 (px 1) solid Styles.colors.border
-            , borderRadius Styles.radius.lg
-            , padding Styles.spacing.lg
-            , minWidth (px 140)
-            , flex (num 1)
-            ]
-        ]
-        [ div
-            [ css
-                [ Styles.textCaption
-                , marginBottom Styles.spacing.sm
-                ]
-            ]
-            [ text label ]
-        , div
-            [ css
-                [ Css.fontSize (px 28)
-                , fontWeight Styles.fontWeights.semibold
-                , color
-                    (case accentColor of
-                        Just c ->
-                            c
-
-                        Nothing ->
-                            Styles.colors.textPrimary
-                    )
-                , lineHeight (num 1)
-                ]
-            ]
-            [ text value ]
-        ]
-
-
-viewJobsSection : Model -> Html Msg
-viewJobsSection model =
-    div []
-        [ div
-            [ css
-                [ Styles.flexBetween
-                , marginBottom Styles.spacing.lg
-                ]
-            ]
-            [ h2
-                [ css
-                    [ Styles.textH1
-                    , margin zero
-                    ]
-                ]
-                [ text "Recent Jobs" ]
-            , Button.button Button.Secondary "Refresh" RefreshClicked
-            ]
-        , case model.jobs.downloadError of
-            Just downloadErr ->
-                viewAlert Styles.colors.error Styles.colors.errorMuted downloadErr.message (Just ClearDownloadError)
-
-            Nothing ->
-                text ""
-        , case model.jobs.error of
-            Just err ->
-                viewAlert Styles.colors.error Styles.colors.errorMuted err Nothing
-
-            Nothing ->
-                if List.isEmpty model.jobs.jobs then
-                    viewEmptyState model.jobs.loading
-
-                else
-                    div
-                        [ css
-                            [ displayFlex
-                            , flexDirection column
-                            , Styles.gap Styles.spacing.md
-                            ]
-                        ]
-                        (List.map (viewJobCard model.currentTime model.jobs.expandedJobIds model.jobs.expandedErrorIds) model.jobs.jobs)
-        ]
-
-
-viewAlert : Color -> Color -> String -> Maybe Msg -> Html Msg
-viewAlert textColor bgColor message dismissMsg =
-    div
-        [ css
-            [ backgroundColor bgColor
-            , border3 (px 1) solid textColor
-            , borderRadius Styles.radius.md
-            , padding Styles.spacing.base
-            , marginBottom Styles.spacing.lg
-            , Styles.flexBetween
-            ]
-        ]
-        [ span
-            [ css [ color textColor, Css.fontSize Styles.fontSize.body ] ]
-            [ text message ]
-        , case dismissMsg of
-            Just msg ->
-                Button.button Button.Ghost "Dismiss" msg
-
-            Nothing ->
-                text ""
-        ]
-
-
-viewEmptyState : Bool -> Html Msg
-viewEmptyState isLoading =
-    div
-        [ css
-            [ backgroundColor Styles.colors.surface
-            , border3 (px 1) solid Styles.colors.border
-            , borderRadius Styles.radius.lg
-            , padding Styles.spacing.massive
-            , textAlign center
-            ]
-        ]
-        [ div
-            [ css
-                [ Css.fontSize (px 48)
-                , marginBottom Styles.spacing.lg
-                , opacity (num 0.3)
-                ]
-            ]
-            [ text
-                (if isLoading then
-                    "..."
-
-                 else
-                    "📄"
-                )
-            ]
-        , h3
-            [ css
-                [ Styles.textH2
-                , marginBottom Styles.spacing.sm
-                ]
-            ]
-            [ text
-                (if isLoading then
-                    "Loading jobs..."
-
-                 else
-                    "No jobs yet"
-                )
-            ]
-        , p
-            [ css
-                [ Styles.textSecondary
-                , margin zero
-                ]
-            ]
-            [ text
-                (if isLoading then
-                    "Please wait while we fetch your jobs"
-
-                 else
-                    "Upload a PDF to get started with document processing"
-                )
-            ]
-        ]
-
-
-viewJobCard : Time.Posix -> Set String -> Set String -> Job -> Html Msg
-viewJobCard currentTime expandedJobIds expandedErrorIds job =
-    let
-        isExpanded =
-            Set.member job.id expandedJobIds
-
-        isErrorExpanded =
-            Set.member job.id expandedErrorIds
-    in
-    div
-        [ css
-            [ backgroundColor Styles.colors.surface
-            , border3 (px 1) solid Styles.colors.border
-            , borderRadius Styles.radius.lg
-            , overflow Css.hidden
-            , Styles.transitions.base
-            , hover
-                [ borderColor Styles.colors.borderStrong
-                ]
-            ]
-        ]
-        [ -- Clickable header
+        [ -- Jobs count
           div
             [ css
-                [ Styles.flexBetween
-                , padding Styles.spacing.lg
-                , cursor pointer
-                , Styles.transitions.base
-                , hover
-                    [ backgroundColor Styles.colors.overlay
-                    ]
-                ]
-            , onClick (ToggleJobExpanded job.id)
-            ]
-            [ div
-                [ css
-                    [ Styles.flexRow
-                    , Styles.gap Styles.spacing.base
-                    ]
-                ]
-                [ -- Expand indicator
-                  span
-                    [ css
-                        [ color Styles.colors.textTertiary
-                        , Css.fontSize Styles.fontSize.small
-                        , Css.width (px 16)
-                        , Styles.transitions.base
-                        , transform
-                            (if isExpanded then
-                                rotate (deg 90)
-
-                             else
-                                rotate (deg 0)
-                            )
-                        ]
-                    ]
-                    [ text "▶" ]
-                , -- Filename or Job ID
-                  span
-                    [ css
-                        [ fontWeight Styles.fontWeights.medium
-                        , color Styles.colors.textPrimary
-                        ]
-                    ]
-                    [ text (displayJobName job) ]
-                , -- Model badge
-                  span
-                    [ css
-                        [ Css.fontSize Styles.fontSize.caption
-                        , fontWeight Styles.fontWeights.medium
-                        , color Styles.colors.accent
-                        , backgroundColor Styles.colors.accentMuted
-                        , padding2 Styles.spacing.xs Styles.spacing.sm
-                        , borderRadius Styles.radius.full
-                        ]
-                    ]
-                    [ text (pdfModelToDisplayName job.pdfModel) ]
-                , StatusBadge.statusBadge job.status
-                ]
-            , div
-                [ css
-                    [ Styles.flexRow
-                    , Styles.gap Styles.spacing.base
-                    ]
-                ]
-                [ span
-                    [ css
-                        [ Styles.textSmall
-                        ]
-                    ]
-                    [ text (formatRelativeTime currentTime job.submittedAt) ]
-                , case job.status of
-                    Complete ->
-                        case job.s3OutputKey of
-                            Just _ ->
-                                Button.button Button.Primary "Download" (DownloadResult job.id)
-
-                            Nothing ->
-                                text ""
-
-                    _ ->
-                        text ""
+                [ fontFamilies Styles.fontStack
+                , fontSize (px 12)
+                , color (hex "888888") -- $--foreground-muted
                 ]
             ]
-        , -- Expanded content
-          if isExpanded then
-            div
+            [ text ("Showing " ++ String.fromInt showingCount ++ " of " ++ String.fromInt totalJobs ++ " jobs") ]
+
+        -- Pagination controls (placeholder for now)
+        , div
+            [ css
+                [ displayFlex
+                , alignItems center
+                , property "gap" "4px"
+                ]
+            ]
+            [ -- Previous button (disabled)
+              button
                 [ css
-                    [ padding Styles.spacing.xl
-                    , paddingTop zero
-                    , borderTop3 (px 1) solid Styles.colors.border
+                    [ padding2 (px 8) (px 12)
+                    , backgroundColor transparent
+                    , border3 (px 1) solid (hex "1F1F1F")
+                    , borderRadius (px 6)
+                    , color (hex "666666")
+                    , cursor notAllowed
+                    , opacity (num 0.5)
                     ]
                 ]
-                [ -- File info
-                  div
-                    [ css
-                        [ marginBottom Styles.spacing.lg
-                        , marginTop Styles.spacing.lg
-                        , padding Styles.spacing.md
-                        , backgroundColor Styles.colors.surfaceRaised
-                        , borderRadius Styles.radius.sm
-                        ]
+                [ Icon.icon Icon.ChevronLeft Icon.Small (hex "666666") ]
+
+            -- Next button (disabled)
+            , button
+                [ css
+                    [ padding2 (px 8) (px 12)
+                    , backgroundColor transparent
+                    , border3 (px 1) solid (hex "1F1F1F")
+                    , borderRadius (px 6)
+                    , color (hex "666666")
+                    , cursor notAllowed
+                    , opacity (num 0.5)
                     ]
-                    (case job.originalFilename of
-                        Just filename ->
-                            [ div
-                                [ css
-                                    [ Styles.textCaption
-                                    , marginBottom Styles.spacing.xs
-                                    ]
-                                ]
-                                [ text "ORIGINAL FILE" ]
-                            , div
-                                [ css
-                                    [ fontWeight Styles.fontWeights.medium
-                                    , color Styles.colors.textPrimary
-                                    , marginBottom Styles.spacing.sm
-                                    ]
-                                ]
-                                [ text filename ]
-                            , div
-                                [ css
-                                    [ Styles.textCaption
-                                    , marginBottom Styles.spacing.xs
-                                    ]
-                                ]
-                                [ text "S3 KEY" ]
-                            , div
-                                [ css
-                                    [ Styles.textCode
-                                    , overflowX auto
-                                    ]
-                                ]
-                                [ text job.s3InputKey ]
-                            ]
-
-                        Nothing ->
-                            [ div
-                                [ css
-                                    [ Styles.textCode
-                                    , overflowX auto
-                                    ]
-                                ]
-                                [ text job.s3InputKey ]
-                            ]
-                    )
-                , -- Prompt if present
-                  case job.prompt of
-                    Just promptText ->
-                        div
-                            [ css
-                                [ marginBottom Styles.spacing.lg
-                                , padding Styles.spacing.base
-                                , backgroundColor Styles.colors.surfaceRaised
-                                , border3 (px 1) solid Styles.colors.border
-                                , borderRadius Styles.radius.md
-                                ]
-                            ]
-                            [ div
-                                [ css
-                                    [ Styles.textCaption
-                                    , marginBottom Styles.spacing.sm
-                                    ]
-                                ]
-                                [ text "CUSTOM PROMPT" ]
-                            , div
-                                [ css
-                                    [ Styles.textCode
-                                    , whiteSpace preWrap
-                                    ]
-                                ]
-                                [ text promptText ]
-                            ]
-
-                    Nothing ->
-                        text ""
-                , -- Timeline
-                  Timeline.timeline currentTime job
-                , -- Error message if failed
-                  case job.error of
-                    Just errorMsg ->
-                        let
-                            errorSummary =
-                                extractErrorSummary errorMsg
-                        in
-                        div
-                            [ css
-                                [ marginTop Styles.spacing.lg
-                                , backgroundColor Styles.colors.errorMuted
-                                , border3 (px 1) solid Styles.colors.error
-                                , borderRadius Styles.radius.md
-                                , overflow Css.hidden
-                                ]
-                            ]
-                            [ -- Clickable header
-                              div
-                                [ css
-                                    [ padding Styles.spacing.base
-                                    , cursor pointer
-                                    , Styles.flexBetween
-                                    , Styles.transitions.base
-                                    , hover
-                                        [ backgroundColor (rgba 255 0 0 0.1)
-                                        ]
-                                    ]
-                                , onClick (ToggleErrorExpanded job.id)
-                                ]
-                                [ div
-                                    [ css
-                                        [ Styles.flexRow
-                                        , Styles.gap Styles.spacing.sm
-                                        ]
-                                    ]
-                                    [ -- Expand indicator
-                                      span
-                                        [ css
-                                            [ color Styles.colors.error
-                                            , Css.fontSize Styles.fontSize.small
-                                            , Css.width (px 16)
-                                            , Styles.transitions.base
-                                            , transform
-                                                (if isErrorExpanded then
-                                                    rotate (deg 90)
-
-                                                 else
-                                                    rotate (deg 0)
-                                                )
-                                            ]
-                                        ]
-                                        [ text "▶" ]
-                                    , span
-                                        [ css
-                                            [ fontWeight Styles.fontWeights.medium
-                                            , color Styles.colors.error
-                                            ]
-                                        ]
-                                        [ text "Error Details" ]
-                                    ]
-                                , span
-                                    [ css
-                                        [ Css.fontSize Styles.fontSize.small
-                                        , color Styles.colors.error
-                                        , opacity (num 0.7)
-                                        ]
-                                    ]
-                                    [ text
-                                        (if isErrorExpanded then
-                                            "Click to collapse"
-
-                                         else
-                                            "Click to expand"
-                                        )
-                                    ]
-                                ]
-                            , -- Summary always visible
-                              div
-                                [ css
-                                    [ padding2 zero Styles.spacing.base
-                                    , paddingBottom Styles.spacing.base
-                                    ]
-                                ]
-                                [ div
-                                    [ css
-                                        [ Styles.textCode
-                                        , color Styles.colors.error
-                                        , Css.fontSize Styles.fontSize.body
-                                        ]
-                                    ]
-                                    [ text errorSummary ]
-                                ]
-                            , -- Full details (expandable)
-                              if isErrorExpanded then
-                                div
-                                    [ css
-                                        [ padding Styles.spacing.base
-                                        , paddingTop zero
-                                        , borderTop3 (px 1) solid Styles.colors.error
-                                        , maxHeight (px 400)
-                                        , overflowY auto
-                                        ]
-                                    ]
-                                    [ div
-                                        [ css
-                                            [ Styles.textCode
-                                            , color Styles.colors.error
-                                            , whiteSpace preWrap
-                                            , Css.fontSize Styles.fontSize.small
-                                            , marginTop Styles.spacing.base
-                                            ]
-                                        ]
-                                        [ text errorMsg ]
-                                    ]
-
-                              else
-                                text ""
-                            ]
-
-                    Nothing ->
-                        text ""
                 ]
-
-          else
-            text ""
+                [ Icon.icon Icon.ChevronRight Icon.Small (hex "666666") ]
+            ]
         ]
+
+
+-- HELPER FUNCTIONS
 
 
 formatRelativeTime : Time.Posix -> Time.Posix -> String
@@ -684,7 +549,7 @@ formatRelativeTime now submitted =
 truncateJobId : String -> String
 truncateJobId jobId =
     if String.length jobId > 12 then
-        String.left 8 jobId ++ "..."
+        String.left 4 jobId ++ "..." ++ String.right 4 jobId
 
     else
         jobId
@@ -704,43 +569,35 @@ displayJobName job =
             "Job " ++ truncateJobId job.id
 
 
-extractErrorSummary : String -> String
-extractErrorSummary errorMsg =
-    -- Extract the main error type from a Python traceback or error message
-    -- Look for common patterns like "AssertionError", "ValueError", etc.
-    let
-        lines =
-            String.lines errorMsg
+pdfModelShortName : PdfModel -> String
+pdfModelShortName model =
+    case model of
+        Types.Marker ->
+            "Marker"
 
-        -- Try to find the last line that looks like an error (e.g., "AssertionError: message")
-        errorLine =
-            lines
-                |> List.reverse
-                |> List.filter (\line -> String.contains "Error" line || String.contains "Exception" line)
-                |> List.head
+        Types.Dolphin ->
+            "Dolphin"
 
-        -- Get the first meaningful line as fallback
-        firstLine =
-            lines
-                |> List.filter (\line -> not (String.isEmpty (String.trim line)))
-                |> List.head
-                |> Maybe.withDefault "An error occurred"
-    in
-    case errorLine of
-        Just line ->
-            let
-                trimmed =
-                    String.trim line
-            in
-            if String.length trimmed > 100 then
-                String.left 100 trimmed ++ "..."
+        Types.Docling ->
+            "Docling"
 
-            else
-                trimmed
+        Types.DeepSeekOcr ->
+            "DeepSeek OCR"
 
-        Nothing ->
-            if String.length firstLine > 100 then
-                String.left 100 firstLine ++ "..."
+        Types.MinerU ->
+            "MinerU"
 
-            else
-                firstLine
+        Types.OlmOcr ->
+            "olmocr"
+
+        Types.Docext ->
+            "docext"
+
+        Types.DotsOcr ->
+            "dots.ocr"
+
+        Types.LightOnOcr ->
+            "LightOnOCR-2"
+
+        Types.PaddleOcr ->
+            "PaddleOCR"

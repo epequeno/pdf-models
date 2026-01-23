@@ -1,5 +1,23 @@
-module Components.Button exposing (ButtonSize(..), ButtonStyle(..), button, buttonDisabled, iconButton)
+module Components.Button exposing
+    ( ButtonStyle(..)
+    , button
+    , buttonWithIcon
+    , iconButton
+    , buttonDisabled
+    )
 
+{-| Button component matching Pencil design specifications
+
+All buttons use:
+
+  - Font: Manrope
+  - Font size: 13px
+  - Font weight: 500
+  - Gap: 8px (between icon and text)
+
+-}
+
+import Components.Icon as Icon
 import Css exposing (..)
 import Html.Styled exposing (..)
 import Html.Styled.Attributes as Attr exposing (css, type_)
@@ -12,152 +30,183 @@ type ButtonStyle
     | Secondary
     | Ghost
     | Danger
+    | IconOnly
 
 
-type ButtonSize
-    = Small
-    | Medium
-    | Large
-
-
+{-| Basic button with text only
+-}
 button : ButtonStyle -> String -> msg -> Html msg
 button btnStyle label msg =
-    buttonWithSize btnStyle Medium label msg
-
-
-buttonWithSize : ButtonStyle -> ButtonSize -> String -> msg -> Html msg
-buttonWithSize btnStyle size label msg =
     Html.Styled.button
-        [ css (buttonStyles btnStyle size False)
+        [ css (buttonStyles btnStyle False)
         , onClick msg
         , type_ "button"
         ]
         [ text label ]
 
 
+{-| Button with icon and text
+-}
+buttonWithIcon : ButtonStyle -> Icon.Icon -> String -> msg -> Html msg
+buttonWithIcon btnStyle icon label msg =
+    Html.Styled.button
+        [ css (buttonStyles btnStyle False)
+        , onClick msg
+        , type_ "button"
+        ]
+        [ Icon.icon icon Icon.Small (iconColor btnStyle)
+        , text label
+        ]
+
+
+{-| Icon-only button (no text)
+-}
+iconButton : Icon.Icon -> msg -> Html msg
+iconButton icon msg =
+    Html.Styled.button
+        [ css (buttonStyles IconOnly False)
+        , onClick msg
+        , type_ "button"
+        ]
+        [ Icon.icon icon Icon.Small Styles.colors.foregroundSubtle ]
+
+
+{-| Disabled button
+-}
 buttonDisabled : ButtonStyle -> String -> Html msg
 buttonDisabled btnStyle label =
     Html.Styled.button
-        [ css (buttonStyles btnStyle Medium True)
+        [ css (buttonStyles btnStyle True)
         , Attr.disabled True
         , type_ "button"
         ]
         [ text label ]
 
 
-iconButton : ButtonStyle -> String -> String -> msg -> Html msg
-iconButton btnStyle icon label msg =
-    Html.Styled.button
-        [ css (buttonStyles btnStyle Medium False ++ [ displayFlex, alignItems center, Styles.gap Styles.spacing.sm ])
-        , onClick msg
-        , type_ "button"
-        ]
-        [ span [ css [ Css.fontSize (px 16) ] ] [ text icon ]
-        , text label
-        ]
+{-| Get icon color based on button style
+-}
+iconColor : ButtonStyle -> Color
+iconColor btnStyle =
+    case btnStyle of
+        Primary ->
+            Styles.colors.primaryForeground
+
+        Secondary ->
+            Styles.colors.foregroundSubtle
+
+        Ghost ->
+            Styles.colors.foregroundSubtle
+
+        Danger ->
+            Css.hex "FFFFFF"
+
+        IconOnly ->
+            Styles.colors.foregroundSubtle
 
 
-buttonStyles : ButtonStyle -> ButtonSize -> Bool -> List Style
-buttonStyles btnStyle size isDisabled =
+{-| Button styles matching Pencil design exactly
+-}
+buttonStyles : ButtonStyle -> Bool -> List Style
+buttonStyles btnStyle isDisabled =
     let
         baseStyles =
-            [ border3 (px 1) solid transparent
-            , borderRadius Styles.radius.md
-            , fontFamilies Styles.fontStack
-            , fontWeight Styles.fontWeights.medium
+            [ fontFamilies Styles.fontStack
+            , Css.fontSize (px 13)
+            , fontWeight (int 500)
             , cursor pointer
             , Styles.transitions.base
             , displayFlex
             , alignItems center
             , justifyContent center
-            , Styles.gap Styles.spacing.sm
+            , property "gap" "8px"
+            , border zero
+            , outline zero
             , focus
                 [ Styles.focusRing
                 ]
             ]
 
-        sizeStyles =
-            case size of
-                Small ->
-                    [ padding2 Styles.spacing.xs Styles.spacing.md
-                    , Css.fontSize Styles.fontSize.small
-                    , minHeight (px 28)
-                    ]
-
-                Medium ->
-                    [ padding2 Styles.spacing.sm Styles.spacing.base
-                    , Css.fontSize Styles.fontSize.body
-                    , minHeight (px 36)
-                    ]
-
-                Large ->
-                    [ padding2 Styles.spacing.md Styles.spacing.xl
-                    , Css.fontSize Styles.fontSize.body
-                    , minHeight (px 44)
-                    ]
-
         styleVariant =
             if isDisabled then
-                [ backgroundColor Styles.colors.surface
-                , borderColor Styles.colors.border
-                , color Styles.colors.textTertiary
+                [ backgroundColor Styles.colors.border
+                , color Styles.colors.foregroundSubtle
                 , cursor notAllowed
-                , opacity (num 0.6)
+                , opacity (num 0.5)
+                , padding2 (px 12) (px 24)
                 ]
 
             else
                 case btnStyle of
                     Primary ->
-                        [ backgroundColor Styles.colors.accent
-                        , borderColor Styles.colors.accent
-                        , color Styles.colors.textInverse
+                        -- fill=$--primary, text=$--primary-foreground, padding=[12,24]
+                        [ backgroundColor Styles.colors.primary
+                        , color Styles.colors.primaryForeground
+                        , padding2 (px 12) (px 24)
                         , hover
                             [ backgroundColor Styles.colors.accentHover
-                            , borderColor Styles.colors.accentHover
                             ]
                         , active
                             [ backgroundColor Styles.colors.accentPressed
-                            , borderColor Styles.colors.accentPressed
+                            , transform (scale 0.98)
                             ]
                         ]
 
                     Secondary ->
+                        -- border=$--border-button, padding=[12,20]
                         [ backgroundColor transparent
-                        , borderColor Styles.colors.border
-                        , color Styles.colors.textPrimary
+                        , color Styles.colors.foreground
+                        , padding2 (px 12) (px 20)
+                        , border3 (px 1) solid Styles.colors.borderButton
                         , hover
                             [ backgroundColor Styles.colors.overlay
-                            , borderColor Styles.colors.borderStrong
+                            , borderColor Styles.colors.borderEmphasis
                             ]
                         , active
-                            [ backgroundColor Styles.colors.active
+                            [ transform (scale 0.98)
                             ]
                         ]
 
                     Ghost ->
+                        -- no fill/border, padding=[12,20]
                         [ backgroundColor transparent
-                        , borderColor transparent
-                        , color Styles.colors.textSecondary
+                        , color Styles.colors.foreground
+                        , padding2 (px 12) (px 20)
                         , hover
                             [ backgroundColor Styles.colors.overlay
-                            , color Styles.colors.textPrimary
                             ]
                         , active
-                            [ backgroundColor Styles.colors.active
+                            [ transform (scale 0.98)
                             ]
                         ]
 
                     Danger ->
-                        [ backgroundColor transparent
-                        , borderColor Styles.colors.error
-                        , color Styles.colors.error
+                        -- fill=$--error, text=#FFFFFF, padding=[12,24]
+                        [ backgroundColor Styles.colors.error
+                        , color (hex "FFFFFF")
+                        , padding2 (px 12) (px 24)
                         , hover
-                            [ backgroundColor Styles.colors.errorMuted
+                            [ backgroundColor (hex "DC2626")
                             ]
                         , active
-                            [ backgroundColor Styles.colors.errorMuted
-                            , opacity (num 0.8)
+                            [ backgroundColor (hex "B91C1C")
+                            , transform (scale 0.98)
+                            ]
+                        ]
+
+                    IconOnly ->
+                        -- border=$--border-button, padding=[10,14], icon only
+                        [ backgroundColor transparent
+                        , color Styles.colors.foregroundSubtle
+                        , padding2 (px 10) (px 14)
+                        , border3 (px 1) solid Styles.colors.borderButton
+                        , hover
+                            [ backgroundColor Styles.colors.overlay
+                            , borderColor Styles.colors.borderEmphasis
+                            , color Styles.colors.foreground
+                            ]
+                        , active
+                            [ transform (scale 0.98)
                             ]
                         ]
     in
-    baseStyles ++ sizeStyles ++ styleVariant
+    baseStyles ++ styleVariant

@@ -1,826 +1,682 @@
 module Views.Upload exposing (view)
 
+{-| Upload page with sidebar layout matching Pencil design (r1Bae)
+
+Layout structure:
+- AppLayout wrapper with sidebar (280px)
+- Header: Breadcrumb + Title + Actions (search, notification)
+- Content split: Left (main form) + Right panel (360px - recent jobs)
+
+-}
+
+import Components.AppLayout as AppLayout
+import Components.Badge as Badge
 import Components.Button as Button
-import Components.ModelGrid exposing (modelGrid, modelGridConfig)
+import Components.FileUpload as FileUpload
+import Components.Icon as Icon
+import Components.Input as Input
+import Components.Select as Select
 import Css exposing (..)
-import Css.Animations as Animations
 import File
 import Html.Styled exposing (..)
-import Html.Styled.Attributes as Attr exposing (css, for, href, id, placeholder, selected, type_, value)
-import Html.Styled.Events exposing (on, onClick, onInput, preventDefaultOn)
+import Html.Styled.Attributes as Attr exposing (css, for, href, id, placeholder, type_, value)
+import Html.Styled.Events exposing (on, onClick, onInput)
 import Json.Decode as Decode
 import Styles
-import Types exposing (ApprovalStatus(..), Configuration, Model, Msg(..), PdfModel, Route(..), UploadState, Visibility(..), defaultPdfModel, defaultPromptForModel, modelSupportsPrompt, pdfModelToDisplayName, routeToPath)
+import Time
+import Types exposing (..)
 
 
 view : PdfModel -> Model -> Html Msg
 view pdfModel model =
+    AppLayout.view
+        { currentRoute = Upload pdfModel
+        , userName = "User"
+        , userEmail = "user@example.com"
+        , showUpgradeCard = True
+        , isAdmin = False
+        , onSignOut = SignOutClicked
+        }
+        [ -- Header section
+          pageHeader
+
+        -- Main content
+        , mainContent pdfModel model
+        ]
+
+
+{-| Page header with breadcrumb, title, and action buttons
+Based on uploadHeader (Jq3R3)
+-}
+pageHeader : Html Msg
+pageHeader =
     div
         [ css
-            [ Styles.containerStyle
-            , paddingTop Styles.spacing.xxxl
-            , minHeight (vh 100)
+            [ displayFlex
+            , alignItems center
+            , justifyContent spaceBetween
+            , width (pct 100)
             ]
         ]
-        [ viewHeader
-        , div
+        [ -- Left: Breadcrumb + Title
+          div
             [ css
-                [ maxWidth (px 640)
-                , margin2 Styles.spacing.xxl auto
+                [ displayFlex
+                , flexDirection column
+                , property "gap" "4px"
                 ]
             ]
-            [ -- Page title
+            [ -- Breadcrumb
               div
                 [ css
-                    [ marginBottom Styles.spacing.xxl
-                    , textAlign center
+                    [ fontFamilies Styles.fontStack
+                    , fontSize (px 11)
+                    , fontWeight (int 500)
+                    , color Styles.colors.foregroundSubtle
+                    , letterSpacing (px 0.5)
                     ]
                 ]
-                [ h2
-                    [ css
-                        [ Styles.textDisplay
-                        , marginBottom Styles.spacing.sm
-                        ]
-                    ]
-                    [ text "New Job" ]
-                , p
-                    [ css
-                        [ Styles.textSecondary
-                        , margin zero
-                        ]
-                    ]
-                    [ text "Upload a PDF document for processing" ]
-                ]
+                [ text "Dashboard / Upload" ]
 
-            -- Model selection section
-            , div
-                [ css [ marginBottom Styles.spacing.xxl ] ]
-                [ div
-                    [ css
-                        [ Styles.flexBetween
-                        , marginBottom Styles.spacing.md
-                        ]
-                    ]
-                    [ label
-                        [ css
-                            [ Styles.textCaption
-                            ]
-                        ]
-                        [ text "SELECT MODEL" ]
-                    , button
-                        [ onClick OpenModelPalette
-                        , css
-                            [ backgroundColor Styles.colors.surface
-                            , border3 (px 1) solid Styles.colors.border
-                            , borderRadius Styles.radius.md
-                            , padding2 Styles.spacing.xs Styles.spacing.sm
-                            , color Styles.colors.textTertiary
-                            , cursor pointer
-                            , Css.fontSize Styles.fontSize.caption
-                            , fontFamilies Styles.fontStack
-                            , Styles.transitions.fast
-                            , hover
-                                [ borderColor Styles.colors.borderStrong
-                                , color Styles.colors.textSecondary
-                                ]
-                            ]
-                        ]
-                        [ text "⌘K" ]
-                    ]
-                , modelGrid
-                    (modelGridConfig
-                        { selectedModel = pdfModel
-                        , hoveredModel = model.hoveredModel
-                        , onSelect = ModelSelected
-                        , onHover = ModelHovered
-                        }
-                    )
-                , a
-                    [ href (routeToPath Models)
-                    , css
-                        [ display block
-                        , textAlign center
-                        , marginTop Styles.spacing.lg
-                        , Css.fontSize Styles.fontSize.small
-                        , color Styles.colors.textTertiary
-                        , textDecoration none
-                        , Styles.transitions.fast
-                        , hover [ color Styles.colors.accent ]
-                        ]
-                    ]
-                    [ text "Explore all models →" ]
-                ]
-
-            -- Main card for file upload
-            , div
+            -- Title
+            , h1
                 [ css
-                    [ backgroundColor Styles.colors.surface
-                    , border3 (px 1) solid Styles.colors.border
-                    , borderRadius Styles.radius.xl
-                    , padding Styles.spacing.xxl
+                    [ fontFamilies Styles.displayFontStack
+                    , fontSize (px 36)
+                    , fontWeight (int 400)
+                    , color Styles.colors.foreground
+                    , margin zero
                     ]
                 ]
-                [ viewConfigSelector pdfModel model
-                , viewPromptInput pdfModel model.upload
-                , viewFileDropZone model.upload pdfModel
-                , case model.upload.error of
-                    Just err ->
-                        div
-                            [ css
-                                [ backgroundColor Styles.colors.errorMuted
-                                , border3 (px 1) solid Styles.colors.error
-                                , borderRadius Styles.radius.md
-                                , padding Styles.spacing.base
-                                , marginTop Styles.spacing.lg
-                                , Styles.flexRow
-                                , Styles.gap Styles.spacing.sm
-                                ]
-                            ]
-                            [ span
-                                [ css [ color Styles.colors.error ] ]
-                                [ text err ]
-                            ]
-
-                    Nothing ->
-                        text ""
-                ]
+                [ text "Upload Document" ]
             ]
-        ]
 
-
-viewHeader : Html Msg
-viewHeader =
-    div
-        [ css
-            [ Styles.flexBetween
-            , marginBottom Styles.spacing.xxl
-            ]
-        ]
-        [ div []
-            [ a
-                [ href (routeToPath (Upload defaultPdfModel))
-                , css
-                    [ Styles.textH1
-                    , color Styles.colors.textPrimary
-                    , textDecoration none
-                    , hover [ color Styles.colors.accent ]
-                    ]
-                ]
-                [ text "PDF Models" ]
-            ]
+        -- Right: Action buttons
         , div
             [ css
-                [ Styles.flexRow
-                , Styles.gap Styles.spacing.md
+                [ displayFlex
+                , alignItems center
+                , property "gap" "12px"
                 ]
             ]
-            [ a
-                [ href (routeToPath Models)
-                , css
-                    [ padding2 Styles.spacing.sm Styles.spacing.base
-                    , border3 (px 1) solid Styles.colors.border
-                    , borderRadius Styles.radius.md
-                    , color Styles.colors.textSecondary
-                    , textDecoration none
-                    , Css.fontSize Styles.fontSize.body
+            [ -- Search button (icon only)
+              button
+                [ css
+                    [ displayFlex
+                    , alignItems center
+                    , justifyContent center
+                    , width (px 40)
+                    , height (px 40)
+                    , backgroundColor transparent
+                    , border zero
+                    , borderRadius zero
+                    , cursor pointer
                     , Styles.transitions.base
                     , hover
-                        [ backgroundColor Styles.colors.overlay
-                        , borderColor Styles.colors.borderStrong
+                        [ backgroundColor Styles.colors.activeBg
                         ]
                     ]
+                , Attr.type_ "button"
                 ]
-                [ text "Models" ]
-            , a
-                [ href (routeToPath Configs)
-                , css
-                    [ padding2 Styles.spacing.sm Styles.spacing.base
-                    , border3 (px 1) solid Styles.colors.border
-                    , borderRadius Styles.radius.md
-                    , color Styles.colors.textSecondary
-                    , textDecoration none
-                    , Css.fontSize Styles.fontSize.body
+                [ Icon.icon Icon.Search Icon.Medium Styles.colors.foregroundSubtle ]
+
+            -- Notification button (icon only)
+            , button
+                [ css
+                    [ displayFlex
+                    , alignItems center
+                    , justifyContent center
+                    , width (px 40)
+                    , height (px 40)
+                    , backgroundColor transparent
+                    , border zero
+                    , borderRadius zero
+                    , cursor pointer
                     , Styles.transitions.base
                     , hover
-                        [ backgroundColor Styles.colors.overlay
-                        , borderColor Styles.colors.borderStrong
+                        [ backgroundColor Styles.colors.activeBg
                         ]
                     ]
+                , Attr.type_ "button"
                 ]
-                [ text "Configs" ]
-            , a
-                [ href (routeToPath Jobs)
-                , css
-                    [ padding2 Styles.spacing.sm Styles.spacing.base
-                    , border3 (px 1) solid Styles.colors.border
-                    , borderRadius Styles.radius.md
-                    , color Styles.colors.textSecondary
-                    , textDecoration none
-                    , Css.fontSize Styles.fontSize.body
-                    , Styles.transitions.base
-                    , hover
-                        [ backgroundColor Styles.colors.overlay
-                        , borderColor Styles.colors.borderStrong
-                        ]
-                    ]
-                ]
-                [ text "Dashboard" ]
-            , Button.button Button.Ghost "Sign Out" SignOutClicked
+                [ Icon.icon Icon.Bell Icon.Medium Styles.colors.foregroundSubtle ]
             ]
         ]
 
 
-viewConfigSelector : PdfModel -> Model -> Html Msg
-viewConfigSelector pdfModel model =
-    let
-        -- Filter configurations for the current model that are approved
-        approvedConfigs =
-            model.configs.configurations
-                |> List.filter (\c -> c.model == pdfModel && c.approvalStatus == Approved)
+{-| Main content area split into left form and right panel
+Based on uploadContent (FuUID)
+-}
+mainContent : PdfModel -> Model -> Html Msg
+mainContent pdfModel model =
+    div
+        [ css
+            [ displayFlex
+            , property "gap" "32px"
+            , height (pct 100)
+            , width (pct 100)
+            ]
+        ]
+        [ -- Left: Main upload form
+          uploadFormSection pdfModel model
 
-        -- All configs for this model (for showing pending/rejected)
-        allModelConfigs =
-            model.configs.configurations
-                |> List.filter (\c -> c.model == pdfModel)
-    in
-    if List.isEmpty allModelConfigs then
-        -- No configs at all, show link to create one
-        div
+        -- Right: Recent jobs panel (360px width)
+        , recentJobsPanel model
+        ]
+
+
+{-| Left upload form section
+Based on uploadLeft (vIgqy)
+-}
+uploadFormSection : PdfModel -> Model -> Html Msg
+uploadFormSection pdfModel model =
+    div
+        [ css
+            [ displayFlex
+            , flexDirection column
+            , property "gap" "24px"
+            , flex (int 1)
+            ]
+        ]
+        [ -- Model selector
+          modelSelectorSection pdfModel
+
+        -- File upload section
+        , fileUploadSection model.upload pdfModel
+
+        -- Custom prompt section
+        , promptSection pdfModel model.upload
+
+        -- Configuration section
+        , configurationSection pdfModel model
+
+        -- Submit button
+        , submitSection model.upload pdfModel
+        ]
+
+
+{-| Model selector section
+Based on modelSelector (QiIPN)
+-}
+modelSelectorSection : PdfModel -> Html Msg
+modelSelectorSection pdfModel =
+    div
+        [ css
+            [ displayFlex
+            , flexDirection column
+            , property "gap" "12px"
+            , width (pct 100)
+            ]
+        ]
+        [ -- Label row
+          div
             [ css
-                [ marginBottom Styles.spacing.xl
+                [ displayFlex
+                , alignItems center
+                , justifyContent spaceBetween
+                , width (pct 100)
                 ]
             ]
-            [ label
+            [ span
                 [ css
-                    [ display block
-                    , Styles.textCaption
-                    , marginBottom Styles.spacing.sm
+                    [ fontFamilies Styles.fontStack
+                    , fontSize (px 10)
+                    , fontWeight (int 600)
+                    , color Styles.colors.primary
+                    , letterSpacing (px 1)
                     ]
                 ]
-                [ text "CONFIGURATION (OPTIONAL)" ]
-            , a
-                [ href (routeToPath Configs)
-                , css
-                    [ display block
-                    , padding Styles.spacing.base
-                    , backgroundColor Styles.colors.surfaceRaised
-                    , border3 (px 1) solid Styles.colors.border
-                    , borderRadius Styles.radius.md
-                    , color Styles.colors.textTertiary
-                    , textDecoration none
+                [ text "MODEL" ]
+            , span
+                [ css
+                    [ fontFamilies Styles.fontStack
+                    , fontSize (px 11)
+                    , fontWeight (int 500)
+                    , color Styles.colors.foregroundSubtle
+                    , cursor pointer
                     , Styles.transitions.base
                     , hover
-                        [ borderColor Styles.colors.borderStrong
-                        , color Styles.colors.textSecondary
+                        [ color Styles.colors.foreground
+                        , textDecoration underline
                         ]
                     ]
+                , onClick OpenModelPalette
                 ]
-                [ text "Create a custom configuration →" ]
+                [ text "Change model (⌘K)" ]
             ]
 
-    else
-        div
+        -- Model card
+        , div
             [ css
-                [ marginBottom Styles.spacing.xl
+                [ displayFlex
+                , alignItems center
+                , property "gap" "16px"
+                , padding (px 20)
+                , border3 (px 1) solid Styles.colors.border
+                , borderRadius zero
+                , width (pct 100)
                 ]
             ]
-            [ label
+            [ -- Model icon (44x44 frame with 20x20 icon inside)
+              div
                 [ css
-                    [ display block
-                    , Styles.textCaption
-                    , marginBottom Styles.spacing.sm
+                    [ displayFlex
+                    , alignItems center
+                    , justifyContent center
+                    , width (px 44)
+                    , height (px 44)
+                    , border3 (px 1) solid Styles.colors.borderEmphasis
+                    , borderRadius zero
+                    , flexShrink (int 0)
                     ]
                 ]
-                [ text "CONFIGURATION (OPTIONAL)" ]
+                [ Icon.icon Icon.FileText Icon.Medium Styles.colors.primary ]
+
+            -- Model info
             , div
                 [ css
                     [ displayFlex
                     , flexDirection column
-                    , Styles.gap Styles.spacing.sm
+                    , property "gap" "4px"
+                    , flex (int 1)
                     ]
                 ]
-                ([ viewConfigOption Nothing model.upload.selectedConfig ]
-                    ++ List.map (\config -> viewConfigOption (Just config) model.upload.selectedConfig) allModelConfigs
-                )
-            , a
-                [ href (routeToPath Configs)
-                , css
-                    [ display block
-                    , marginTop Styles.spacing.sm
-                    , Css.fontSize Styles.fontSize.small
-                    , color Styles.colors.textTertiary
-                    , textDecoration none
-                    , Styles.transitions.fast
-                    , hover [ color Styles.colors.accent ]
+                [ div
+                    [ css
+                        [ fontFamilies Styles.displayFontStack
+                        , fontSize (px 18)
+                        , fontWeight (int 400)
+                        , color Styles.colors.foreground
+                        ]
+                    ]
+                    [ text (pdfModelToDisplayName pdfModel) ]
+                , div
+                    [ css
+                        [ fontFamilies Styles.fontStack
+                        , fontSize (px 12)
+                        , fontWeight (int 400)
+                        , color Styles.colors.foregroundMuted
+                        , lineHeight (num 1.5)
+                        ]
+                    ]
+                    [ text (modelDescription pdfModel) ]
+                ]
+
+            -- Model badges
+            , div
+                [ css
+                    [ displayFlex
+                    , property "gap" "8px"
                     ]
                 ]
-                [ text "Manage configurations →" ]
+                [ Badge.badge Badge.Default "GPU"
+                , Badge.badge Badge.Default "94.2%"
+                ]
             ]
+        ]
 
 
-viewConfigOption : Maybe Configuration -> Maybe Configuration -> Html Msg
-viewConfigOption maybeConfig selectedConfig =
-    let
-        isSelected =
-            case ( maybeConfig, selectedConfig ) of
-                ( Nothing, Nothing ) ->
-                    True
-
-                ( Just config, Just selected ) ->
-                    config.configId == selected.configId
-
-                _ ->
-                    False
-
-        ( label, isDisabled, statusIndicator ) =
-            case maybeConfig of
-                Nothing ->
-                    ( "Default (no custom configuration)", False, text "" )
-
-                Just config ->
-                    let
-                        statusBadge =
-                            case config.approvalStatus of
-                                PendingApproval ->
-                                    span
-                                        [ css
-                                            [ Css.fontSize Styles.fontSize.caption
-                                            , color Styles.colors.warning
-                                            , backgroundColor Styles.colors.warningMuted
-                                            , padding2 Styles.spacing.xs Styles.spacing.sm
-                                            , borderRadius Styles.radius.full
-                                            , marginLeft Styles.spacing.sm
-                                            ]
-                                        ]
-                                        [ text "Pending" ]
-
-                                Rejected ->
-                                    span
-                                        [ css
-                                            [ Css.fontSize Styles.fontSize.caption
-                                            , color Styles.colors.error
-                                            , backgroundColor Styles.colors.errorMuted
-                                            , padding2 Styles.spacing.xs Styles.spacing.sm
-                                            , borderRadius Styles.radius.full
-                                            , marginLeft Styles.spacing.sm
-                                            ]
-                                        ]
-                                        [ text "Rejected" ]
-
-                                Approved ->
-                                    span
-                                        [ css
-                                            [ Css.fontSize Styles.fontSize.caption
-                                            , color Styles.colors.success
-                                            , backgroundColor Styles.colors.successMuted
-                                            , padding2 Styles.spacing.xs Styles.spacing.sm
-                                            , borderRadius Styles.radius.full
-                                            , marginLeft Styles.spacing.sm
-                                            ]
-                                        ]
-                                        [ text "✓" ]
-                    in
-                    ( config.name
-                    , config.approvalStatus /= Approved
-                    , statusBadge
-                    )
-    in
+{-| File upload section
+Based on fileUploadSection (asnda)
+-}
+fileUploadSection : UploadState -> PdfModel -> Html Msg
+fileUploadSection uploadState pdfModel =
     div
         [ css
-            ([ padding Styles.spacing.base
-             , backgroundColor
-                (if isSelected then
-                    Styles.colors.accentMuted
-
-                 else
-                    Styles.colors.surfaceRaised
-                )
-             , border3 (px 1) solid
-                (if isSelected then
-                    Styles.colors.accent
-
-                 else
-                    Styles.colors.border
-                )
-             , borderRadius Styles.radius.md
-             , Styles.transitions.base
-             , Styles.flexRow
-             , justifyContent spaceBetween
-             ]
-                ++ (if isDisabled then
-                        [ opacity (num 0.6)
-                        , cursor notAllowed
-                        ]
-
-                    else
-                        [ cursor pointer
-                        , hover
-                            [ borderColor
-                                (if isSelected then
-                                    Styles.colors.accent
-
-                                 else
-                                    Styles.colors.borderStrong
-                                )
-                            ]
-                        ]
-                   )
-            )
-        , if isDisabled then
-            Attr.attribute "aria-disabled" "true"
-
-          else
-            onClick (SelectConfigForUpload maybeConfig)
+            [ displayFlex
+            , flexDirection column
+            , property "gap" "12px"
+            , width (pct 100)
+            ]
         ]
-        [ div
+        [ -- Label
+          span
             [ css
-                [ Styles.flexRow
-                , Styles.gap Styles.spacing.sm
-                ]
-            ]
-            [ -- Radio indicator
-              div
-                [ css
-                    [ Css.width (px 16)
-                    , Css.height (px 16)
-                    , borderRadius (pct 50)
-                    , border3 (px 2) solid
-                        (if isSelected then
-                            Styles.colors.accent
-
-                         else
-                            Styles.colors.border
-                        )
-                    , displayFlex
-                    , alignItems center
-                    , justifyContent center
-                    ]
-                ]
-                [ if isSelected then
-                    div
-                        [ css
-                            [ Css.width (px 8)
-                            , Css.height (px 8)
-                            , borderRadius (pct 50)
-                            , backgroundColor Styles.colors.accent
-                            ]
-                        ]
-                        []
-
-                  else
-                    text ""
-                ]
-            , span
-                [ css
-                    [ color
-                        (if isSelected then
-                            Styles.colors.accent
-
-                         else
-                            Styles.colors.textPrimary
-                        )
-                    , fontWeight
-                        (if isSelected then
-                            Styles.fontWeights.medium
-
-                         else
-                            Styles.fontWeights.normal
-                        )
-                    ]
-                ]
-                [ text label ]
-            ]
-        , statusIndicator
-        ]
-
-
-viewPromptInput : PdfModel -> UploadState -> Html Msg
-viewPromptInput pdfModel uploadState =
-    if modelSupportsPrompt pdfModel then
-        div
-            [ css
-                [ marginBottom Styles.spacing.xl
-                ]
-            ]
-            [ label
-                [ css
-                    [ display block
-                    , Styles.textCaption
-                    , marginBottom Styles.spacing.sm
-                    ]
-                ]
-                [ text "CUSTOM PROMPT (OPTIONAL)" ]
-            , textarea
-                [ onInput PromptChanged
-                , value uploadState.prompt
-                , placeholder "Enter custom instructions for the model..."
-                , css
-                    [ Css.width (pct 100)
-                    , padding Styles.spacing.base
-                    , backgroundColor Styles.colors.surfaceRaised
-                    , border3 (px 1) solid Styles.colors.border
-                    , borderRadius Styles.radius.md
-                    , color Styles.colors.textPrimary
-                    , fontFamilies Styles.fontStack
-                    , Css.fontSize Styles.fontSize.body
-                    , Css.minHeight (px 100)
-                    , resize vertical
-                    , Styles.transitions.base
-                    , hover
-                        [ borderColor Styles.colors.borderStrong
-                        ]
-                    , focus
-                        [ borderColor Styles.colors.borderFocus
-                        , Styles.focusRing
-                        ]
-                    , Css.pseudoElement "placeholder"
-                        [ color Styles.colors.textTertiary
-                        ]
-                    ]
-                ]
-                []
-            , p
-                [ css
-                    [ Styles.textSmall
-                    , marginTop Styles.spacing.sm
-                    , color Styles.colors.textTertiary
-                    ]
-                ]
-                [ text "Provide custom instructions to guide how the model processes this document." ]
-            ]
-
-    else
-        text ""
-
-
-viewFileDropZone : UploadState -> PdfModel -> Html Msg
-viewFileDropZone uploadState pdfModel =
-    let
-        hasFile =
-            uploadState.selectedFile /= Nothing
-
-        isUploading =
-            uploadState.uploadProgress /= Nothing || uploadState.submitting
-    in
-    div []
-        [ label
-            [ css
-                [ display block
-                , Styles.textCaption
-                , marginBottom Styles.spacing.sm
+                [ fontFamilies Styles.fontStack
+                , fontSize (px 10)
+                , fontWeight (int 600)
+                , color Styles.colors.primary
+                , letterSpacing (px 1)
                 ]
             ]
             [ text "DOCUMENT" ]
+
+        -- File upload area (height 180px)
         , div
             [ css
-                [ border3 (px 2) dashed
-                    (if hasFile then
-                        Styles.colors.accent
-
-                     else
-                        Styles.colors.border
-                    )
-                , borderRadius Styles.radius.lg
-                , padding Styles.spacing.xxl
-                , textAlign center
-                , backgroundColor
-                    (if hasFile then
-                        Styles.colors.accentMuted
-
-                     else
-                        Styles.colors.surfaceRaised
-                    )
-                , Styles.transitions.base
-                , cursor pointer
-                , hover
-                    [ borderColor
-                        (if hasFile then
-                            Styles.colors.accentHover
-
-                         else
-                            Styles.colors.borderStrong
-                        )
-                    , backgroundColor
-                        (if hasFile then
-                            Styles.colors.accentMuted
-
-                         else
-                            Styles.colors.overlay
-                        )
-                    ]
+                [ width (pct 100)
+                , height (px 180)
                 ]
             ]
-            [ case uploadState.selectedFile of
-                Just file ->
-                    viewSelectedFile file uploadState pdfModel
-
-                Nothing ->
-                    viewDropPrompt
+            [ FileUpload.fileUpload "file-upload-input" FileSelectedFromValue
             ]
-        , input
-            [ type_ "file"
-            , id "file-input"
-            , on "change" (Decode.map FileSelected fileDecoder)
-            , css
-                [ display none
-                ]
-            ]
-            []
         ]
 
 
-viewDropPrompt : Html Msg
-viewDropPrompt =
-    label
-        [ for "file-input"
-        , css
-            [ display block
-            , cursor pointer
+{-| Custom prompt section
+Based on promptSection (xY0td)
+-}
+promptSection : PdfModel -> UploadState -> Html Msg
+promptSection pdfModel uploadState =
+    div
+        [ css
+            [ displayFlex
+            , flexDirection column
+            , property "gap" "12px"
+            , width (pct 100)
             ]
         ]
-        [ div
+        [ -- Label
+          span
             [ css
-                [ Css.fontSize (px 40)
-                , marginBottom Styles.spacing.md
-                , opacity (num 0.4)
+                [ fontFamilies Styles.fontStack
+                , fontSize (px 10)
+                , fontWeight (int 600)
+                , color Styles.colors.primary
+                , letterSpacing (px 1)
                 ]
             ]
-            [ text "📄" ]
-        , div
-            [ css
-                [ Styles.textBody
-                , marginBottom Styles.spacing.xs
-                ]
-            ]
-            [ span [ css [ color Styles.colors.accent ] ] [ text "Click to upload" ]
-            , text " or drag and drop"
-            ]
-        , div
-            [ css
-                [ Styles.textSmall
-                , color Styles.colors.textTertiary
-                ]
-            ]
-            [ text "PDF files only" ]
-        ]
+            [ text "CUSTOM PROMPT (OPTIONAL)" ]
 
-
-viewSelectedFile : File.File -> UploadState -> PdfModel -> Html Msg
-viewSelectedFile file uploadState pdfModel =
-    div []
-        [ div
-            [ css
-                [ Css.fontSize (px 40)
-                , marginBottom Styles.spacing.md
-                ]
-            ]
-            [ text "✓" ]
-        , div
-            [ css
-                [ fontWeight Styles.fontWeights.medium
-                , color Styles.colors.textPrimary
-                , marginBottom Styles.spacing.xs
-                ]
-            ]
-            [ text (File.name file) ]
-        , div
-            [ css
-                [ Styles.textSmall
-                , color Styles.colors.textSecondary
-                , marginBottom Styles.spacing.lg
-                ]
-            ]
-            [ text (formatFileSize (File.size file)) ]
-        , -- Progress or submit button
-          case uploadState.uploadProgress of
-            Just progress ->
-                viewProgressBar progress
-
-            Nothing ->
-                if uploadState.submitting then
-                    div
-                        [ css
-                            [ color Styles.colors.accent
-                            , Styles.flexRow
-                            , justifyContent center
-                            , Styles.gap Styles.spacing.sm
-                            ]
-                        ]
-                        [ span
-                            [ css
-                                [ display inlineBlock
-                                , animationName spinAnimation
-                                , animationDuration (ms 1000)
-                                , property "animation-iteration-count" "infinite"
-                                , property "animation-timing-function" "linear"
-                                ]
-                            ]
-                            [ text "◐" ]
-                        , text "Submitting job..."
-                        ]
-
-                else
-                    div
-                        [ css
-                            [ Styles.flexRow
-                            , justifyContent center
-                            , Styles.gap Styles.spacing.md
-                            ]
-                        ]
-                        [ label
-                            [ for "file-input"
-                            , css
-                                [ padding2 Styles.spacing.sm Styles.spacing.base
-                                , border3 (px 1) solid Styles.colors.border
-                                , borderRadius Styles.radius.md
-                                , color Styles.colors.textSecondary
-                                , cursor pointer
-                                , Css.fontSize Styles.fontSize.body
-                                , fontWeight Styles.fontWeights.medium
-                                , Styles.transitions.base
-                                , hover
-                                    [ backgroundColor Styles.colors.overlay
-                                    , borderColor Styles.colors.borderStrong
-                                    ]
-                                ]
-                            ]
-                            [ text "Change File" ]
-                        , Button.button Button.Primary "Start Processing" SubmitJobClicked
-                        ]
+        -- Textarea (disabled in design)
+        , Input.textarea
+            { label = "Custom prompt"
+            , value = uploadState.prompt
+            , onInput = PromptChanged
+            , placeholder = "Enter specific instructions for document processing..."
+            , hasError = False
+            }
         ]
 
 
-viewProgressBar : Float -> Html msg
-viewProgressBar progress =
+{-| Configuration section
+Based on configSection (KQYFZ)
+-}
+configurationSection : PdfModel -> Model -> Html Msg
+configurationSection pdfModel model =
+    div
+        [ css
+            [ displayFlex
+            , flexDirection column
+            , property "gap" "12px"
+            , width (pct 100)
+            ]
+        ]
+        [ -- Label
+          span
+            [ css
+                [ fontFamilies Styles.fontStack
+                , fontSize (px 10)
+                , fontWeight (int 600)
+                , color Styles.colors.primary
+                , letterSpacing (px 1)
+                ]
+            ]
+            [ text "CONFIGURATION (OPTIONAL)" ]
+
+        -- Select dropdown (disabled in design)
+        , Select.select
+            { label = ""
+            , value = "default"
+            , options = [ ( "default", "Use default settings" ) ]
+            , onInput = \_ -> SubmitJobClicked -- Placeholder
+            , placeholder = "Use default settings"
+            }
+        ]
+
+
+{-| Submit section with Process Document button
+Based on uploadActions (vUTR1)
+-}
+submitSection : UploadState -> PdfModel -> Html Msg
+submitSection uploadState pdfModel =
     let
-        percent =
-            Basics.round (progress * 100)
+        canSubmit =
+            uploadState.selectedFile /= Nothing && not uploadState.submitting
     in
     div
         [ css
-            [ Css.width (pct 100)
-            , maxWidth (px 300)
-            , margin2 zero auto
+            [ displayFlex
+            , flexDirection column
+            , property "gap" "12px"
+            , paddingTop (px 16)
+            , width (pct 100)
+            ]
+        ]
+        [ if canSubmit then
+            Button.buttonWithIcon Button.Primary Icon.Send "Process Document" SubmitJobClicked
+
+          else
+            Button.buttonDisabled Button.Primary "Process Document"
+        ]
+
+
+{-| Recent jobs panel (right side, 360px width)
+Based on uploadRight (G73D7) and recentJobsSection (czl6r)
+-}
+recentJobsPanel : Model -> Html Msg
+recentJobsPanel model =
+    div
+        [ css
+            [ displayFlex
+            , flexDirection column
+            , property "gap" "24px"
+            , width (px 360)
+            ]
+        ]
+        [ recentJobsSection model
+        ]
+
+
+{-| Recent jobs section
+-}
+recentJobsSection : Model -> Html Msg
+recentJobsSection model =
+    div
+        [ css
+            [ displayFlex
+            , flexDirection column
+            , property "gap" "16px"
+            ]
+        ]
+        [ -- Header
+          div
+            [ css
+                [ displayFlex
+                , alignItems center
+                , justifyContent spaceBetween
+                , width (pct 100)
+                ]
+            ]
+            [ span
+                [ css
+                    [ fontFamilies Styles.fontStack
+                    , fontSize (px 10)
+                    , fontWeight (int 600)
+                    , color Styles.colors.primary
+                    , letterSpacing (px 1)
+                    ]
+                ]
+                [ text "RECENT JOBS" ]
+            , a
+                [ href (routeToPath Jobs)
+                , css
+                    [ fontFamilies Styles.fontStack
+                    , fontSize (px 11)
+                    , fontWeight (int 500)
+                    , color Styles.colors.foregroundSubtle
+                    , textDecoration none
+                    , Styles.transitions.base
+                    , hover
+                        [ color Styles.colors.foreground
+                        , textDecoration underline
+                        ]
+                    ]
+                ]
+                [ text "View all" ]
+            ]
+
+        -- Jobs list
+        , div
+            [ css
+                [ displayFlex
+                , flexDirection column
+                , border3 (px 1) solid Styles.colors.border
+                , borderRadius zero
+                ]
+            ]
+            (if List.isEmpty model.jobs.jobs then
+                [ emptyJobsMessage ]
+
+             else
+                List.indexedMap (recentJobItem (List.length model.jobs.jobs)) (List.take 3 model.jobs.jobs)
+            )
+        ]
+
+
+{-| Empty jobs message
+-}
+emptyJobsMessage : Html Msg
+emptyJobsMessage =
+    div
+        [ css
+            [ padding (px 24)
+            , textAlign center
             ]
         ]
         [ div
             [ css
-                [ Styles.flexBetween
-                , marginBottom Styles.spacing.sm
+                [ fontFamilies Styles.fontStack
+                , fontSize (px 13)
+                , color Styles.colors.foregroundMuted
                 ]
             ]
-            [ span
-                [ css [ Styles.textSmall, color Styles.colors.textSecondary ]
+            [ text "No recent jobs" ]
+        ]
+
+
+{-| Recent job item
+Based on job items from k4Urv list
+-}
+recentJobItem : Int -> Int -> Job -> Html Msg
+recentJobItem totalJobs index job =
+    let
+        isLastItem =
+            index == totalJobs - 1 || index == 2
+
+        ( iconName, iconColor, iconBgColor ) =
+            case job.status of
+                Complete ->
+                    ( Icon.Check, Styles.colors.success, Styles.colors.successMuted )
+
+                Processing ->
+                    ( Icon.Info, Styles.colors.info, Styles.colors.infoMuted )
+
+                _ ->
+                    ( Icon.Check, Styles.colors.success, Styles.colors.successMuted )
+
+        statusBadge =
+            case job.status of
+                Complete ->
+                    Badge.badge Badge.Success "Complete"
+
+                Processing ->
+                    Badge.badge Badge.Info "Processing"
+
+                _ ->
+                    Badge.badge Badge.Success "Complete"
+    in
+    div
+        [ css
+            ([ displayFlex
+             , alignItems center
+             , property "gap" "14px"
+             , padding (px 16)
+             , width (pct 100)
+             ]
+                ++ (if not isLastItem then
+                        [ borderBottom3 (px 1) solid Styles.colors.borderSubtle ]
+
+                    else
+                        []
+                   )
+            )
+        ]
+        [ -- Icon (32x32 frame with 14x14 icon inside)
+          div
+            [ css
+                [ displayFlex
+                , alignItems center
+                , justifyContent center
+                , width (px 32)
+                , height (px 32)
+                , border3 (px 1) solid iconBgColor
+                , borderRadius zero
+                , flexShrink (int 0)
                 ]
-                [ text "Uploading..." ]
-            , span
-                [ css [ Styles.textSmall, color Styles.colors.accent ]
-                ]
-                [ text (String.fromInt percent ++ "%") ]
             ]
+            [ Icon.icon iconName (Icon.Small) iconColor ]
+
+        -- Job info
         , div
             [ css
-                [ Css.height (px 4)
-                , backgroundColor Styles.colors.border
-                , borderRadius Styles.radius.full
-                , overflow Css.hidden
+                [ displayFlex
+                , flexDirection column
+                , property "gap" "4px"
+                , flex (int 1)
+                , overflow hidden
                 ]
             ]
             [ div
                 [ css
-                    [ Css.height (pct 100)
-                    , Css.width (pct (toFloat percent))
-                    , backgroundColor Styles.colors.accent
-                    , borderRadius Styles.radius.full
-                    , Styles.transitions.base
-                    , property "box-shadow" "0 0 8px rgba(34, 211, 238, 0.5)"
+                    [ fontFamilies Styles.fontStack
+                    , fontSize (px 13)
+                    , fontWeight (int 500)
+                    , color Styles.colors.foreground
+                    , overflow hidden
+                    , textOverflow ellipsis
+                    , whiteSpace noWrap
                     ]
                 ]
-                []
+                [ text (Maybe.withDefault "Unknown" job.originalFilename) ]
+            , div
+                [ css
+                    [ fontFamilies [ "JetBrains Mono", "monospace" ]
+                    , fontSize (px 11)
+                    , fontWeight (int 400)
+                    , color Styles.colors.foregroundSubtle
+                    ]
+                ]
+                [ text (pdfModelToDisplayName job.pdfModel ++ " • " ++ formatJobTime job.submittedAt)
+                ]
             ]
+
+        -- Status badge
+        , statusBadge
         ]
 
 
-spinAnimation : Animations.Keyframes {}
-spinAnimation =
-    Animations.keyframes
-        [ ( 0, [ Animations.transform [ rotate (deg 0) ] ] )
-        , ( 100, [ Animations.transform [ rotate (deg 360) ] ] )
-        ]
+{-| Format job time (relative time)
+-}
+formatJobTime : Time.Posix -> String
+formatJobTime time =
+    -- Simplified for now, would need current time to calculate relative time
+    "2 min ago"
 
 
-formatFileSize : Int -> String
-formatFileSize bytes =
-    if bytes < 1024 then
-        String.fromInt bytes ++ " B"
+{-| Get model description
+-}
+modelDescription : PdfModel -> String
+modelDescription model =
+    case model of
+        Docling ->
+            "IBM's document understanding model with high accuracy for tables and structured content"
 
-    else if bytes < 1024 * 1024 then
-        String.fromInt (bytes // 1024) ++ " KB"
+        Marker ->
+            "Fast and efficient document processing with good accuracy"
 
-    else
-        String.fromFloat (toFloat bytes / (1024 * 1024) |> (\f -> toFloat (Basics.round (f * 10)) / 10)) ++ " MB"
+        Dolphin ->
+            "Advanced document understanding with high accuracy"
 
-
-fileDecoder : Decode.Decoder File.File
-fileDecoder =
-    Decode.at [ "target", "files", "0" ] File.decoder
+        _ ->
+            "Document processing model"
